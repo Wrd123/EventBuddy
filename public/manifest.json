@@ -1,0 +1,9 @@
+{
+    "short_name": "EventBuddy",
+    "name": "EventBuddy - Group Event Planner",
+    "icons": [],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#7c3aed",
+    "background_color": "#ffffff"
+  }
