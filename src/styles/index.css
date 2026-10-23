@@ -13,6 +13,12 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Track the visible viewport so the fixed footer isn't hidden behind
+   mobile browser toolbars; browsers without dvh keep height: 100% */
+#root {
+  height: 100dvh;
+}
+
 /* Custom styles for EventBuddy */
 .app-container {
   max-width: 480px;

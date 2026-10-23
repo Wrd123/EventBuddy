@@ -11,7 +11,7 @@ const Discover = () => {
     <div className="flex flex-col h-full">
       <Header title="Discover" />
       
-      <div className="flex-1 overflow-y-auto pb-16">
+      <div className="flex-1 overflow-y-auto">
         <SearchBar />
         
         <EventRecommendations events={suggestedEvents} />

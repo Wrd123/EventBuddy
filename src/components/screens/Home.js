@@ -34,7 +34,7 @@ const Home = () => {
     <div className="flex flex-col h-full">
       <Header title="EventBuddy" />
       
-      <div className="flex-1 overflow-y-auto pb-16">
+      <div className="flex-1 overflow-y-auto">
         {/* Welcome Section */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-800 text-white p-6">
           <h2 className="text-2xl font-bold mb-2">

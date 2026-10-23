@@ -16,7 +16,7 @@ const Groups = () => {
     <div className="flex flex-col h-full">
       <Header title="Your Groups" />
       
-      <div className="p-4 flex-1 overflow-y-auto pb-16">
+      <div className="p-4 flex-1 overflow-y-auto">
         <div className="flex justify-between mb-4">
           <h2 className="text-lg font-semibold">Active Groups</h2>
           <button className="text-purple-600 text-sm font-medium flex items-center">

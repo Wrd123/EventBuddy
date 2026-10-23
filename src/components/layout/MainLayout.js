@@ -34,7 +34,7 @@ const MainLayout = () => {
   // Render auth screens if not authenticated
   if (!isAuthenticated) {
     return (
-      <div className="w-full h-full max-w-md mx-auto bg-gray-100 overflow-hidden relative" style={{ maxHeight: '640px' }}>
+      <div className="w-full h-full max-w-md mx-auto bg-gray-100 overflow-hidden relative">
         {currentScreen === 'login' ? <Login /> : <Register />}
       </div>
     );
@@ -69,7 +69,7 @@ const MainLayout = () => {
   };
 
   return (
-    <div className="w-full h-full max-w-md mx-auto bg-gray-100 overflow-hidden relative" style={{ maxHeight: '640px' }}>
+    <div className="w-full h-full max-w-md mx-auto bg-gray-100 overflow-hidden relative">
       {renderScreen()}
       {/* Each screen renders its own Footer when it needs one */}
     </div>
@@ -78,7 +78,7 @@ const MainLayout = () => {
 
 // Loading screen component
 const LoadingScreen = () => (
-  <div className="w-full h-full max-w-md mx-auto bg-white flex items-center justify-center" style={{ maxHeight: '640px' }}>
+  <div className="w-full h-full max-w-md mx-auto bg-white flex items-center justify-center">
     <div className="text-center">
       <div className="animate-pulse text-3xl text-purple-600 font-bold mb-4">
         EventBuddy

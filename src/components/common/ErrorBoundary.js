@@ -29,7 +29,7 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       // You can render any custom fallback UI
       return (
-        <div className="w-full h-full max-w-md mx-auto bg-white flex items-center justify-center p-4" style={{ maxHeight: '640px' }}>
+        <div className="w-full h-full max-w-md mx-auto bg-white flex items-center justify-center p-4">
           <div className="text-center">
             <h2 className="text-2xl text-red-600 font-bold mb-4">Something went wrong</h2>
             <p className="mb-4 text-gray-700">We're sorry, an error occurred while rendering this screen.</p>

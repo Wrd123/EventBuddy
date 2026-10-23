@@ -6,7 +6,7 @@ const Footer = () => {
   const { navigateTo, currentScreen } = useAppContext();
 
   return (
-    <div className="fixed bottom-0 w-full bg-white border-t border-gray-200">
+    <div className="shrink-0 bg-white border-t border-gray-200">
       <nav className="flex justify-around p-3">
         <NavItem 
           Icon={Calendar} 
