@@ -2,9 +2,10 @@
 // validateEvent, Register's form rules), because the client can be bypassed
 // and the server is the real gatekeeper. Each returns the first problem as a
 // user-facing message, or '' if valid.
-const { ISO_DATE } = require('./models/Event');
+const { ISO_DATE, TIME } = require('./models/Event');
 
 const MAX_NAME_LENGTH = 60;
+const MAX_ACTIVITY_LENGTH = 80;
 const MIN_PASSWORD_LENGTH = 6;
 // bcrypt only uses the first 72 bytes of a password; longer ones would
 // silently match on just their prefix
@@ -45,6 +46,25 @@ const validateNewEvent = (fields, now = new Date()) => {
   return '';
 };
 
+// event: the event the item belongs to, for its date range.
+// Items can't run past midnight yet; the end must be after the start.
+const validateScheduleItem = ({ date, startTime, endTime, activity, location }, event) => {
+  if (!activity) return "Please enter what's happening.";
+  if (activity.length > MAX_ACTIVITY_LENGTH) {
+    return `Activity must be ${MAX_ACTIVITY_LENGTH} characters or fewer.`;
+  }
+  if (!isRealDate(date)) return 'Please choose a day.';
+  if (date < event.startDate || date > event.endDate) return 'Please choose a day during the event.';
+  if (!startTime) return 'Please choose a start time.';
+  if (!TIME.test(startTime)) return 'Please choose a valid start time.';
+  if (endTime && !TIME.test(endTime)) return 'Please choose a valid end time.';
+  if (endTime && endTime <= startTime) return 'The end time must be after the start time.';
+  if (location.length > MAX_ACTIVITY_LENGTH) {
+    return `Location must be ${MAX_ACTIVITY_LENGTH} characters or fewer.`;
+  }
+  return '';
+};
+
 const validateRegistration = ({ email, username, password }) => {
   if (!email || !EMAIL.test(email)) return 'Please enter a valid email address.';
   if (!username || !USERNAME.test(username)) {
@@ -66,6 +86,7 @@ module.exports = {
   earliestTodayAnywhere,
   validateEventFields,
   validateNewEvent,
+  validateScheduleItem,
   validateRegistration,
   text
 };

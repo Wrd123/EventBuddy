@@ -13,12 +13,28 @@ const memberSchema = new mongoose.Schema({
   color: { type: String, default: '#7c3aed' }
 });
 
+// Times are "HH:MM" (24-hour) strings: like ISO dates they sort and compare
+// correctly as text, and they mean wall-clock time at the event
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Who's going to a schedule item. Like members, an attendee is a registered
+// user or (for demo data, until friends are accounts) just a name.
+const attendeeSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    name: { type: String, required: true, trim: true }
+  },
+  { _id: false }
+);
+
 const scheduleItemSchema = new mongoose.Schema({
   date: { type: String, required: true, match: ISO_DATE },
-  time: { type: String, default: '' },
-  activity: { type: String, required: true, trim: true },
-  location: { type: String, default: '', trim: true },
-  attending: { type: Number, default: 0, min: 0 }
+  startTime: { type: String, required: true, match: TIME },
+  endTime: { type: String, default: '', match: [/^$|^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid end time'] },
+  activity: { type: String, required: true, trim: true, maxlength: 80 },
+  location: { type: String, default: '', trim: true, maxlength: 80 },
+  attendees: [attendeeSchema],
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 });
 
 const eventSchema = new mongoose.Schema(
@@ -53,3 +69,4 @@ eventSchema.set('toJSON', {
 
 module.exports = mongoose.model('Event', eventSchema);
 module.exports.ISO_DATE = ISO_DATE;
+module.exports.TIME = TIME;

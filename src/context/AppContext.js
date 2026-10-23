@@ -168,6 +168,31 @@ export const AppProvider = ({ children }) => {
     }
   };
   
+  // Replace an event in the list with a fresh copy from the server, or add it
+  // if the list doesn't have it yet (e.g. it was opened from a link)
+  const storeEvent = (updated) => {
+    setEvents(prev =>
+      prev.some(event => event._id === updated._id)
+        ? prev.map(event => (event._id === updated._id ? updated : event))
+        : [...prev, updated]
+    );
+    return updated;
+  };
+
+  // Schedule actions. Errors are thrown for the screen to show next to the
+  // form or button, rather than stored in the shared error state.
+  const addScheduleItem = async (eventId, item) =>
+    storeEvent(await eventService.addScheduleItem(eventId, item));
+
+  const updateScheduleItem = async (eventId, itemId, changes) =>
+    storeEvent(await eventService.updateScheduleItem(eventId, itemId, changes));
+
+  const deleteScheduleItem = async (eventId, itemId) =>
+    storeEvent(await eventService.deleteScheduleItem(eventId, itemId));
+
+  const setGoing = async (eventId, itemId, going) =>
+    storeEvent(await eventService.setGoing(eventId, itemId, going));
+
   // Clear any errors
   const clearError = () => {
     setError(null);
@@ -188,7 +213,11 @@ export const AppProvider = ({ children }) => {
     updateProfile,
     createEvent: createNewEvent,
     updateEvent: updateEventData,
-    deleteEvent: deleteEventData
+    deleteEvent: deleteEventData,
+    addScheduleItem,
+    updateScheduleItem,
+    deleteScheduleItem,
+    setGoing
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

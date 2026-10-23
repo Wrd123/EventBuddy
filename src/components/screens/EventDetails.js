@@ -6,6 +6,7 @@ import { Avatar, ScreenLoader } from '../common';
 import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
 import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay } from '../../utils/dates';
+import { formatTimeRange, sortSchedule } from '../../utils/schedule';
 
 const EventDetails = () => {
   const { eventId } = useParams();
@@ -95,7 +96,7 @@ const EventContent = ({ event }) => {
   // Preview one day: today while the event is running, else its first day.
   // The Schedule screen shows every day.
   const day = defaultScheduleDay(event);
-  const items = event.schedule.filter(item => item.date === day);
+  const items = sortSchedule(event.schedule.filter(item => item.date === day));
   const heading = getEventStatus(event) === 'ongoing' ? "Today's Schedule" : `Schedule · ${formatDay(day)}`;
 
   return (
@@ -124,7 +125,7 @@ const EventContent = ({ event }) => {
       {items.length > 0 ? (
         <div className="flex flex-col space-y-3">
           {items.map((item) => (
-            <ScheduleItem key={`${item.date}-${item.time}-${item.activity}`} item={item} />
+            <ScheduleItem key={item._id} item={item} />
           ))}
         </div>
       ) : (
@@ -138,12 +139,12 @@ const ScheduleItem = ({ item }) => (
   <div className="border border-gray-200 rounded-lg p-3">
     <div className="flex justify-between items-start">
       <div>
-        <div className="text-sm text-gray-500">{item.time}</div>
+        <div className="text-sm text-gray-500">{formatTimeRange(item.startTime, item.endTime)}</div>
         <div className="font-medium">{item.activity}</div>
         <div className="text-sm">{item.location}</div>
       </div>
-      <div className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs">
-        {item.attending} attending
+      <div className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs shrink-0 ml-2">
+        {item.attendees.length} going
       </div>
     </div>
   </div>

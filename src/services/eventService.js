@@ -27,3 +27,30 @@ export const updateEvent = (eventId, eventData) =>
 
 export const deleteEvent = (eventId) =>
   apiRequest(eventPath(eventId), { method: 'DELETE' });
+
+// Schedule items. Each call returns the whole updated event.
+const schedulePath = (eventId, itemId) =>
+  `${eventPath(eventId)}/schedule${itemId ? `/${encodeURIComponent(itemId)}` : ''}`;
+
+export const addScheduleItem = async (eventId, item) => {
+  const { event } = await apiRequest(schedulePath(eventId), { method: 'POST', body: item });
+  return event;
+};
+
+export const updateScheduleItem = async (eventId, itemId, changes) => {
+  const { event } = await apiRequest(schedulePath(eventId, itemId), { method: 'PATCH', body: changes });
+  return event;
+};
+
+export const deleteScheduleItem = async (eventId, itemId) => {
+  const { event } = await apiRequest(schedulePath(eventId, itemId), { method: 'DELETE' });
+  return event;
+};
+
+// going: true to join, false to leave
+export const setGoing = async (eventId, itemId, going) => {
+  const { event } = await apiRequest(`${schedulePath(eventId, itemId)}/going`, {
+    method: going ? 'PUT' : 'DELETE'
+  });
+  return event;
+};
