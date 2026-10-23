@@ -3,7 +3,6 @@
     "version": "0.1.0",
     "private": true,
     "dependencies": {
-        "axios": "^1.11.0",
         "lucide-react": "^0.263.1",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
@@ -11,9 +10,12 @@
         "react-scripts": "^5.0.1"
     },
     "scripts": {
+        "dev": "concurrently --names web,api --prefix-colors magenta,green \"npm start\" \"npm run server\"",
         "start": "react-scripts start",
+        "server": "npm --prefix server run dev",
         "build": "react-scripts build",
         "test": "react-scripts test",
+        "test:server": "npm --prefix server test",
         "eject": "react-scripts eject"
     },
     "eslintConfig": {
@@ -39,7 +41,9 @@
         "@testing-library/react": "^13.4.0",
         "@testing-library/user-event": "^13.5.0",
         "autoprefixer": "^10.4.14",
+        "concurrently": "^10.0.6",
         "postcss": "^8.4.24",
         "tailwindcss": "^3.3.2"
-    }
+    },
+    "proxy": "http://localhost:4000"
 }

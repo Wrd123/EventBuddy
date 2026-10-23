@@ -1,6 +1,7 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import * as authService from '../services/authService';
 import * as eventService from '../services/eventService';
+import { setUnauthorizedHandler } from '../services/api';
 
 // Create context
 const AppContext = createContext();
@@ -15,32 +16,48 @@ export const AppProvider = ({ children }) => {
   const [suggestedEvents, setSuggestedEvents] = useState([]);
   const [error, setError] = useState(null);
   
+  // Drop the session locally (no navigation; the router's guards react to it).
+  // Stable identity, since the effects below depend on it.
+  const clearSession = useCallback(() => {
+    authService.logout();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setEvents([]);
+    setSuggestedEvents([]);
+  }, []);
+
+  // If the server rejects our token mid-session (expired), log out
+  useEffect(() => {
+    setUnauthorizedHandler(clearSession);
+    return () => setUnauthorizedHandler(() => {});
+  }, [clearSession]);
+
   // Initialize authentication state
   useEffect(() => {
     const initAuth = async () => {
-      try {
-        // Check if user is logged in
-        const user = authService.getCurrentUser();
-        
-        if (user) {
-          setCurrentUser(user);
-          setIsAuthenticated(true);
-          
-          // Fetch latest user data from API
-          const profileData = await authService.getProfile();
-          setCurrentUser(profileData);
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        // Handle expired or invalid token
-        authService.logout();
-      } finally {
+      // Start from the cached user so the app opens instantly
+      const user = authService.getCurrentUser();
+      if (!user) {
         setIsLoading(false);
+        return;
+      }
+
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setIsLoading(false);
+
+      try {
+        // Refresh from the server, which also confirms the token is valid
+        setCurrentUser(await authService.getProfile());
+      } catch (error) {
+        // Only an explicit rejection ends the session. Offline or a server
+        // hiccup keeps the cached user, as phone apps do.
+        if (error.status === 401) clearSession();
       }
     };
-    
+
     initAuth();
-  }, []);
+  }, [clearSession]);
   
   // Fetch events when authenticated
   useEffect(() => {
@@ -94,11 +111,7 @@ export const AppProvider = ({ children }) => {
   };
   
   const logout = () => {
-    authService.logout();
-    setCurrentUser(null);
-    setIsAuthenticated(false);
-    setEvents([]);
-    setSuggestedEvents([]);
+    clearSession();
   };
   
   const updateProfile = async (profileData) => {

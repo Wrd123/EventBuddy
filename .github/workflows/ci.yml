@@ -10,7 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-and-build:
+  web:
+    name: Web app
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -19,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # npm ci installs exactly what package-lock.json lists and fails if it
@@ -33,3 +34,33 @@ jobs:
       # CI=true makes lint warnings fail the build
       - name: Build
         run: npm run build
+
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      # The tests run a real MongoDB in memory; keep its ~100MB download
+      # between runs
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test

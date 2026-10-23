@@ -1,70 +1,8 @@
-// Single source of mock fixtures. Services read from here so screens never
-// import fixtures directly once a feature has a service behind it.
-// Every record uses `_id` to match what a MongoDB-style API will return.
+// Mock fixtures for features that don't have a backend yet. Events and users
+// come from the API (server/src/seed/demoData.js holds the demo events).
+// Every record uses `_id` to match what the MongoDB API returns.
 
-// Events the current user belongs to (seed data for eventService)
-export const events = [
-  {
-    _id: '1',
-    name: "Summer Music Festival",
-    startDate: "2027-04-15",
-    endDate: "2027-04-18",
-    location: "Indio, CA",
-    description: "Annual summer music festival with top artists",
-    members: [
-      { _id: "user1", name: "Alex", color: "#3b82f6" },
-      { _id: "user2", name: "Taylor", color: "#10b981" },
-      { _id: "user3", name: "Jordan", color: "#8b5cf6" },
-      { _id: "user4", name: "Jamie", color: "#f59e0b" }
-    ],
-    schedule: [
-      { date: "2027-04-15", time: "2:00 PM - 3:30 PM", activity: "Arctic Monkeys", location: "Main Stage", attending: 4 },
-      { date: "2027-04-15", time: "4:00 PM - 5:00 PM", activity: "Tame Impala", location: "Sunset Stage", attending: 2 },
-      { date: "2027-04-16", time: "5:30 PM - 6:30 PM", activity: "Billie Eilish", location: "Main Stage", attending: 1 },
-      { date: "2027-04-17", time: "7:00 PM - 8:30 PM", activity: "The Strokes", location: "Desert Stage", attending: 0 }
-    ],
-    createdBy: 'user1',
-    createdAt: '2025-04-01T00:00:00Z'
-  },
-  {
-    _id: '2',
-    name: "Hiking Trip",
-    startDate: "2026-11-13",
-    endDate: "2026-11-15",
-    location: "Smoky Mountains",
-    description: "Weekend hiking adventure in the mountains",
-    members: [
-      { _id: "user1", name: "Alex", color: "#3b82f6" },
-      { _id: "user3", name: "Jordan", color: "#8b5cf6" },
-      { _id: "user5", name: "Casey", color: "#ec4899" }
-    ],
-    schedule: [
-      { date: "2026-11-14", time: "9:00 AM - 12:00 PM", activity: "Morning Hike", location: "Trail Head", attending: 3 },
-      { date: "2026-11-14", time: "1:00 PM - 3:00 PM", activity: "Lunch Break", location: "Summit", attending: 3 }
-    ],
-    createdBy: 'user1',
-    createdAt: '2025-04-05T00:00:00Z'
-  },
-  {
-    _id: '9',
-    name: "Beach Day",
-    startDate: "2026-08-08",
-    endDate: "2026-08-08",
-    location: "Tybee Island, GA",
-    description: "Day trip to the beach",
-    members: [
-      { _id: "user2", name: "Taylor", color: "#10b981" },
-      { _id: "user4", name: "Jamie", color: "#f59e0b" }
-    ],
-    schedule: [
-      { date: "2026-08-08", time: "10:00 AM - 4:00 PM", activity: "Beach", location: "North Beach", attending: 2 }
-    ],
-    createdBy: 'user2',
-    createdAt: '2026-07-20T00:00:00Z'
-  }
-];
-
-// Suggested events (seed data for eventService)
+// Suggested events (eventService.getSuggestedEvents; discovery has no backend yet)
 export const suggestedEvents = [
   { _id: '3', name: "Coachella 2027", startDate: "2027-04-09", endDate: "2027-04-18", location: "Indio, CA" },
   { _id: '4', name: "Lollapalooza", startDate: "2027-07-29", endDate: "2027-08-01", location: "Chicago, IL" },
@@ -124,7 +62,7 @@ export const groups = [
     name: "Festival Squad",
     memberCount: 4,
     eventName: "Summer Music Festival",
-    eventId: '1',
+    eventId: '000000000000000000000001',
     icon: "Music",
     color: "purple",
     notifications: 3,
@@ -135,7 +73,7 @@ export const groups = [
     name: "Hiking Crew",
     memberCount: 5,
     eventName: "Smoky Mountains Trip",
-    eventId: '2',
+    eventId: '000000000000000000000002',
     icon: "Map",
     color: "blue",
     notifications: 0,

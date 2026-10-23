@@ -9,11 +9,14 @@ import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay } from '
 
 const EventDetails = () => {
   const { eventId } = useParams();
-  const { event, status } = useEvent(eventId);
+  const { event, status, error } = useEvent(eventId);
 
   if (status === 'loading') return <ScreenLoader />;
   if (status === 'not-found') {
     return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
+  }
+  if (status === 'error') {
+    return <NotFound title="Couldn't load event" message={error} />;
   }
 
   return (

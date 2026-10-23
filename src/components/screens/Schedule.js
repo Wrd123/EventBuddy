@@ -9,7 +9,7 @@ import { eachDay, formatDay, defaultScheduleDay } from '../../utils/dates';
 
 const Schedule = () => {
   const { eventId } = useParams();
-  const { event, status } = useEvent(eventId);
+  const { event, status, error } = useEvent(eventId);
   // null until the user picks a tab; until then show the default day.
   // Derived rather than initial state, since the event may still be loading.
   const [chosenDay, setChosenDay] = useState(null);
@@ -17,6 +17,9 @@ const Schedule = () => {
   if (status === 'loading') return <ScreenLoader />;
   if (status === 'not-found') {
     return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
+  }
+  if (status === 'error') {
+    return <NotFound title="Couldn't load event" message={error} />;
   }
 
   const activeDay = chosenDay ?? defaultScheduleDay(event);

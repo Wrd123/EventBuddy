@@ -1,97 +1,47 @@
 import * as eventService from './eventService';
-import * as authService from './authService';
 
-// The mock services wait on setTimeout to simulate network latency.
-// Calling the function schedules that timer synchronously, so we can
-// flush it immediately with fake timers instead of really waiting.
-const run = (call) => {
-  const promise = call();
-  jest.runAllTimers();
-  return promise;
-};
-
-const logIn = () => run(() => authService.login({ email: 'user@example.com', password: 'password' }));
-
-const newEvent = {
-  name: 'Friendsgiving',
-  type: 'outdoor',
-  startDate: '2026-11-27',
-  endDate: '2026-11-29',
-  location: 'Atlanta, GA',
-  invitedFriends: ['Alex', 'Taylor']
-};
+// The server's own tests cover event rules (validation, creator, access).
+// These check the client calls the right endpoints and unwraps responses.
+const respond = (status, body) => ({ ok: status < 400, status, json: () => Promise.resolve(body) });
 
 beforeEach(() => {
   localStorage.clear();
-  jest.useFakeTimers();
+  global.fetch = jest.fn();
 });
 
-afterEach(() => {
-  jest.useRealTimers();
-});
+const lastRequest = () => {
+  const [url, options] = global.fetch.mock.calls[global.fetch.mock.calls.length - 1];
+  return { url, ...options };
+};
 
-describe('createEvent', () => {
-  it('adds the logged-in user as the first member', async () => {
-    const { user } = await logIn();
-    const { event } = await run(() => eventService.createEvent(newEvent));
+describe('eventService', () => {
+  it('getUserEvents returns the events array', async () => {
+    global.fetch.mockResolvedValue(respond(200, { events: [{ _id: '1' }] }));
 
-    expect(event.members[0]).toEqual({ _id: user._id, name: user.name, color: '#7c3aed' });
+    expect(await eventService.getUserEvents()).toEqual([{ _id: '1' }]);
+    expect(lastRequest().url).toBe('/api/events');
   });
 
-  it('sets createdBy to the logged-in user', async () => {
-    const { user } = await logIn();
-    const { event } = await run(() => eventService.createEvent(newEvent));
+  it('getEventById URL-encodes the id and returns the event', async () => {
+    global.fetch.mockResolvedValue(respond(200, { event: { _id: 'a/b' } }));
 
-    expect(event.createdBy).toBe(user._id);
+    expect(await eventService.getEventById('a/b')).toEqual({ _id: 'a/b' });
+    expect(lastRequest().url).toBe('/api/events/a%2Fb');
   });
 
-  it('adds invited friends after the creator, in order, with unique ids', async () => {
-    await logIn();
-    const { event } = await run(() => eventService.createEvent(newEvent));
+  it('createEvent posts the event and returns { event }', async () => {
+    global.fetch.mockResolvedValue(respond(201, { event: { _id: '9', name: 'Party' } }));
 
-    expect(event.members.map(m => m.name)).toEqual(['John Doe', 'Alex', 'Taylor']);
-    const ids = event.members.map(m => m._id);
-    expect(new Set(ids).size).toBe(ids.length);
+    const result = await eventService.createEvent({ name: 'Party' });
+
+    expect(result).toEqual({ event: { _id: '9', name: 'Party' } });
+    expect(lastRequest()).toMatchObject({ url: '/api/events', method: 'POST', body: '{"name":"Party"}' });
   });
 
-  it('makes the creator the only member when nobody is invited', async () => {
-    await logIn();
-    const { event } = await run(() => eventService.createEvent({ ...newEvent, invitedFriends: undefined }));
+  it('deleteEvent sends DELETE', async () => {
+    global.fetch.mockResolvedValue(respond(204));
 
-    expect(event.members).toHaveLength(1);
-  });
-
-  it('keeps the submitted fields and starts with an empty schedule', async () => {
-    await logIn();
-    const { event } = await run(() => eventService.createEvent(newEvent));
-
-    expect(event).toMatchObject({
-      name: 'Friendsgiving',
-      type: 'outdoor',
-      startDate: '2026-11-27',
-      endDate: '2026-11-29',
-      location: 'Atlanta, GA',
-      schedule: []
-    });
-  });
-
-  it('saves the event so getUserEvents returns it', async () => {
-    await logIn();
-    const before = await run(() => eventService.getUserEvents());
-    const { event } = await run(() => eventService.createEvent(newEvent));
-    const after = await run(() => eventService.getUserEvents());
-
-    expect(after).toHaveLength(before.length + 1);
-    expect(after).toContainEqual(event);
-  });
-
-  it('throws and saves nothing when nobody is logged in', async () => {
-    const before = await run(() => eventService.getUserEvents());
-
-    await expect(run(() => eventService.createEvent(newEvent)))
-      .rejects.toThrow('You need to be logged in to create an event.');
-
-    const after = await run(() => eventService.getUserEvents());
-    expect(after).toHaveLength(before.length);
+    await eventService.deleteEvent('9');
+    expect(lastRequest()).toMatchObject({ url: '/api/events/9', method: 'DELETE' });
   });
 });

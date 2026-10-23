@@ -2,26 +2,16 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import * as authService from '../../services/authService';
+import { installFakeApi } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from './MainLayout';
 
-// The mock services wait on setTimeout to simulate network latency. With fake
-// timers, Testing Library's find* queries advance the clock while they wait.
+let fakeApi;
+
 beforeEach(() => {
   localStorage.clear();
-  jest.useFakeTimers();
+  fakeApi = installFakeApi();
 });
-
-afterEach(() => {
-  jest.useRealTimers();
-});
-
-const logIn = async () => {
-  const promise = authService.login({ email: 'user@example.com', password: 'password' });
-  jest.runAllTimers();
-  await promise;
-};
 
 // Start the app at a URL, as if opened from a link or after a refresh
 const renderAt = (path) =>
@@ -33,9 +23,7 @@ const renderAt = (path) =>
     </MemoryRouter>
   );
 
-// Timeouts are in fake time, so a generous one costs nothing. Logging in
-// (1000ms) and then loading the event (300ms) exceeds the 1000ms default.
-const eventTitle = (name) => screen.findByRole('heading', { level: 1, name }, { timeout: 5000 });
+const screenTitle = (name) => screen.findByRole('heading', { level: 1, name });
 
 describe('routing', () => {
   it('sends logged-out users to the login screen', async () => {
@@ -45,35 +33,43 @@ describe('routing', () => {
   });
 
   it('opens an event straight from its URL', async () => {
-    await logIn();
+    fakeApi.logIn();
     renderAt('/events/1');
 
-    expect(await eventTitle('Summer Music Festival')).toBeInTheDocument();
+    expect(await screenTitle('Summer Music Festival')).toBeInTheDocument();
   });
 
   it('opens a sub-screen straight from its URL', async () => {
-    await logIn();
+    fakeApi.logIn();
     renderAt('/events/1/schedule');
 
     expect(await screen.findByText('Arctic Monkeys')).toBeInTheDocument();
   });
 
   it('shows Event not found for an unknown event id', async () => {
-    await logIn();
+    fakeApi.logIn();
     renderAt('/events/does-not-exist');
 
-    expect(await eventTitle('Event not found')).toBeInTheDocument();
+    expect(await screenTitle('Event not found')).toBeInTheDocument();
+  });
+
+  it("shows Couldn't load event when the server is unreachable", async () => {
+    fakeApi.logIn();
+    global.fetch.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
+    renderAt('/events/1');
+
+    expect(await screenTitle("Couldn't load event")).toBeInTheDocument();
   });
 
   it('shows Page not found for an unknown URL', async () => {
-    await logIn();
+    fakeApi.logIn();
     renderAt('/no-such-page');
 
-    expect(await eventTitle('Page not found')).toBeInTheDocument();
+    expect(await screenTitle('Page not found')).toBeInTheDocument();
   });
 
   it('sends logged-in users away from the login screen', async () => {
-    await logIn();
+    fakeApi.logIn();
     renderAt('/login');
 
     expect(await screen.findByText('Your Events')).toBeInTheDocument();
@@ -90,6 +86,30 @@ describe('routing', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Login' }));
 
-    expect(await eventTitle('Hiking Trip')).toBeInTheDocument();
+    expect(await screenTitle('Hiking Trip')).toBeInTheDocument();
+  });
+
+  it("shows the server's message for a wrong password", async () => {
+    renderAt('/login');
+
+    fireEvent.change(await screen.findByPlaceholderText('your@email.com'), {
+      target: { value: 'user@example.com' }
+    });
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), {
+      target: { value: 'wrong' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+    expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
+  });
+
+  it('logs out when the server rejects a saved login', async () => {
+    // A token from a previous session that the server no longer accepts
+    localStorage.setItem('eventbuddy_token', 'expired-token');
+    localStorage.setItem('eventbuddy_user', JSON.stringify({ name: 'John Doe' }));
+    renderAt('/');
+
+    expect(await screen.findByText("Don't have an account?")).toBeInTheDocument();
+    expect(localStorage.getItem('eventbuddy_token')).toBeNull();
   });
 });

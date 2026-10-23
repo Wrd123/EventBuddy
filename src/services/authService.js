@@ -1,60 +1,28 @@
-// Mock authentication service
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// Authentication against the EventBuddy API. The login token and a copy of
+// the user are kept in localStorage so the app opens logged in.
+import { apiRequest, TOKEN_KEY } from './api';
 
-// Mock user data
-const mockUser = {
-  _id: '1',
-  email: 'user@example.com',
-  name: 'John Doe',
-  avatar: null,
-  createdAt: new Date().toISOString()
-};
-
-// Simulate localStorage for token
-const TOKEN_KEY = 'eventbuddy_token';
 const USER_KEY = 'eventbuddy_user';
 
+const saveSession = ({ token, user }) => {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+};
+
+const saveUser = (user) => {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+};
+
 export const login = async (credentials) => {
-  await delay(1000); // Simulate network delay
-  
-  // Mock login validation
-  if (credentials.email === 'user@example.com' && credentials.password === 'password') {
-    const token = 'mock-jwt-token-' + Date.now();
-    const user = { ...mockUser, email: credentials.email };
-    
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-    
-    return {
-      token,
-      user,
-      message: 'Login successful'
-    };
-  } else {
-    throw new Error('Invalid email or password');
-  }
+  const data = await apiRequest('/auth/login', { method: 'POST', body: credentials });
+  saveSession(data);
+  return data;
 };
 
 export const register = async (userData) => {
-  await delay(1000); // Simulate network delay
-  
-  // Mock registration
-  const token = 'mock-jwt-token-' + Date.now();
-  const user = {
-    ...mockUser,
-    _id: Date.now().toString(),
-    email: userData.email,
-    name: userData.name || userData.firstName + ' ' + userData.lastName
-  };
-  
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-  
-  return {
-    token,
-    user,
-    message: 'Registration successful'
-  };
+  const data = await apiRequest('/auth/register', { method: 'POST', body: userData });
+  saveSession(data);
+  return data;
 };
 
 export const logout = () => {
@@ -62,36 +30,28 @@ export const logout = () => {
   localStorage.removeItem(USER_KEY);
 };
 
+// The cached user, for an instant start before the server answers.
+// Without a token the cached user is meaningless.
 export const getCurrentUser = () => {
-  const userStr = localStorage.getItem(USER_KEY);
-  return userStr ? JSON.parse(userStr) : null;
+  if (!localStorage.getItem(TOKEN_KEY)) return null;
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY));
+  } catch {
+    return null;
+  }
 };
 
+// Fresh user from the server; also checks the token is still valid
 export const getProfile = async () => {
-  await delay(500);
-  const user = getCurrentUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const { user } = await apiRequest('/auth/me');
+  saveUser(user);
   return user;
 };
 
 export const updateProfile = async (profileData) => {
-  await delay(500);
-  const user = getCurrentUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
-  
-  const updatedUser = { ...user, ...profileData };
-  localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
-  
-  return {
-    user: updatedUser,
-    message: 'Profile updated successfully'
-  };
+  const data = await apiRequest('/auth/me', { method: 'PATCH', body: profileData });
+  saveUser(data.user);
+  return data;
 };
 
-export const isAuthenticated = () => {
-  return !!localStorage.getItem(TOKEN_KEY);
-};
+export const isAuthenticated = () => !!localStorage.getItem(TOKEN_KEY);
