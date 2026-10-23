@@ -73,3 +73,28 @@ export const resetInviteLink = async (eventId) => {
   const { event } = await apiRequest(`${eventPath(eventId)}/invite/reset`, { method: 'POST' });
   return event;
 };
+
+// Money. getLedger returns { expenses, payments } for an event.
+const expensePath = (eventId, expenseId) =>
+  `${eventPath(eventId)}/expenses${expenseId ? `/${encodeURIComponent(expenseId)}` : ''}`;
+const paymentPath = (eventId, paymentId) =>
+  `${eventPath(eventId)}/payments${paymentId ? `/${encodeURIComponent(paymentId)}` : ''}`;
+
+export const getLedger = (eventId) => apiRequest(expensePath(eventId));
+
+// expense: { description, amountCents, date, paidBy, splitType, shares: [{ user, amountCents }] }
+export const addExpense = async (eventId, expense) =>
+  (await apiRequest(expensePath(eventId), { method: 'POST', body: expense })).expense;
+
+export const updateExpense = async (eventId, expenseId, expense) =>
+  (await apiRequest(expensePath(eventId, expenseId), { method: 'PATCH', body: expense })).expense;
+
+export const deleteExpense = (eventId, expenseId) =>
+  apiRequest(expensePath(eventId, expenseId), { method: 'DELETE' });
+
+// payment: { from, to, amountCents, date }
+export const recordPayment = async (eventId, payment) =>
+  (await apiRequest(paymentPath(eventId), { method: 'POST', body: payment })).payment;
+
+export const deletePayment = (eventId, paymentId) =>
+  apiRequest(paymentPath(eventId, paymentId), { method: 'DELETE' });

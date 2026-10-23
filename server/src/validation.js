@@ -3,6 +3,7 @@
 // and the server is the real gatekeeper. Each returns the first problem as a
 // user-facing message, or '' if valid.
 const { ISO_DATE, TIME } = require('./models/Event');
+const { MAX_CENTS } = require('./models/Expense');
 
 const MAX_NAME_LENGTH = 60;
 const MAX_ACTIVITY_LENGTH = 80;
@@ -65,6 +66,54 @@ const validateScheduleItem = ({ date, startTime, endTime, activity, location }, 
   return '';
 };
 
+const OBJECT_ID = /^[0-9a-f]{24}$/;
+
+// Whether a user id (as sent by the client) belongs to a member of the event
+const isMember = (event, userId) =>
+  typeof userId === 'string' && OBJECT_ID.test(userId) && event.members.some((m) => m.user.equals(userId));
+
+const validateCents = (cents, what) => {
+  if (!Number.isInteger(cents) || cents <= 0) return `Please enter ${what} over $0.`;
+  if (cents > MAX_CENTS) return 'That amount is too large.';
+  return '';
+};
+
+// shares: [{ user, amountCents }]. They must cover exactly the total, so the
+// group's balances always add up to zero.
+const validateExpense = ({ description, amountCents, date, paidBy, splitType, shares }, event) => {
+  if (!description) return 'Please describe the expense.';
+  if (description.length > MAX_ACTIVITY_LENGTH) return `Description must be ${MAX_ACTIVITY_LENGTH} characters or fewer.`;
+  const amountError = validateCents(amountCents, 'an amount');
+  if (amountError) return amountError;
+  if (!isRealDate(date)) return 'Please choose a date.';
+  if (!isMember(event, paidBy)) return 'The person who paid must be in the event.';
+  if (!['equal', 'exact'].includes(splitType)) return 'Please choose how to split it.';
+  if (!Array.isArray(shares) || shares.length === 0) return 'Please choose who to split it with.';
+
+  const seen = new Set();
+  let total = 0;
+  for (const share of shares) {
+    if (!share || !isMember(event, share.user)) return 'Everyone in the split must be in the event.';
+    if (seen.has(share.user)) return 'Each person can only appear once in the split.';
+    seen.add(share.user);
+    if (!Number.isInteger(share.amountCents) || share.amountCents < 0) return 'Split amounts must be $0 or more.';
+    total += share.amountCents;
+  }
+  if (total !== amountCents) return 'The split must add up to the total.';
+  return '';
+};
+
+// me: the logged-in user, who must be one side of the payment
+const validatePayment = ({ from, to, amountCents, date }, event, me) => {
+  if (!isMember(event, from) || !isMember(event, to)) return 'Both people must be in the event.';
+  if (from === to) return 'A payment needs two different people.';
+  if (!me._id.equals(from) && !me._id.equals(to)) return 'You can only record payments you made or received.';
+  const amountError = validateCents(amountCents, 'an amount');
+  if (amountError) return amountError;
+  if (!isRealDate(date)) return 'Please choose a date.';
+  return '';
+};
+
 const validateRegistration = ({ email, username, password }) => {
   if (!email || !EMAIL.test(email)) return 'Please enter a valid email address.';
   if (!username || !USERNAME.test(username)) {
@@ -87,6 +136,9 @@ module.exports = {
   validateEventFields,
   validateNewEvent,
   validateScheduleItem,
+  validateExpense,
+  validatePayment,
+  isMember,
   validateRegistration,
   text
 };

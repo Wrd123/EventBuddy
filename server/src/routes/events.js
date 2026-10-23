@@ -7,10 +7,16 @@ const { HttpError } = require('../errors');
 const { validateEventFields, validateNewEvent, text } = require('../validation');
 const { visibleTo, findVisibleEvent, findOwnEvent } = require('../eventAccess');
 const scheduleRoutes = require('./schedule');
+const { expenses: expenseRoutes, payments: paymentRoutes } = require('./expenses');
+const Expense = require('../models/Expense');
+const Payment = require('../models/Payment');
+const { MAX_CENTS } = require('../models/Expense');
 
 const router = express.Router();
 router.use(requireAuth);
 router.use('/:id/schedule', scheduleRoutes);
+router.use('/:id/expenses', expenseRoutes);
+router.use('/:id/payments', paymentRoutes);
 
 router.get('/', async (req, res) => {
   const events = await Event.find(visibleTo(req.user)).sort({ startDate: 1 });
@@ -58,6 +64,15 @@ router.patch('/:id', async (req, res) => {
     }
   }
 
+  // Whole cents, or null to remove the budget
+  if ('budgetCents' in req.body) {
+    const budget = req.body.budgetCents;
+    if (budget !== null && (!Number.isInteger(budget) || budget < 0 || budget > MAX_CENTS)) {
+      throw new HttpError(400, 'Please enter a budget between $0 and $100,000.');
+    }
+    event.budgetCents = budget;
+  }
+
   // An event that already started can still be edited, so the "not in the
   // past" rule only applies when the start date itself changes
   const error = event.isModified('startDate')
@@ -80,7 +95,12 @@ router.post('/:id/invite/reset', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const event = await findOwnEvent(req.params.id, req.user);
-  await event.deleteOne();
+  // Its money records go with it
+  await Promise.all([
+    Expense.deleteMany({ event: event._id }),
+    Payment.deleteMany({ event: event._id }),
+    event.deleteOne()
+  ]);
   res.status(204).end();
 });
 

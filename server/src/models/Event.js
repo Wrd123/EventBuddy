@@ -58,7 +58,14 @@ const eventSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     // Anyone with the link can join, so only members ever see it (events are
     // only sent to members) and the organizer can replace it
-    inviteCode: { type: String, default: newInviteCode, unique: true }
+    inviteCode: { type: String, default: newInviteCode, unique: true },
+    // Optional trip budget in whole cents, set by the organizer
+    budgetCents: {
+      type: Number,
+      default: null,
+      min: 0,
+      validate: { validator: (v) => v === null || Number.isInteger(v), message: 'Budget must be whole cents' }
+    }
   },
   { timestamps: true }
 );

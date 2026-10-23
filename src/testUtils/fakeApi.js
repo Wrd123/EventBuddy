@@ -5,7 +5,7 @@ const TOKEN = 'fake-token';
 export const demoUser = { _id: 'u1', name: 'John Doe', email: 'user@example.com', username: 'johndoe' };
 
 const me = { _id: 'm1', user: 'u1', name: 'John Doe', color: '#7c3aed' };
-const alex = { _id: 'm2', user: null, name: 'Alex', color: '#3b82f6' };
+const alex = { _id: 'm2', user: 'u2', name: 'Alex', color: '#3b82f6' };
 
 const taylor = { _id: 'm3', user: 'u3', name: 'Taylor', color: '#10b981' };
 
@@ -17,6 +17,7 @@ const demoEvents = () => [
     startDate: '2027-04-15',
     endDate: '2027-04-18',
     location: 'Indio, CA',
+    budgetCents: 50000,
     members: [me, alex],
     schedule: [
       {
@@ -35,7 +36,7 @@ const demoEvents = () => [
         endTime: '15:30',
         activity: 'Arctic Monkeys',
         location: 'Main Stage',
-        attendees: [{ user: null, name: 'Alex' }]
+        attendees: [{ user: 'u2', name: 'Alex' }]
       }
     ],
     createdBy: 'u1'
@@ -70,9 +71,77 @@ const demoEvents = () => [
 const respond = (status, body) =>
   Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(JSON.parse(JSON.stringify(body))) });
 
+// Event 1's money: Alex paid a $300 Airbnb, split with John
+const demoLedger = () => ({
+  '1': {
+    expenses: [
+      {
+        _id: 'x1',
+        description: 'Airbnb',
+        amountCents: 30000,
+        date: '2027-03-01',
+        paidBy: { user: 'u2', name: 'Alex' },
+        splitType: 'equal',
+        shares: [{ user: 'u1', name: 'John Doe', amountCents: 15000 }, { user: 'u2', name: 'Alex', amountCents: 15000 }],
+        createdBy: 'u2'
+      }
+    ],
+    payments: []
+  }
+});
+
 let events = demoEvents();
+let ledgers = demoLedger();
 let nextItemId = 100;
 let nextEventId = 100;
+
+const ledgerFor = (eventId) => {
+  ledgers[eventId] = ledgers[eventId] || { expenses: [], payments: [] };
+  return ledgers[eventId];
+};
+
+// Fills in names like the real API does
+const withName = (event, user) => ({ user, name: event.members.find((m) => m.user === user)?.name ?? '?' });
+
+const moneyRoute = (event, method, kind, id, body) => {
+  const ledger = ledgerFor(event._id);
+  if (kind === 'expenses' && method === 'GET' && !id) return respond(200, ledger);
+
+  if (kind === 'expenses') {
+    const stored = body && {
+      ...body,
+      paidBy: withName(event, body.paidBy),
+      shares: body.shares.map((s) => ({ ...withName(event, s.user), amountCents: s.amountCents }))
+    };
+    if (method === 'POST') {
+      const expense = { ...stored, _id: `x${nextItemId++}`, createdBy: demoUser._id };
+      ledger.expenses.unshift(expense);
+      return respond(201, { expense });
+    }
+    const index = ledger.expenses.findIndex((e) => e._id === id);
+    if (index === -1) return respond(404, { message: 'Expense not found.' });
+    if (method === 'PATCH') {
+      ledger.expenses[index] = { ...ledger.expenses[index], ...stored };
+      return respond(200, { expense: ledger.expenses[index] });
+    }
+    ledger.expenses.splice(index, 1);
+    return respond(204);
+  }
+
+  if (method === 'POST') {
+    const payment = {
+      ...body,
+      _id: `p${nextItemId++}`,
+      from: withName(event, body.from),
+      to: withName(event, body.to),
+      createdBy: demoUser._id
+    };
+    ledger.payments.unshift(payment);
+    return respond(201, { payment });
+  }
+  ledger.payments = ledger.payments.filter((p) => p._id !== id);
+  return respond(204);
+};
 
 const isMember = (event) => event.members.some((m) => m.user === demoUser._id);
 
@@ -158,6 +227,14 @@ const route = (method, path, body, authed) => {
     return respond(200, { event });
   }
 
+  // /events/:id/expenses[/:expenseId], /events/:id/payments[/:paymentId]
+  const moneyMatch = path.match(/^\/events\/([^/]+)\/(expenses|payments)(?:\/([^/]+))?$/);
+  if (moneyMatch) {
+    const event = events.find((e) => e._id === moneyMatch[1] && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    return moneyRoute(event, method, moneyMatch[2], moneyMatch[3], body);
+  }
+
   // /events/:id, /events/:id/schedule[/:itemId[/going]]
   const match = path.match(/^\/events\/([^/]+)(?:\/schedule(?:\/([^/]+)(?:\/(going))?)?)?$/);
   if (!match) return respond(404, { message: 'Not found.' });
@@ -169,6 +246,7 @@ const route = (method, path, body, authed) => {
   if (path.includes('/schedule')) {
     return scheduleRoute(event, method, match[2] && decodeURIComponent(match[2]), match[3], body);
   }
+  if (method === 'PATCH') Object.assign(event, body);
   return respond(200, { event });
 };
 
@@ -176,6 +254,7 @@ const route = (method, path, body, authed) => {
 // the way a past login would have, so the app opens already logged in.
 export const installFakeApi = () => {
   events = demoEvents();
+  ledgers = demoLedger();
   global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) =>
     route(
       method,

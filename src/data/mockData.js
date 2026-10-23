@@ -19,42 +19,6 @@ export const chatMessages = [
   { _id: 'msg6', sender: "Me", senderInitial: "Me", color: "#8b5cf6", message: "Can't wait! Where should we meet before?", time: "10:17 AM", isCurrentUser: true }
 ];
 
-// Mock expenses
-export const expenses = [
-  {
-    _id: 'exp1',
-    title: "Accommodation",
-    addedBy: "Alex",
-    amount: 320.00,
-    date: "Apr 15, 2025",
-    splitType: "equally",
-    amountPerPerson: 80.00,
-    status: "settled"
-  },
-  {
-    _id: 'exp2',
-    title: "Transportation",
-    addedBy: "Taylor",
-    amount: 120.00,
-    date: "Apr 16, 2025",
-    splitType: "equally",
-    amountPerPerson: 30.00,
-    status: "pending",
-    pendingCount: 2
-  },
-  {
-    _id: 'exp3',
-    title: "Food & Drinks",
-    addedBy: "You",
-    amount: 120.00,
-    date: "Apr 17, 2025",
-    splitType: "equally",
-    amountPerPerson: 30.00,
-    status: "pending",
-    pendingCount: 1
-  }
-];
-
 // Groups data
 export const groups = [
   {

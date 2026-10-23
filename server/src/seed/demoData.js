@@ -3,6 +3,8 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Event = require('../models/Event');
+const Expense = require('../models/Expense');
+const Payment = require('../models/Payment');
 const { ORGANIZER_COLOR } = require('../colors');
 
 const DEMO_PASSWORD = 'password';
@@ -47,6 +49,7 @@ const demoEvents = (users) => {
       endDate: '2027-04-18',
       location: 'Indio, CA',
       description: 'Annual summer music festival with top artists',
+      budgetCents: 85000,
       members: ['me', 'Alex', 'Taylor', 'Jordan', 'Jamie'].map(member),
       schedule: [
         item('2027-04-15', '14:00', '15:30', 'Arctic Monkeys', 'Main Stage', going('me', 'Alex', 'Taylor', 'Jordan')),
@@ -88,6 +91,32 @@ const demoEvents = (users) => {
   ];
 };
 
+// Festival money: who paid for what, and one payment already settled
+const demoLedger = (users) => {
+  const event = DEMO_EVENT_IDS.festival;
+  const who = (name) => ({ user: users[name]._id, name: users[name].name });
+  const equally = (amountCents, ...names) => {
+    // Same rule as the app: leftover cents go to the first people listed
+    const base = Math.floor(amountCents / names.length);
+    const extra = amountCents % names.length;
+    return names.map((name, i) => ({ ...who(name), amountCents: base + (i < extra ? 1 : 0) }));
+  };
+  const expense = (description, amountCents, date, payer, shares) => ({
+    event, description, amountCents, date, paidBy: who(payer), splitType: 'equal', shares, createdBy: users[payer]._id
+  });
+
+  return {
+    expenses: [
+      expense('Airbnb', 32000, '2027-03-01', 'Alex', equally(32000, 'me', 'Alex', 'Taylor', 'Jordan')),
+      expense('Rental car', 12000, '2027-04-14', 'Taylor', equally(12000, 'me', 'Alex', 'Taylor', 'Jordan')),
+      expense('Groceries & drinks', 12050, '2027-04-15', 'me', equally(12050, 'me', 'Alex', 'Taylor', 'Jordan', 'Jamie'))
+    ],
+    payments: [
+      { event, from: who('Jordan'), to: who('Alex'), amountCents: 8000, date: '2027-03-02', createdBy: users.Jordan._id }
+    ]
+  };
+};
+
 // Creates the demo accounts and events if the demo user doesn't exist yet.
 // Safe to run repeatedly. Returns the demo user.
 const seedDemoData = async () => {
@@ -106,6 +135,9 @@ const seedDemoData = async () => {
 
   // Validation is skipped on purpose: some demo events are in the past
   await Event.insertMany(demoEvents(users));
+  const ledger = demoLedger(users);
+  await Expense.insertMany(ledger.expenses);
+  await Payment.insertMany(ledger.payments);
   return me;
 };
 
