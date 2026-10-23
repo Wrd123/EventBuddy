@@ -15,6 +15,7 @@ const run = async () => {
   await mongoose.connect(mongoUri);
   await seedDemoData();
   console.log(`Seeded. Demo login: ${DEMO_LOGIN.email} / ${DEMO_LOGIN.password}`);
+  console.log('Demo friends (same password): alex@, taylor@, jordan@, jamie@, casey@example.com');
   await mongoose.disconnect();
 };
 

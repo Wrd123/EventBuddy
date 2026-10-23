@@ -10,15 +10,14 @@ const newEvent = {
   type: 'outdoor',
   startDate: '2099-11-25',
   endDate: '2099-11-27',
-  location: 'Atlanta, GA',
-  invitedFriends: ['Alex', 'Taylor']
+  location: 'Atlanta, GA'
 };
 
 const createEvent = (auth, overrides = {}) =>
   api().post('/api/events').set('Authorization', auth).send({ ...newEvent, ...overrides });
 
 describe('POST /api/events', () => {
-  it('creates an event with the creator as the first member', async () => {
+  it('creates an event with the creator as its only member', async () => {
     const { auth, user } = await registerUser();
     const res = await createEvent(auth).expect(201);
 
@@ -29,8 +28,9 @@ describe('POST /api/events', () => {
       createdBy: user._id,
       schedule: []
     });
-    assert.deepEqual(res.body.event.members.map((m) => m.name), [user.name, 'Alex', 'Taylor']);
-    assert.equal(res.body.event.members[0].user, user._id);
+    assert.equal(res.body.event.members.length, 1);
+    assertFields(res.body.event.members[0], { user: user._id, name: user.name });
+    assert.match(res.body.event.inviteCode, /^[A-Za-z0-9_-]{12}$/);
   });
 
   it('takes the creator from the token, not the request body', async () => {
@@ -153,7 +153,7 @@ describe('PATCH /api/events/:id', () => {
       .send({ createdBy: other.user._id, members: [] })
       .expect(200);
     assert.equal(res.body.event.createdBy, user._id);
-    assert.equal(res.body.event.members.length, 3);
+    assert.equal(res.body.event.members.length, 1);
   });
 
   it('allows editing an event that already started', async () => {

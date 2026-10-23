@@ -10,6 +10,7 @@ const start = async () => {
     await seedDemoData();
     console.log('Using a temporary in-memory database (set MONGODB_URI to use Atlas).');
     console.log(`Demo login: ${DEMO_LOGIN.email} / ${DEMO_LOGIN.password}`);
+    console.log('Demo friends (same password): alex@, taylor@, jordan@, jamie@, casey@example.com');
   }
 
   const server = createApp().listen(port, () => {

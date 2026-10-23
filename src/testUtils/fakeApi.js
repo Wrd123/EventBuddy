@@ -7,9 +7,12 @@ export const demoUser = { _id: 'u1', name: 'John Doe', email: 'user@example.com'
 const me = { _id: 'm1', user: 'u1', name: 'John Doe', color: '#7c3aed' };
 const alex = { _id: 'm2', user: null, name: 'Alex', color: '#3b82f6' };
 
+const taylor = { _id: 'm3', user: 'u3', name: 'Taylor', color: '#10b981' };
+
 const demoEvents = () => [
   {
     _id: '1',
+    inviteCode: 'festival-code',
     name: 'Summer Music Festival',
     startDate: '2027-04-15',
     endDate: '2027-04-18',
@@ -39,6 +42,7 @@ const demoEvents = () => [
   },
   {
     _id: '2',
+    inviteCode: 'hiking-code',
     name: 'Hiking Trip',
     startDate: '2026-11-13',
     endDate: '2026-11-15',
@@ -46,6 +50,18 @@ const demoEvents = () => [
     members: [me],
     schedule: [],
     createdBy: 'u1'
+  },
+  {
+    // Someone else's event, which John can only join through its invite
+    _id: '3',
+    inviteCode: 'game-code',
+    name: 'Game Night',
+    startDate: '2026-12-04',
+    endDate: '2026-12-04',
+    location: "Taylor's place",
+    members: [taylor],
+    schedule: [],
+    createdBy: 'u3'
   }
 ];
 
@@ -56,6 +72,9 @@ const respond = (status, body) =>
 
 let events = demoEvents();
 let nextItemId = 100;
+let nextEventId = 100;
+
+const isMember = (event) => event.members.some((m) => m.user === demoUser._id);
 
 // Applies a schedule change and returns { event } like the real API
 const scheduleRoute = (event, method, itemId, action, body) => {
@@ -81,6 +100,9 @@ const scheduleRoute = (event, method, itemId, action, body) => {
 };
 
 const route = (method, path, body, authed) => {
+  if (method === 'POST' && path === '/auth/register') {
+    return respond(201, { token: TOKEN, user: demoUser });
+  }
   if (method === 'POST' && path === '/auth/login') {
     const { email, password } = body;
     return email === demoUser.email && password === 'password'
@@ -90,13 +112,58 @@ const route = (method, path, body, authed) => {
   if (!authed) return respond(401, { message: 'Please log in.' });
 
   if (path === '/auth/me') return respond(200, { user: demoUser });
-  if (path === '/events') return respond(200, { events });
+  if (path === '/events' && method === 'POST') {
+    const event = {
+      ...body,
+      _id: `e${nextEventId}`,
+      inviteCode: `code-${nextEventId++}`,
+      members: [me],
+      schedule: [],
+      createdBy: demoUser._id
+    };
+    events.push(event);
+    return respond(201, { event });
+  }
+  if (path === '/events') return respond(200, { events: events.filter(isMember) });
+
+  const inviteMatch = path.match(/^\/invites\/([^/]+)(\/join)?$/);
+  if (inviteMatch) {
+    const event = events.find((e) => e.inviteCode === decodeURIComponent(inviteMatch[1]));
+    if (!event) return respond(404, { message: "This invite link isn't valid anymore. Ask for a new one." });
+    if (inviteMatch[2]) {
+      if (!isMember(event)) event.members.push({ _id: 'm9', user: demoUser._id, name: demoUser.name, color: '#3b82f6' });
+      return respond(200, { event });
+    }
+    const organizer = event.members.find((m) => m.user === event.createdBy);
+    return respond(200, {
+      invite: {
+        eventId: event._id,
+        name: event.name,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        organizerName: organizer?.name ?? '',
+        memberCount: event.members.length,
+        isMember: isMember(event)
+      }
+    });
+  }
+
+  // /events/:id/invite/reset
+  const resetMatch = path.match(/^\/events\/([^/]+)\/invite\/reset$/);
+  if (resetMatch && method === 'POST') {
+    const event = events.find((e) => e._id === resetMatch[1] && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    event.inviteCode = `reset-${nextEventId++}`;
+    return respond(200, { event });
+  }
 
   // /events/:id, /events/:id/schedule[/:itemId[/going]]
   const match = path.match(/^\/events\/([^/]+)(?:\/schedule(?:\/([^/]+)(?:\/(going))?)?)?$/);
   if (!match) return respond(404, { message: 'Not found.' });
 
-  const event = events.find((e) => e._id === decodeURIComponent(match[1]));
+  // Like the real API, events you're not a member of don't exist for you
+  const event = events.find((e) => e._id === decodeURIComponent(match[1]) && isMember(e));
   if (!event) return respond(404, { message: 'Event not found.' });
 
   if (path.includes('/schedule')) {

@@ -16,6 +16,7 @@ import Login from '../screens/Login';
 import Register from '../screens/Register';
 import Profile from '../screens/Profile';
 import NotFound from '../screens/NotFound';
+import Invite from '../screens/Invite';
 
 // Every screen has a URL, so refresh, the back button and deep links work.
 // Each screen renders its own Footer when it needs one.
@@ -38,6 +39,7 @@ const MainLayout = () => (
         <Route path="/events/:eventId/schedule" element={<Schedule />} />
         <Route path="/events/:eventId/chat" element={<GroupChat />} />
         <Route path="/events/:eventId/expenses" element={<Expenses />} />
+        <Route path="/invite/:code" element={<Invite />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
@@ -45,14 +47,15 @@ const MainLayout = () => (
 );
 
 // Logged-out users are sent to /login, remembering where they were going
-// so they land there after logging in
+// so they land there after logging in. Not after tapping Log Out, though:
+// the next person to log in should start at Home, not on the old Profile.
 const RequireAuth = () => {
-  const { isAuthenticated, isLoading } = useAppContext();
+  const { isAuthenticated, isLoading, loggedOutByUser } = useAppContext();
   const location = useLocation();
 
   if (isLoading) return <LoadingScreen />;
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace state={loggedOutByUser ? undefined : { from: location }} />;
   }
   return <Outlet />;
 };

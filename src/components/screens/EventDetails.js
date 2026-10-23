@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Calendar, MessageSquare, DollarSign, Map, Plus } from 'lucide-react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Header from '../common/Header';
 import { Avatar, ScreenLoader } from '../common';
 import NotFound from './NotFound';
+import InviteSheet from '../common/InviteSheet';
+import { useAppContext } from '../../context/AppContext';
 import { useEvent } from '../../hooks/useEvent';
 import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay } from '../../utils/dates';
 import { formatTimeRange, sortSchedule } from '../../utils/schedule';
@@ -11,6 +13,10 @@ import { formatTimeRange, sortSchedule } from '../../utils/schedule';
 const EventDetails = () => {
   const { eventId } = useParams();
   const { event, status, error } = useEvent(eventId);
+  const { currentUser } = useAppContext();
+  // Create Event sends new organizers here with the invite sheet open
+  const location = useLocation();
+  const [showInvite, setShowInvite] = useState(Boolean(location.state?.showInvite));
 
   if (status === 'loading') return <ScreenLoader />;
   if (status === 'not-found') {
@@ -21,7 +27,7 @@ const EventDetails = () => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       <Header 
         title={event.name} 
         type="screen" 
@@ -33,8 +39,16 @@ const EventDetails = () => {
       <div className="flex-1 overflow-y-auto pb-16">
         <EventCover event={event} />
         <EventActions eventId={eventId} />
-        <EventContent event={event} />
+        <EventContent event={event} onInvite={() => setShowInvite(true)} />
       </div>
+
+      {showInvite && (
+        <InviteSheet
+          event={event}
+          isOrganizer={event.createdBy === currentUser?._id}
+          onClose={() => setShowInvite(false)}
+        />
+      )}
     </div>
   );
 };
@@ -92,7 +106,7 @@ const ActionButton = ({ Icon, label, onClick }) => (
   </button>
 );
 
-const EventContent = ({ event }) => {
+const EventContent = ({ event, onInvite }) => {
   // Preview one day: today while the event is running, else its first day.
   // The Schedule screen shows every day.
   const day = defaultScheduleDay(event);
@@ -102,9 +116,10 @@ const EventContent = ({ event }) => {
   return (
     <div className="p-4">
       <h3 className="text-lg font-semibold mb-2">Group Members</h3>
-      <div className="flex space-x-2 mb-4">
+      <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar">
         {event.members.map((member) => (
-          <div key={member._id} className="flex flex-col items-center">
+          // shrink-0 so a big group scrolls instead of squashing
+          <div key={member._id} className="flex flex-col items-center shrink-0">
             <Avatar 
               initial={member.name.charAt(0)} 
               color={member.color} 
@@ -113,12 +128,12 @@ const EventContent = ({ event }) => {
             <span className="text-xs mt-1">{member.name}</span>
           </div>
         ))}
-        <div className="flex flex-col items-center">
-          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 border border-dashed border-purple-300">
+        <button onClick={onInvite} className="flex flex-col items-center shrink-0">
+          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 border border-dashed border-purple-300">
             <Plus size={16} />
           </div>
           <span className="text-xs mt-1">Invite</span>
-        </div>
+        </button>
       </div>
     
       <h3 className="text-lg font-semibold mb-2">{heading}</h3>

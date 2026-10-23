@@ -1,5 +1,7 @@
 const express = require('express');
 const Event = require('../models/Event');
+const { newInviteCode } = require('../models/Event');
+const { ORGANIZER_COLOR } = require('../colors');
 const { requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
 const { validateEventFields, validateNewEvent, text } = require('../validation');
@@ -9,9 +11,6 @@ const scheduleRoutes = require('./schedule');
 const router = express.Router();
 router.use(requireAuth);
 router.use('/:id/schedule', scheduleRoutes);
-
-const MEMBER_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899'];
-const MAX_INVITES = 50;
 
 router.get('/', async (req, res) => {
   const events = await Event.find(visibleTo(req.user)).sort({ startDate: 1 });
@@ -35,20 +34,12 @@ router.post('/', async (req, res) => {
   const error = validateNewEvent(fields);
   if (error) throw new HttpError(400, error);
 
-  // Invited friends are names until friends are real accounts
-  const invited = (Array.isArray(req.body.invitedFriends) ? req.body.invitedFriends : [])
-    .map(text)
-    .filter(Boolean)
-    .slice(0, MAX_INVITES);
-
+  // The creator comes from the login token and starts as the only member;
+  // everyone else joins through the invite link
   const event = await Event.create({
     ...fields,
-    // The creator comes from the login token, and is always the first member
     createdBy: req.user._id,
-    members: [
-      { user: req.user._id, name: req.user.name, color: '#7c3aed' },
-      ...invited.map((name, index) => ({ name, color: MEMBER_COLORS[index % MEMBER_COLORS.length] }))
-    ],
+    members: [{ user: req.user._id, name: req.user.name, color: ORGANIZER_COLOR }],
     schedule: []
   });
 
@@ -74,6 +65,15 @@ router.patch('/:id', async (req, res) => {
     : validateEventFields(event);
   if (error) throw new HttpError(400, error);
 
+  await event.save();
+  res.json({ event });
+});
+
+// A new invite code; the old link stops working. Organizer only, so a
+// member can't cut everyone else off.
+router.post('/:id/invite/reset', async (req, res) => {
+  const event = await findOwnEvent(req.params.id, req.user);
+  event.inviteCode = newInviteCode();
   await event.save();
   res.json({ event });
 });

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 // Event dates are calendar days stored as "YYYY-MM-DD" strings, matching the
@@ -5,10 +6,10 @@ const mongoose = require('mongoose');
 // ISO date strings still sort and range-query correctly in MongoDB.
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-// A member is either a registered user (user is set) or, until friends are
-// real accounts, just a name someone was invited by
+// A member is a registered user. The name is copied in so events render
+// without looking up every user.
 const memberSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true, trim: true },
   color: { type: String, default: '#7c3aed' }
 });
@@ -17,11 +18,10 @@ const memberSchema = new mongoose.Schema({
 // correctly as text, and they mean wall-clock time at the event
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-// Who's going to a schedule item. Like members, an attendee is a registered
-// user or (for demo data, until friends are accounts) just a name.
+// Who's going to a schedule item (a member, with their name copied in)
 const attendeeSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     name: { type: String, required: true, trim: true }
   },
   { _id: false }
@@ -37,6 +37,10 @@ const scheduleItemSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 });
 
+// The secret in an event's invite link. 9 random bytes = 72 bits, written
+// as 12 URL-safe characters: far too many to guess or enumerate.
+const newInviteCode = () => crypto.randomBytes(9).toString('base64url');
+
 const eventSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 60 },
@@ -51,7 +55,10 @@ const eventSchema = new mongoose.Schema(
     description: { type: String, default: '', trim: true },
     members: [memberSchema],
     schedule: [scheduleItemSchema],
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // Anyone with the link can join, so only members ever see it (events are
+    // only sent to members) and the organizer can replace it
+    inviteCode: { type: String, default: newInviteCode, unique: true }
   },
   { timestamps: true }
 );
@@ -70,3 +77,4 @@ eventSchema.set('toJSON', {
 module.exports = mongoose.model('Event', eventSchema);
 module.exports.ISO_DATE = ISO_DATE;
 module.exports.TIME = TIME;
+module.exports.newInviteCode = newInviteCode;

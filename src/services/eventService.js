@@ -54,3 +54,22 @@ export const setGoing = async (eventId, itemId, going) => {
   });
   return event;
 };
+
+// Invites. getInvite returns a preview ({ eventId, name, ..., isMember });
+// joinInvite and resetInviteLink return the whole event.
+const invitePath = (code) => `/invites/${encodeURIComponent(code)}`;
+
+export const getInvite = async (code) => {
+  const { invite } = await apiRequest(invitePath(code));
+  return invite;
+};
+
+export const joinInvite = async (code) => {
+  const { event } = await apiRequest(`${invitePath(code)}/join`, { method: 'POST' });
+  return event;
+};
+
+export const resetInviteLink = async (eventId) => {
+  const { event } = await apiRequest(`${eventPath(eventId)}/invite/reset`, { method: 'POST' });
+  return event;
+};

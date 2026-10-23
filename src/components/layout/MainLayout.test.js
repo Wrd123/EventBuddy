@@ -103,6 +103,20 @@ describe('routing', () => {
     expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
   });
 
+  it('goes Home after logging back in, not to where you logged out', async () => {
+    fakeApi.logIn();
+    renderAt('/profile');
+
+    fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
+    fireEvent.change(await screen.findByPlaceholderText('your@email.com'), {
+      target: { value: 'user@example.com' }
+    });
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+    expect(await screen.findByText('Your Events')).toBeInTheDocument();
+  });
+
   it('logs out when the server rejects a saved login', async () => {
     // A token from a previous session that the server no longer accepts
     localStorage.setItem('eventbuddy_token', 'expired-token');

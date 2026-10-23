@@ -15,6 +15,9 @@ export const AppProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [suggestedEvents, setSuggestedEvents] = useState([]);
   const [error, setError] = useState(null);
+  // True after the user taps Log Out (vs. a session that expired), so the
+  // login guard doesn't send the next login back to the page they left
+  const [loggedOutByUser, setLoggedOutByUser] = useState(false);
   
   // Drop the session locally (no navigation; the router's guards react to it).
   // Stable identity, since the effects below depend on it.
@@ -88,6 +91,7 @@ export const AppProvider = ({ children }) => {
       
       setCurrentUser(response.user);
       setIsAuthenticated(true);
+      setLoggedOutByUser(false);
       
       return response;
     } catch (error) {
@@ -102,6 +106,7 @@ export const AppProvider = ({ children }) => {
       
       setCurrentUser(response.user);
       setIsAuthenticated(true);
+      setLoggedOutByUser(false);
       
       return response;
     } catch (error) {
@@ -112,6 +117,7 @@ export const AppProvider = ({ children }) => {
   
   const logout = () => {
     clearSession();
+    setLoggedOutByUser(true);
   };
   
   const updateProfile = async (profileData) => {
@@ -193,6 +199,13 @@ export const AppProvider = ({ children }) => {
   const setGoing = async (eventId, itemId, going) =>
     storeEvent(await eventService.setGoing(eventId, itemId, going));
 
+  // Invites: joining adds the event to your list right away
+  const joinEvent = async (inviteCode) =>
+    storeEvent(await eventService.joinInvite(inviteCode));
+
+  const resetInviteLink = async (eventId) =>
+    storeEvent(await eventService.resetInviteLink(eventId));
+
   // Clear any errors
   const clearError = () => {
     setError(null);
@@ -203,6 +216,7 @@ export const AppProvider = ({ children }) => {
     currentUser,
     isAuthenticated,
     isLoading,
+    loggedOutByUser,
     events,
     suggestedEvents,
     error,
@@ -217,7 +231,9 @@ export const AppProvider = ({ children }) => {
     addScheduleItem,
     updateScheduleItem,
     deleteScheduleItem,
-    setGoing
+    setGoing,
+    joinEvent,
+    resetInviteLink
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

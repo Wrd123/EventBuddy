@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Button } from '../common';
 
 const Register = () => {
   const { register } = useAppContext();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -46,7 +47,7 @@ const Register = () => {
       const { confirmPassword, ...userData } = formData;
       
       await register(userData);
-      // On success the PublicOnly route redirects to Home
+      // On success the PublicOnly route redirects to where the user was going
     } catch (error) {
       setError(error.message || 'Registration failed. Please try again.');
     } finally {
@@ -173,7 +174,7 @@ const Register = () => {
         <div className="mt-4 text-center">
           <p className="text-gray-600">
             Already have an account?{' '}
-            <Link to="/login" className="text-purple-600 font-medium">
+            <Link to="/login" state={location.state} className="text-purple-600 font-medium">
               Login
             </Link>
           </p>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Calendar, Map, Users, CheckCircle, Plus } from 'lucide-react';
+import { Music, Calendar, Map, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
@@ -30,8 +30,7 @@ const CreateEvent = () => {
     isMultiDay: false,
     startDate: '',
     endDate: '',
-    location: '',
-    invitedFriends: ['Alex', 'Taylor', 'Jordan']
+    location: ''
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,8 +69,9 @@ const CreateEvent = () => {
     setIsSubmitting(true);
     try {
       const { event } = await createEvent(cleaned);
-      // replace: Back from the new event goes Home, not back into this form
-      navigate(`/events/${event._id}`, { replace: true });
+      // replace: Back from the new event goes Home, not back into this form.
+      // Open the invite sheet there, since inviting is the natural next step.
+      navigate(`/events/${event._id}`, { replace: true, state: { showInvite: true } });
     } catch (err) {
       setError(err.message || 'Could not create the event. Please try again.');
       // Only re-enable on failure: on success the screen is leaving, and
@@ -120,16 +120,10 @@ const CreateEvent = () => {
           value={eventData.location} 
           onChange={(value) => handleChange('location', value)} 
         />
-        
-        <FriendSelector 
-          selectedFriends={eventData.invitedFriends} 
-          onToggleFriend={(friend) => {
-            const friends = eventData.invitedFriends.includes(friend)
-              ? eventData.invitedFriends.filter(f => f !== friend)
-              : [...eventData.invitedFriends, friend];
-            handleChange('invitedFriends', friends);
-          }} 
-        />
+
+        <p className="text-sm text-gray-500">
+          You'll get a link to invite friends once the event is created.
+        </p>
       </div>
       
       <div className="p-4 border-t border-gray-200">
@@ -268,36 +262,5 @@ const LocationInput = ({ value, onChange }) => (
     />
   </div>
 );
-
-const FriendSelector = ({ selectedFriends, onToggleFriend }) => {
-  return (
-    <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Invite Friends
-      </label>
-      <div className="flex flex-wrap gap-2 mb-2">
-        {selectedFriends.map((name) => (
-          <div 
-            key={name} 
-            className="flex items-center bg-purple-100 text-purple-600 px-3 py-1 rounded-full"
-            onClick={() => onToggleFriend(name)}
-          >
-            <span>{name}</span>
-            <CheckCircle size={16} className="ml-1" />
-          </div>
-        ))}
-        <div 
-          className="flex items-center border border-dashed border-gray-300 px-3 py-1 rounded-full"
-          onClick={() => {
-            // In a real app, this would open a friend selection modal
-          }}
-        >
-          <Plus size={16} className="mr-1" />
-          <span>Add</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default CreateEvent;

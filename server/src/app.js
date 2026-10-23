@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const authRoutes = require('./routes/auth');
 const eventRoutes = require('./routes/events');
+const inviteRoutes = require('./routes/invites');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const { clientOrigin, trustProxy } = require('./config');
 
@@ -18,6 +19,7 @@ const createApp = () => {
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
   app.use('/api/auth', authRoutes);
   app.use('/api/events', eventRoutes);
+  app.use('/api/invites', inviteRoutes);
 
   app.use('/api', notFound);
   app.use(errorHandler);

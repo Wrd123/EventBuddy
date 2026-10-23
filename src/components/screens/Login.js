@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Button } from '../common';
 
 const Login = () => {
   const { login } = useAppContext();
+  // Where the user was going (e.g. an invite link), passed on to Sign up
+  // too so a new account also lands there
+  const location = useLocation();
+  const fromInvite = location.state?.from?.pathname?.startsWith('/invite/');
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -41,6 +45,12 @@ const Login = () => {
           <h1 className="text-2xl font-bold text-purple-600 mb-2">EventBuddy</h1>
           <p className="text-gray-600">Group event planning made easy</p>
         </div>
+
+        {fromInvite && (
+          <div className="bg-purple-50 border border-purple-200 text-purple-700 px-4 py-3 rounded mb-4 text-center">
+            Log in or sign up to see your invite.
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
@@ -93,7 +103,7 @@ const Login = () => {
         <div className="mt-4 text-center">
           <p className="text-gray-600">
             Don't have an account?{' '}
-            <Link to="/register" className="text-purple-600 font-medium">
+            <Link to="/register" state={location.state} className="text-purple-600 font-medium">
               Sign up
             </Link>
           </p>

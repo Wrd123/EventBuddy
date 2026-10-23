@@ -1,19 +1,11 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import Header, { getInitials } from '../common/Header';
 
 const Profile = () => {
+  // Logging out sends you to /login via the login guard (MainLayout)
   const { currentUser, logout } = useAppContext();
-  const navigate = useNavigate();
-
-  // Go to /login directly; otherwise the login guard would remember /profile
-  // and send the next person who logs in here instead of Home
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -37,7 +29,7 @@ const Profile = () => {
         {/* Logging out is rare on a phone, so it sits at the bottom, out of
             the way, rather than as a prominent primary button */}
         <button
-          onClick={handleLogout}
+          onClick={logout}
           className="mt-auto w-full flex items-center justify-center py-3 text-red-600 font-medium"
         >
           <LogOut size={18} className="mr-2" />
