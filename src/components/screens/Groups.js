@@ -28,7 +28,7 @@ const Groups = () => {
         <div className="space-y-3 mb-6">
           {activeGroups.map(group => (
             <GroupCard 
-              key={group.id} 
+              key={group._id} 
               group={group} 
               onClick={() => navigateTo('eventDetails')} 
             />
@@ -39,7 +39,7 @@ const Groups = () => {
         <div className="space-y-3">
           {pastGroups.map(group => (
             <GroupCard 
-              key={group.id} 
+              key={group._id} 
               group={group} 
               isPast={true}
             />

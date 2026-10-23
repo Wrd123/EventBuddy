@@ -1,16 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Calendar, MessageSquare, DollarSign, Map, Plus } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
-import { Avatar, Button } from '../common';
+import { Avatar } from '../common';
 
 const EventDetails = () => {
   const { selectedEvent, navigateTo } = useAppContext();
 
-  if (!selectedEvent) {
-    navigateTo('home');
-    return null;
-  }
+  // Redirect in an effect: calling navigateTo during render updates
+  // AppProvider state mid-render, which React warns about.
+  useEffect(() => {
+    if (!selectedEvent) navigateTo('home');
+  }, [selectedEvent, navigateTo]);
+
+  if (!selectedEvent) return null;
 
   return (
     <div className="flex flex-col h-full">
@@ -65,7 +68,7 @@ const EventActions = ({ navigateTo }) => (
     <ActionButton 
       Icon={Map} 
       label="Map"
-      onClick={() => navigateTo('eventMap')}
+      onClick={() => navigateTo('map')}
     />
   </div>
 );
@@ -84,8 +87,8 @@ const EventContent = ({ event }) => (
   <div className="p-4">
     <h3 className="text-lg font-semibold mb-2">Group Members</h3>
     <div className="flex space-x-2 mb-4">
-      {event.members.map((member, index) => (
-        <div key={index} className="flex flex-col items-center">
+      {event.members.map((member) => (
+        <div key={member._id} className="flex flex-col items-center">
           <Avatar 
             initial={member.name.charAt(0)} 
             color={member.color} 

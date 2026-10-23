@@ -3,7 +3,7 @@ import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 
 const Profile = () => {
-  const { currentUser, logout, navigateTo } = useAppContext();
+  const { currentUser, logout } = useAppContext();
 
   return (
     <div className="flex flex-col h-full">

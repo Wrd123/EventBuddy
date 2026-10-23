@@ -1,7 +1,8 @@
 // src/components/common/index.js
-export * from './EventCard';
-export * from './SuggestedEventCard';
-export * from './Avatar';
-export * from './Button';
+export { default as Avatar } from './Avatar';
+export { default as Button } from './Button';
+export { default as ErrorBoundary } from './ErrorBoundary';
+export { default as EventCard } from './EventCard';
 export { default as Header } from './Header';
-// Export any other common components
+export { default as LocationPermissionModal } from './LocationPermissionModal';
+export { default as SuggestedEventCard } from './SuggestedEventCard';

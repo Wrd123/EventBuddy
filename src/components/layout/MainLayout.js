@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import Footer from './Footer';
 
 // Import all screens
 import Home from '../screens/Home';
@@ -72,7 +71,7 @@ const MainLayout = () => {
   return (
     <div className="w-full h-full max-w-md mx-auto bg-gray-100 overflow-hidden relative" style={{ maxHeight: '640px' }}>
       {renderScreen()}
-      {/* The Footer component is conditionally rendered in individual screens when needed */}
+      {/* Each screen renders its own Footer when it needs one */}
     </div>
   );
 };

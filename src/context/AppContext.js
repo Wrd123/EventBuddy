@@ -1,7 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import * as authService from '../services/authService';
 import * as eventService from '../services/eventService';
-import * as userService from '../services/userService';
 
 // Create context
 const AppContext = createContext();
@@ -123,7 +122,7 @@ export const AppProvider = ({ children }) => {
       const response = await eventService.createEvent(eventData);
       
       // Add new event to state
-      setEvents([...events, response.event]);
+      setEvents(prev => [...prev, response.event]);
       
       // Select the new event
       selectEvent(response.event);
@@ -140,11 +139,9 @@ export const AppProvider = ({ children }) => {
       const response = await eventService.updateEvent(eventId, eventData);
       
       // Update event in state
-      const updatedEvents = events.map(event => 
+      setEvents(prev => prev.map(event => 
         event._id === eventId ? response.event : event
-      );
-      
-      setEvents(updatedEvents);
+      ));
       
       // Update selected event if it's the current one
       if (selectedEvent && selectedEvent._id === eventId) {
@@ -163,7 +160,7 @@ export const AppProvider = ({ children }) => {
       await eventService.deleteEvent(eventId);
       
       // Remove event from state
-      setEvents(events.filter(event => event._id !== eventId));
+      setEvents(prev => prev.filter(event => event._id !== eventId));
       
       // Clear selected event if it's the deleted one
       if (selectedEvent && selectedEvent._id === eventId) {
@@ -178,9 +175,10 @@ export const AppProvider = ({ children }) => {
   };
   
   // Navigation functions
-  const navigateTo = (screen) => {
+  // Stable identity so screens can list it in effect dependencies
+  const navigateTo = useCallback((screen) => {
     setCurrentScreen(screen);
-  };
+  }, []);
   
   const selectEvent = async (event) => {
     try {

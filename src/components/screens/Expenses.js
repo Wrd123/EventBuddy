@@ -1,12 +1,9 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 import { expenses } from '../../data/mockData';
 
 const Expenses = () => {
-  const { navigateTo } = useAppContext();
-  
   // Calculate budget summary
   const totalBudget = 850.00;
   const spentSoFar = 560.00;
@@ -42,7 +39,7 @@ const Expenses = () => {
         
         <div className="flex flex-col space-y-3">
           {expenses.map((expense) => (
-            <ExpenseCard key={expense.id} expense={expense} />
+            <ExpenseCard key={expense._id} expense={expense} />
           ))}
         </div>
       </div>

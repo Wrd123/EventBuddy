@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Plus } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
@@ -7,10 +7,11 @@ const Schedule = () => {
   const { selectedEvent, navigateTo } = useAppContext();
   const [activeDay, setActiveDay] = useState(0);
   
-  if (!selectedEvent) {
-    navigateTo('eventDetails');
-    return null;
-  }
+  useEffect(() => {
+    if (!selectedEvent) navigateTo('home');
+  }, [selectedEvent, navigateTo]);
+
+  if (!selectedEvent) return null;
 
   return (
     <div className="flex flex-col h-full">

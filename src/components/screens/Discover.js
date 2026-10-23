@@ -2,9 +2,11 @@ import React from 'react';
 import Header from '../common/Header';
 import Footer from '../layout/Footer';
 import { useAppContext } from '../../context/AppContext';
-import { suggestedEvents, recommendedArtists, popularEvents } from '../../data/mockData';
+import { recommendedArtists, popularEvents } from '../../data/mockData';
 
 const Discover = () => {
+  const { suggestedEvents } = useAppContext();
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Discover" />
@@ -12,7 +14,7 @@ const Discover = () => {
       <div className="flex-1 overflow-y-auto pb-16">
         <SearchBar />
         
-        <EventRecommendations />
+        <EventRecommendations events={suggestedEvents} />
         
         <ArtistRecommendations />
         
@@ -42,12 +44,12 @@ const SearchBar = () => (
   </div>
 );
 
-const EventRecommendations = () => (
+const EventRecommendations = ({ events }) => (
   <div className="p-4">
     <h2 className="text-lg font-semibold mb-3">Based on Your Preferences</h2>
     <div className="flex overflow-x-auto space-x-3 pb-3">
-      {suggestedEvents.map(event => (
-        <div key={event.id} className="flex-shrink-0 w-40">
+      {events.map(event => (
+        <div key={event._id} className="flex-shrink-0 w-40">
           <img 
             src="https://placehold.co/160x120" 
             alt={event.name} 
@@ -66,7 +68,7 @@ const ArtistRecommendations = () => (
     <h2 className="text-lg font-semibold mb-3">Artists You Might Like</h2>
     <div className="grid grid-cols-3 gap-3">
       {recommendedArtists.map(artist => (
-        <div key={artist.id} className="text-center">
+        <div key={artist._id} className="text-center">
           <div className="w-full aspect-square bg-gray-200 rounded-lg mb-2 overflow-hidden">
             <img 
               src="https://placehold.co/120x120" 
@@ -86,7 +88,7 @@ const NearbyEvents = () => (
     <h2 className="text-lg font-semibold mb-3">Popular Near You</h2>
     <div className="space-y-3">
       {popularEvents.map(event => (
-        <div key={event.id} className="bg-white rounded-lg shadow p-3 flex">
+        <div key={event._id} className="bg-white rounded-lg shadow p-3 flex">
           <img 
             src="https://placehold.co/80x80" 
             alt={event.name} 

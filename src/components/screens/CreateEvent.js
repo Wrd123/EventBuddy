@@ -5,7 +5,8 @@ import Header from '../common/Header';
 import { Button } from '../common';
 
 const CreateEvent = () => {
-  const { navigateTo } = useAppContext();
+  // eslint-disable-next-line no-unused-vars -- TODO(you): delete once handleSubmit uses it
+  const { createEvent } = useAppContext();
   const [eventData, setEventData] = useState({
     name: '',
     type: 'music-festival',
@@ -13,6 +14,10 @@ const CreateEvent = () => {
     location: '',
     invitedFriends: ['Alex', 'Taylor', 'Jordan']
   });
+  // eslint-disable-next-line no-unused-vars -- TODO(you): delete once handleSubmit uses it
+  const [error, setError] = useState('');
+  // eslint-disable-next-line no-unused-vars -- TODO(you): delete once handleSubmit uses it
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (field, value) => {
     setEventData({
@@ -25,9 +30,21 @@ const CreateEvent = () => {
     handleChange('type', type);
   };
 
-  const handleSubmit = () => {
-    // In a real app, we would save the event data
-    navigateTo('home');
+  const handleSubmit = async () => {
+    // TODO(you): validate eventData and save it.
+    //
+    // Available here:
+    //   eventData        -> { name, type, date, location, invitedFriends }
+    //   createEvent(data) -> async; on success it adds the event to state
+    //                        and navigates to its details screen; on failure
+    //                        it throws an Error with a .message
+    //   setError(msg)     -> shows a red banner above the form ('' hides it)
+    //   setIsSubmitting(bool) -> disables the button while saving
+    //
+    // Decisions to make:
+    //   - Which fields are required? (name? date? at least one friend?)
+    //   - Trim whitespace before checking / saving?
+    //   - On failure, keep the form filled in so the user can retry?
   };
 
   return (
@@ -41,6 +58,12 @@ const CreateEvent = () => {
       />
       
       <div className="p-4 flex-1 overflow-y-auto">
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
         <EventNameInput 
           value={eventData.name} 
           onChange={(value) => handleChange('name', value)} 
@@ -78,8 +101,9 @@ const CreateEvent = () => {
           fullWidth
           variant="primary"
           size="lg"
+          disabled={isSubmitting}
         >
-          Create Event
+          {isSubmitting ? 'Creating...' : 'Create Event'}
         </Button>
       </div>
     </div>
@@ -170,9 +194,6 @@ const LocationInput = ({ value, onChange }) => (
 );
 
 const FriendSelector = ({ selectedFriends, onToggleFriend }) => {
-  // In a real app, this list would come from the user's connections
-  const availableFriends = ['Alex', 'Taylor', 'Jordan', 'Jamie', 'Casey'];
-  
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 import { chatMessages } from '../../data/mockData';
 
 const GroupChat = () => {
   const [message, setMessage] = useState('');
-  const { navigateTo } = useAppContext();
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -36,14 +34,11 @@ const GroupChat = () => {
 };
 
 const ChatMessages = ({ messages }) => {
-  // Find messages with newDay flag to insert day dividers
-  let currentDay = null;
-  
   return (
     <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
       <div className="flex flex-col space-y-3">
-        {messages.map((msg, index) => (
-          <React.Fragment key={msg.id}>
+        {messages.map((msg) => (
+          <React.Fragment key={msg._id}>
             {msg.newDay && (
               <div className="flex items-center justify-center my-2">
                 <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">

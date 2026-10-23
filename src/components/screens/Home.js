@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Navigation, RefreshCw, Music, Users } from 'lucide-react';
+import { MapPin, Navigation } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useLocation } from '../../hooks/useLocation';
 import Header from '../common/Header';
@@ -97,7 +97,7 @@ const Home = () => {
           <div className="flex flex-col space-y-3">
             {events.map((event) => (
               <EventCard 
-                key={event.id} 
+                key={event._id} 
                 event={event} 
                 onSelect={() => selectEvent(event)} 
               />
@@ -109,7 +109,7 @@ const Home = () => {
           <h3 className="text-lg font-semibold mb-3">Suggested For You</h3>
           <div className="flex overflow-x-auto space-x-3 pb-2">
             {suggestedEvents.map((event) => (
-              <SuggestedEventCard key={event.id} event={event} />
+              <SuggestedEventCard key={event._id} event={event} />
             ))}
           </div>
         </div>

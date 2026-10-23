@@ -1,55 +1,7 @@
 // Mock event service
+import { events as mockEvents, suggestedEvents as mockSuggestedEvents } from '../data/mockData';
+
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Mock events data
-const mockEvents = [
-  {
-    _id: '1',
-    name: "Summer Music Festival",
-    date: "Apr 15-18, 2025",
-    location: "Indio, CA",
-    description: "Annual summer music festival with top artists",
-    members: [
-      { name: "Alex", color: "#3b82f6", _id: "user1" },
-      { name: "Taylor", color: "#10b981", _id: "user2" },
-      { name: "Jordan", color: "#8b5cf6", _id: "user3" },
-      { name: "Jamie", color: "#f59e0b", _id: "user4" }
-    ],
-    schedule: [
-      { time: "2:00 PM - 3:30 PM", activity: "Arctic Monkeys", location: "Main Stage", attending: 4 },
-      { time: "4:00 PM - 5:00 PM", activity: "Tame Impala", location: "Sunset Stage", attending: 2 },
-      { time: "5:30 PM - 6:30 PM", activity: "Billie Eilish", location: "Main Stage", attending: 1 },
-      { time: "7:00 PM - 8:30 PM", activity: "The Strokes", location: "Desert Stage", attending: 0 }
-    ],
-    createdBy: 'user1',
-    createdAt: '2025-04-01T00:00:00Z'
-  },
-  {
-    _id: '2',
-    name: "Hiking Trip",
-    date: "May 10-12, 2025",
-    location: "Smoky Mountains",
-    description: "Weekend hiking adventure in the mountains",
-    members: [
-      { name: "Alex", color: "#3b82f6", _id: "user1" },
-      { name: "Jordan", color: "#8b5cf6", _id: "user3" },
-      { name: "Casey", color: "#ec4899", _id: "user5" }
-    ],
-    schedule: [
-      { time: "9:00 AM - 12:00 PM", activity: "Morning Hike", location: "Trail Head", attending: 3 },
-      { time: "1:00 PM - 3:00 PM", activity: "Lunch Break", location: "Summit", attending: 3 }
-    ],
-    createdBy: 'user1',
-    createdAt: '2025-04-05T00:00:00Z'
-  }
-];
-
-// Suggested events
-const mockSuggestedEvents = [
-  { _id: '3', name: "Coachella 2025", date: "Apr 10-19, 2025", location: "Indio, CA" },
-  { _id: '4', name: "Lollapalooza", date: "Jul 30-Aug 2, 2025", location: "Chicago, IL" },
-  { _id: '5', name: "Bonnaroo", date: "Jun 12-15, 2025", location: "Manchester, TN" }
-];
 
 // Simulate local storage for events
 const EVENTS_KEY = 'eventbuddy_events';

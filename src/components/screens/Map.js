@@ -102,8 +102,8 @@ const NearbyFriends = ({ friends }) => (
   <div className="bg-white border-t border-gray-200 p-4">
     <h3 className="font-medium mb-2">Nearby Friends</h3>
     <div className="flex space-x-4 mb-4">
-      {friends.map((friend, index) => (
-        <div key={index} className="flex flex-col items-center">
+      {friends.map((friend) => (
+        <div key={friend._id} className="flex flex-col items-center">
           <Avatar 
             initial={friend.initial} 
             color={friend.color}
