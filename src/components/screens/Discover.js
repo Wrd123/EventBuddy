@@ -3,6 +3,7 @@ import Header from '../common/Header';
 import Footer from '../layout/Footer';
 import { useAppContext } from '../../context/AppContext';
 import { recommendedArtists, popularEvents } from '../../data/mockData';
+import { formatDateRange } from '../../utils/dates';
 
 const Discover = () => {
   const { suggestedEvents } = useAppContext();
@@ -56,7 +57,7 @@ const EventRecommendations = ({ events }) => (
             className="w-full h-20 object-cover rounded-lg mb-2" 
           />
           <div className="font-medium text-sm">{event.name}</div>
-          <div className="text-xs text-gray-500">{event.date}</div>
+          <div className="text-xs text-gray-500">{formatDateRange(event.startDate, event.endDate)}</div>
         </div>
       ))}
     </div>
@@ -97,7 +98,7 @@ const NearbyEvents = () => (
           <div className="flex-1">
             <div className="font-medium">{event.name}</div>
             <div className="text-sm text-gray-500 mb-1">
-              {event.date} • {event.location}
+              {formatDateRange(event.startDate, event.endDate)} • {event.location}
             </div>
             <div className="text-xs text-purple-600">
               {event.interestedFriends} friends interested

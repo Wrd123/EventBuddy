@@ -3,6 +3,7 @@ import { Calendar, MessageSquare, DollarSign, Map, Plus } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 import { Avatar } from '../common';
+import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay } from '../../utils/dates';
 
 const EventDetails = () => {
   const { selectedEvent, navigateTo } = useAppContext();
@@ -43,7 +44,7 @@ const EventCover = ({ event }) => (
     />
     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
       <h2 className="text-white text-xl font-bold">{event.name}</h2>
-      <p className="text-white">{[event.date, event.location].filter(Boolean).join(' • ')}</p>
+      <p className="text-white">{[formatDateRange(event.startDate, event.endDate), event.location].filter(Boolean).join(' • ')}</p>
     </div>
   </div>
 );
@@ -83,36 +84,48 @@ const ActionButton = ({ Icon, label, onClick }) => (
   </button>
 );
 
-const EventContent = ({ event }) => (
-  <div className="p-4">
-    <h3 className="text-lg font-semibold mb-2">Group Members</h3>
-    <div className="flex space-x-2 mb-4">
-      {event.members.map((member) => (
-        <div key={member._id} className="flex flex-col items-center">
-          <Avatar 
-            initial={member.name.charAt(0)} 
-            color={member.color} 
-            size="md" 
-          />
-          <span className="text-xs mt-1">{member.name}</span>
+const EventContent = ({ event }) => {
+  // Preview one day: today while the event is running, else its first day.
+  // The Schedule screen shows every day.
+  const day = defaultScheduleDay(event);
+  const items = event.schedule.filter(item => item.date === day);
+  const heading = getEventStatus(event) === 'ongoing' ? "Today's Schedule" : `Schedule · ${formatDay(day)}`;
+
+  return (
+    <div className="p-4">
+      <h3 className="text-lg font-semibold mb-2">Group Members</h3>
+      <div className="flex space-x-2 mb-4">
+        {event.members.map((member) => (
+          <div key={member._id} className="flex flex-col items-center">
+            <Avatar 
+              initial={member.name.charAt(0)} 
+              color={member.color} 
+              size="md" 
+            />
+            <span className="text-xs mt-1">{member.name}</span>
+          </div>
+        ))}
+        <div className="flex flex-col items-center">
+          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 border border-dashed border-purple-300">
+            <Plus size={16} />
+          </div>
+          <span className="text-xs mt-1">Invite</span>
         </div>
-      ))}
-      <div className="flex flex-col items-center">
-        <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 border border-dashed border-purple-300">
-          <Plus size={16} />
-        </div>
-        <span className="text-xs mt-1">Invite</span>
       </div>
-    </div>
     
-    <h3 className="text-lg font-semibold mb-2">Today's Schedule</h3>
-    <div className="flex flex-col space-y-3">
-      {event.schedule.map((item, index) => (
-        <ScheduleItem key={index} item={item} />
-      ))}
+      <h3 className="text-lg font-semibold mb-2">{heading}</h3>
+      {items.length > 0 ? (
+        <div className="flex flex-col space-y-3">
+          {items.map((item) => (
+            <ScheduleItem key={`${item.date}-${item.time}-${item.activity}`} item={item} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">Nothing scheduled for this day yet.</p>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 const ScheduleItem = ({ item }) => (
   <div className="border border-gray-200 rounded-lg p-3">

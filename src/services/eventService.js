@@ -4,8 +4,10 @@ import { getCurrentUser } from './authService';
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Simulate local storage for events
-const EVENTS_KEY = 'eventbuddy_events';
+// Simulate local storage for events. Bump the version when the stored
+// event shape changes so old data isn't read in the new format
+// (v2: free-text `date` became `startDate`/`endDate`).
+const EVENTS_KEY = 'eventbuddy_events_v2';
 
 const getStoredEvents = () => {
   const stored = localStorage.getItem(EVENTS_KEY);

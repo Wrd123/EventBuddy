@@ -12,7 +12,8 @@ const mockLocationData = {
       {
         _id: 'loc_1',
         name: 'Atlanta Jazz Festival',
-        date: 'Sep 15-17, 2025',
+        startDate: '2026-11-06',
+        endDate: '2026-11-08',
         location: 'Piedmont Park, Atlanta',
         distance: '2.3 miles',
         interestedFriends: 15,
@@ -21,7 +22,8 @@ const mockLocationData = {
       {
         _id: 'loc_2',
         name: 'Food & Wine Expo',
-        date: 'Sep 22, 2025',
+        startDate: '2026-11-21',
+        endDate: '2026-11-21',
         location: 'Georgia World Congress Center',
         distance: '5.1 miles',
         interestedFriends: 8,
@@ -35,7 +37,8 @@ const mockLocationData = {
       {
         _id: 'loc_default_1',
         name: 'Local Music Night',
-        date: 'This Weekend',
+        startDate: '2026-10-24',
+        endDate: '2026-10-25',
         location: 'Downtown',
         distance: '1.2 miles',
         interestedFriends: 5,

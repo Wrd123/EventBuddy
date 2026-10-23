@@ -15,7 +15,8 @@ const logIn = () => run(() => authService.login({ email: 'user@example.com', pas
 const newEvent = {
   name: 'Friendsgiving',
   type: 'outdoor',
-  date: 'Nov 27, 2026',
+  startDate: '2026-11-27',
+  endDate: '2026-11-29',
   location: 'Atlanta, GA',
   invitedFriends: ['Alex', 'Taylor']
 };
@@ -67,7 +68,8 @@ describe('createEvent', () => {
     expect(event).toMatchObject({
       name: 'Friendsgiving',
       type: 'outdoor',
-      date: 'Nov 27, 2026',
+      startDate: '2026-11-27',
+      endDate: '2026-11-29',
       location: 'Atlanta, GA',
       schedule: []
     });

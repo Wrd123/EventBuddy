@@ -6,6 +6,9 @@ import Header from '../common/Header';
 import Footer from '../layout/Footer';
 import LocationPermissionModal from '../common/LocationPermissionModal';
 import { EventCard, SuggestedEventCard } from '../common';
+import { todayISO, getEventStatus, formatDateRange } from '../../utils/dates';
+
+const byStartDate = (a, b) => a.startDate.localeCompare(b.startDate);
 
 const Home = () => {
   const { events, suggestedEvents, selectEvent, currentUser } = useAppContext();
@@ -20,6 +23,16 @@ const Home = () => {
   } = useLocation();
 
   const [showLocationModal, setShowLocationModal] = useState(false);
+
+  // Upcoming and in-progress events soonest first; past events most recent first
+  const today = todayISO();
+  const withStatus = events.map(event => ({ event, status: getEventStatus(event, today) }));
+  const activeEvents = withStatus
+    .filter(({ status }) => status !== 'past')
+    .sort((a, b) => byStartDate(a.event, b.event));
+  const pastEvents = withStatus
+    .filter(({ status }) => status === 'past')
+    .sort((a, b) => byStartDate(b.event, a.event));
 
   const handleRequestLocation = async () => {
     try {
@@ -41,7 +54,7 @@ const Home = () => {
             {currentUser ? `Hey ${currentUser.name?.split(' ')[0]}! 🎵` : 'Welcome! 🎵'}
           </h2>
           <p className="text-purple-100 mb-4">
-            You have {events.length} upcoming events
+            You have {activeEvents.length} upcoming event{activeEvents.length === 1 ? '' : 's'}
           </p>
         </div>
 
@@ -75,7 +88,7 @@ const Home = () => {
               {nearbyEvents.map((event) => (
                 <div key={event._id} className="bg-white rounded-lg shadow-md p-4">
                   <h4 className="font-semibold text-gray-800">{event.name}</h4>
-                  <p className="text-sm text-gray-600">{event.date}</p>
+                  <p className="text-sm text-gray-600">{formatDateRange(event.startDate, event.endDate)}</p>
                   <div className="flex items-center text-sm text-gray-500 mt-1">
                     <MapPin size={14} className="mr-1" />
                     <span>{event.location} • {event.distance}</span>
@@ -94,16 +107,37 @@ const Home = () => {
         {/* Your existing events */}
         <div className="p-4">
           <h3 className="text-lg font-semibold mb-3">Your Events</h3>
-          <div className="flex flex-col space-y-3">
-            {events.map((event) => (
-              <EventCard 
-                key={event._id} 
-                event={event} 
-                onSelect={() => selectEvent(event)} 
-              />
-            ))}
-          </div>
+          {activeEvents.length > 0 ? (
+            <div className="flex flex-col space-y-3">
+              {activeEvents.map(({ event, status }) => (
+                <EventCard 
+                  key={event._id} 
+                  event={event} 
+                  status={status}
+                  onSelect={() => selectEvent(event)} 
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No upcoming events yet. Tap + to plan one.</p>
+          )}
         </div>
+
+        {pastEvents.length > 0 && (
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-3">Past Events</h3>
+            <div className="flex flex-col space-y-3">
+              {pastEvents.map(({ event, status }) => (
+                <EventCard 
+                  key={event._id} 
+                  event={event} 
+                  status={status}
+                  onSelect={() => selectEvent(event)} 
+                />
+              ))}
+            </div>
+          </div>
+        )}
         
         <div className="p-4">
           <h3 className="text-lg font-semibold mb-3">Suggested For You</h3>

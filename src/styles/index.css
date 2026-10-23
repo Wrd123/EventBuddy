@@ -47,6 +47,15 @@ html, body, #root {
   background: #a3a3a3;
 }
 
+/* Horizontal chip/tab strips scroll by swipe; hide their scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Animation for transitions */
 .screen-transition {
   transition: all 0.3s ease;

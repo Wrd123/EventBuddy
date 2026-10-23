@@ -7,7 +7,8 @@ export const events = [
   {
     _id: '1',
     name: "Summer Music Festival",
-    date: "Apr 15-18, 2025",
+    startDate: "2027-04-15",
+    endDate: "2027-04-18",
     location: "Indio, CA",
     description: "Annual summer music festival with top artists",
     members: [
@@ -17,10 +18,10 @@ export const events = [
       { _id: "user4", name: "Jamie", color: "#f59e0b" }
     ],
     schedule: [
-      { time: "2:00 PM - 3:30 PM", activity: "Arctic Monkeys", location: "Main Stage", attending: 4 },
-      { time: "4:00 PM - 5:00 PM", activity: "Tame Impala", location: "Sunset Stage", attending: 2 },
-      { time: "5:30 PM - 6:30 PM", activity: "Billie Eilish", location: "Main Stage", attending: 1 },
-      { time: "7:00 PM - 8:30 PM", activity: "The Strokes", location: "Desert Stage", attending: 0 }
+      { date: "2027-04-15", time: "2:00 PM - 3:30 PM", activity: "Arctic Monkeys", location: "Main Stage", attending: 4 },
+      { date: "2027-04-15", time: "4:00 PM - 5:00 PM", activity: "Tame Impala", location: "Sunset Stage", attending: 2 },
+      { date: "2027-04-16", time: "5:30 PM - 6:30 PM", activity: "Billie Eilish", location: "Main Stage", attending: 1 },
+      { date: "2027-04-17", time: "7:00 PM - 8:30 PM", activity: "The Strokes", location: "Desert Stage", attending: 0 }
     ],
     createdBy: 'user1',
     createdAt: '2025-04-01T00:00:00Z'
@@ -28,7 +29,8 @@ export const events = [
   {
     _id: '2',
     name: "Hiking Trip",
-    date: "May 10-12, 2025",
+    startDate: "2026-11-13",
+    endDate: "2026-11-15",
     location: "Smoky Mountains",
     description: "Weekend hiking adventure in the mountains",
     members: [
@@ -37,19 +39,36 @@ export const events = [
       { _id: "user5", name: "Casey", color: "#ec4899" }
     ],
     schedule: [
-      { time: "9:00 AM - 12:00 PM", activity: "Morning Hike", location: "Trail Head", attending: 3 },
-      { time: "1:00 PM - 3:00 PM", activity: "Lunch Break", location: "Summit", attending: 3 }
+      { date: "2026-11-14", time: "9:00 AM - 12:00 PM", activity: "Morning Hike", location: "Trail Head", attending: 3 },
+      { date: "2026-11-14", time: "1:00 PM - 3:00 PM", activity: "Lunch Break", location: "Summit", attending: 3 }
     ],
     createdBy: 'user1',
     createdAt: '2025-04-05T00:00:00Z'
+  },
+  {
+    _id: '9',
+    name: "Beach Day",
+    startDate: "2026-08-08",
+    endDate: "2026-08-08",
+    location: "Tybee Island, GA",
+    description: "Day trip to the beach",
+    members: [
+      { _id: "user2", name: "Taylor", color: "#10b981" },
+      { _id: "user4", name: "Jamie", color: "#f59e0b" }
+    ],
+    schedule: [
+      { date: "2026-08-08", time: "10:00 AM - 4:00 PM", activity: "Beach", location: "North Beach", attending: 2 }
+    ],
+    createdBy: 'user2',
+    createdAt: '2026-07-20T00:00:00Z'
   }
 ];
 
 // Suggested events (seed data for eventService)
 export const suggestedEvents = [
-  { _id: '3', name: "Coachella 2025", date: "Apr 10-19, 2025", location: "Indio, CA" },
-  { _id: '4', name: "Lollapalooza", date: "Jul 30-Aug 2, 2025", location: "Chicago, IL" },
-  { _id: '5', name: "Bonnaroo", date: "Jun 12-15, 2025", location: "Manchester, TN" }
+  { _id: '3', name: "Coachella 2027", startDate: "2027-04-09", endDate: "2027-04-18", location: "Indio, CA" },
+  { _id: '4', name: "Lollapalooza", startDate: "2027-07-29", endDate: "2027-08-01", location: "Chicago, IL" },
+  { _id: '5', name: "Bonnaroo", startDate: "2027-06-10", endDate: "2027-06-13", location: "Manchester, TN" }
 ];
 
 // Mock chat messages
@@ -164,21 +183,24 @@ export const popularEvents = [
   {
     _id: '6',
     name: "Summer Music Festival",
-    date: "May 15-17, 2025",
+    startDate: "2027-05-14",
+    endDate: "2027-05-16",
     location: "Nashville, TN",
     interestedFriends: 5
   },
   {
     _id: '7',
     name: "Food & Wine Festival",
-    date: "Jun 5-7, 2025",
+    startDate: "2027-06-04",
+    endDate: "2027-06-06",
     location: "Memphis, TN",
     interestedFriends: 3
   },
   {
     _id: '8',
     name: "Outdoor Adventure Weekend",
-    date: "Jul 12-14, 2025",
+    startDate: "2027-07-09",
+    endDate: "2027-07-11",
     location: "Smoky Mountains",
     interestedFriends: 2
   }

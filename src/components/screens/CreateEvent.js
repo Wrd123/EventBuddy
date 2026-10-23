@@ -3,15 +3,20 @@ import { Music, Calendar, Map, Users, CheckCircle, Plus } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 import { Button } from '../common';
+import { todayISO } from '../../utils/dates';
 
 export const MAX_NAME_LENGTH = 60;
 
 // Returns the first problem as a user-facing message, or '' if valid.
 // Expects trimmed values; handleSubmit trims before calling it.
-export const validateEvent = ({ name, date }) => {
+// Dates are "YYYY-MM-DD" strings, which compare correctly as strings.
+export const validateEvent = ({ name, startDate, endDate }, today = todayISO()) => {
   if (!name) return 'Please enter an event name.';
   if (name.length > MAX_NAME_LENGTH) return `Event name must be ${MAX_NAME_LENGTH} characters or fewer.`;
-  if (!date) return 'Please enter a date.';
+  if (!startDate) return 'Please choose a date.';
+  if (startDate < today) return "The event can't start in the past.";
+  if (!endDate) return 'Please choose an end date.';
+  if (endDate < startDate) return 'The end date must be on or after the start date.';
   return '';
 };
 
@@ -20,7 +25,9 @@ const CreateEvent = () => {
   const [eventData, setEventData] = useState({
     name: '',
     type: 'music-festival',
-    date: '',
+    isMultiDay: false,
+    startDate: '',
+    endDate: '',
     location: '',
     invitedFriends: ['Alex', 'Taylor', 'Jordan']
   });
@@ -42,12 +49,14 @@ const CreateEvent = () => {
     if (isSubmitting) return;
     setError('');
 
-    // Validate and save the trimmed values, not the raw input
+    // Validate and save the trimmed values, not the raw input.
+    // A single-day event ends on the day it starts; isMultiDay is form-only.
+    const { isMultiDay, ...fields } = eventData;
     const cleaned = {
-      ...eventData,
-      name: eventData.name.trim(),
-      date: eventData.date.trim(),
-      location: eventData.location.trim()
+      ...fields,
+      name: fields.name.trim(),
+      endDate: isMultiDay ? fields.endDate : fields.startDate,
+      location: fields.location.trim()
     };
 
     const validationError = validateEvent(cleaned);
@@ -97,9 +106,11 @@ const CreateEvent = () => {
           onSelect={handleEventTypeSelect} 
         />
         
-        <DateInput 
-          value={eventData.date} 
-          onChange={(value) => handleChange('date', value)} 
+        <DateFields 
+          isMultiDay={eventData.isMultiDay}
+          startDate={eventData.startDate}
+          endDate={eventData.endDate}
+          onChange={handleChange} 
         />
         
         <LocationInput 
@@ -187,20 +198,58 @@ const EventTypeSelector = ({ selectedType, onSelect }) => {
   );
 };
 
-const DateInput = ({ value, onChange }) => (
-  <div className="mb-4">
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Date & Time
-    </label>
-    <input
-      type="text"
-      className="w-full p-2 border border-gray-300 rounded-lg"
-      placeholder="Jun 15-18, 2025"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  </div>
-);
+// type="date" opens the phone's native date picker and always yields
+// "YYYY-MM-DD". min blocks past days in the picker; validateEvent still
+// checks, since min isn't enforced on typed input in every browser.
+const DateFields = ({ isMultiDay, startDate, endDate, onChange }) => {
+  const today = todayISO();
+
+  return (
+    <div className="mb-4">
+      <label className="flex items-center mb-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          className="mr-2 h-4 w-4 accent-purple-600"
+          checked={isMultiDay}
+          onChange={(e) => onChange('isMultiDay', e.target.checked)}
+        />
+        Multi-day event
+      </label>
+
+      <div className={isMultiDay ? 'grid grid-cols-2 gap-2' : ''}>
+        <div>
+          <label htmlFor="event-start-date" className="block text-sm font-medium text-gray-700 mb-1">
+            {isMultiDay ? 'Start date' : 'Date'}
+          </label>
+          <input
+            id="event-start-date"
+            type="date"
+            className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+            min={today}
+            value={startDate}
+            onChange={(e) => onChange('startDate', e.target.value)}
+          />
+        </div>
+
+        {isMultiDay && (
+          <div>
+            <label htmlFor="event-end-date" className="block text-sm font-medium text-gray-700 mb-1">
+              End date
+            </label>
+            <input
+              id="event-end-date"
+              type="date"
+              className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              min={startDate || today}
+              value={endDate}
+              onChange={(e) => onChange('endDate', e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const LocationInput = ({ value, onChange }) => (
   <div className="mb-4">

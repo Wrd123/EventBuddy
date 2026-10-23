@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Plus } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
+import { eachDay, formatDay, defaultScheduleDay } from '../../utils/dates';
 
 const Schedule = () => {
   const { selectedEvent, navigateTo } = useAppContext();
-  const [activeDay, setActiveDay] = useState(0);
+  // Lazy initial state: computed once, and only if there is an event
+  const [activeDay, setActiveDay] = useState(() =>
+    selectedEvent ? defaultScheduleDay(selectedEvent) : null
+  );
   
   useEffect(() => {
     if (!selectedEvent) navigateTo('home');
@@ -16,7 +20,7 @@ const Schedule = () => {
   return (
     <div className="flex flex-col h-full">
       <Header 
-        title="Festival Schedule" 
+        title="Schedule" 
         type="screen" 
         showBack={true} 
         showMenu={false} 
@@ -25,43 +29,62 @@ const Schedule = () => {
       />
       
       <div className="p-4 flex-1 overflow-y-auto">
-        <DaySelector activeDay={activeDay} setActiveDay={setActiveDay} />
+        <DaySelector 
+          days={eachDay(selectedEvent.startDate, selectedEvent.endDate)} 
+          activeDay={activeDay} 
+          setActiveDay={setActiveDay} 
+        />
         
-        <ScheduleItems items={selectedEvent.schedule} />
+        <ScheduleItems items={selectedEvent.schedule.filter(item => item.date === activeDay)} />
       </div>
     </div>
   );
 };
 
-const DaySelector = ({ activeDay, setActiveDay }) => {
-  const days = ['Day 1', 'Day 2', 'Day 3'];
-  
+const DaySelector = ({ days, activeDay, setActiveDay }) => {
+  const activeRef = useRef(null);
+
+  // Long events have more tabs than fit; keep the selected one visible,
+  // e.g. when the schedule opens on day 6 of a festival
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activeDay]);
+
   return (
-    <div className="flex overflow-x-auto space-x-2 mb-4">
-      {days.map((day, index) => (
+    <div className="flex overflow-x-auto no-scrollbar space-x-2 mb-4">
+      {days.map((day) => (
         <button 
-          key={index}
+          key={day}
+          ref={activeDay === day ? activeRef : null}
           className={`flex-shrink-0 px-4 py-2 rounded-full ${
-            activeDay === index 
+            activeDay === day 
               ? 'bg-purple-600 text-white' 
               : 'bg-white text-gray-700 border border-gray-200'
           }`}
-          onClick={() => setActiveDay(index)}
+          onClick={() => setActiveDay(day)}
         >
-          {day}
+          {formatDay(day)}
         </button>
       ))}
     </div>
   );
 };
 
-const ScheduleItems = ({ items }) => (
-  <div className="flex flex-col space-y-4">
-    {items.map((item, index) => (
-      <ScheduleItem key={index} item={item} />
-    ))}
-  </div>
-);
+const ScheduleItems = ({ items }) => {
+  if (items.length === 0) {
+    return <p className="text-sm text-gray-500">Nothing scheduled for this day yet.</p>;
+  }
+
+  // A stable key per item, so a favorite doesn't jump to a different item
+  // when switching days (index keys would reuse the same component state)
+  return (
+    <div className="flex flex-col space-y-4">
+      {items.map((item) => (
+        <ScheduleItem key={`${item.date}-${item.time}-${item.activity}`} item={item} />
+      ))}
+    </div>
+  );
+};
 
 const ScheduleItem = ({ item }) => {
   const [isFavorite, setIsFavorite] = useState(false);
