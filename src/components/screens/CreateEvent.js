@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Music, Calendar, Map, Users, CheckCircle, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 import { Button } from '../common';
@@ -22,6 +23,7 @@ export const validateEvent = ({ name, startDate, endDate }, today = todayISO()) 
 
 const CreateEvent = () => {
   const { createEvent } = useAppContext();
+  const navigate = useNavigate();
   const [eventData, setEventData] = useState({
     name: '',
     type: 'music-festival',
@@ -67,12 +69,13 @@ const CreateEvent = () => {
 
     setIsSubmitting(true);
     try {
-      // createEvent navigates to the new event itself
-      await createEvent(cleaned);
+      const { event } = await createEvent(cleaned);
+      // replace: Back from the new event goes Home, not back into this form
+      navigate(`/events/${event._id}`, { replace: true });
     } catch (err) {
       setError(err.message || 'Could not create the event. Please try again.');
-      // Only re-enable on failure: on success createEvent returns before the
-      // screen changes, and re-enabling would allow a duplicate submit.
+      // Only re-enable on failure: on success the screen is leaving, and
+      // re-enabling would allow a duplicate submit in the meantime.
       // The form keeps its values so the user can retry.
       setIsSubmitting(false);
     }
@@ -84,7 +87,7 @@ const CreateEvent = () => {
         title="Create New Event" 
         type="screen" 
         showBack={true} 
-        showMenu={false} 
+        showProfile={false} 
         showNotifications={false}
       />
       

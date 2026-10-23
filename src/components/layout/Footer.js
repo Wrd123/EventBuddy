@@ -1,9 +1,10 @@
 import React from 'react';
 import { Calendar, Users, Plus, Music, Map } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Footer = () => {
-  const { navigateTo, currentScreen } = useAppContext();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   return (
     <div className="shrink-0 bg-white border-t border-gray-200">
@@ -11,27 +12,27 @@ const Footer = () => {
         <NavItem 
           Icon={Calendar} 
           label="Events" 
-          isActive={currentScreen === 'home'} 
-          onClick={() => navigateTo('home')} 
+          isActive={pathname === '/'} 
+          onClick={() => navigate('/')} 
         />
         <NavItem 
           Icon={Users} 
           label="Groups" 
-          isActive={currentScreen === 'groups'} 
-          onClick={() => navigateTo('groups')} 
+          isActive={pathname === '/groups'} 
+          onClick={() => navigate('/groups')} 
         />
-        <CreateButton onClick={() => navigateTo('createEvent')} />
+        <CreateButton onClick={() => navigate('/create')} />
         <NavItem 
           Icon={Music} 
           label="Discover" 
-          isActive={currentScreen === 'discover'} 
-          onClick={() => navigateTo('discover')} 
+          isActive={pathname === '/discover'} 
+          onClick={() => navigate('/discover')} 
         />
         <NavItem 
           Icon={Map} 
           label="Map" 
-          isActive={currentScreen === 'map'} 
-          onClick={() => navigateTo('map')} 
+          isActive={pathname === '/map'} 
+          onClick={() => navigate('/map')} 
         />
       </nav>
     </div>
@@ -54,6 +55,7 @@ const CreateButton = ({ onClick }) => (
   <button 
     onClick={onClick} 
     className="flex flex-col items-center bg-purple-600 text-white rounded-full p-3 -mt-5"
+    aria-label="Create event"
   >
     <Plus size={24} />
   </button>

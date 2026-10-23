@@ -1,17 +1,16 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import * as authService from '../services/authService';
 import * as eventService from '../services/eventService';
 
 // Create context
 const AppContext = createContext();
 
-// Context provider component
+// Context provider component: auth and event data. Navigation lives in the
+// router (see MainLayout), so nothing here changes screens.
 export const AppProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentScreen, setCurrentScreen] = useState('home');
-  const [selectedEvent, setSelectedEvent] = useState(null);
   const [events, setEvents] = useState([]);
   const [suggestedEvents, setSuggestedEvents] = useState([]);
   const [error, setError] = useState(null);
@@ -72,7 +71,6 @@ export const AppProvider = ({ children }) => {
       
       setCurrentUser(response.user);
       setIsAuthenticated(true);
-      navigateTo('home');
       
       return response;
     } catch (error) {
@@ -87,7 +85,6 @@ export const AppProvider = ({ children }) => {
       
       setCurrentUser(response.user);
       setIsAuthenticated(true);
-      navigateTo('home');
       
       return response;
     } catch (error) {
@@ -102,7 +99,6 @@ export const AppProvider = ({ children }) => {
     setIsAuthenticated(false);
     setEvents([]);
     setSuggestedEvents([]);
-    navigateTo('login');
   };
   
   const updateProfile = async (profileData) => {
@@ -121,11 +117,8 @@ export const AppProvider = ({ children }) => {
     try {
       const response = await eventService.createEvent(eventData);
       
-      // Add new event to state
+      // Add new event to state; the caller decides where to go next
       setEvents(prev => [...prev, response.event]);
-      
-      // Select the new event
-      selectEvent(response.event);
       
       return response;
     } catch (error) {
@@ -143,11 +136,6 @@ export const AppProvider = ({ children }) => {
         event._id === eventId ? response.event : event
       ));
       
-      // Update selected event if it's the current one
-      if (selectedEvent && selectedEvent._id === eventId) {
-        setSelectedEvent(response.event);
-      }
-      
       return response;
     } catch (error) {
       setError(error.message || 'Failed to update event.');
@@ -161,38 +149,12 @@ export const AppProvider = ({ children }) => {
       
       // Remove event from state
       setEvents(prev => prev.filter(event => event._id !== eventId));
-      
-      // Clear selected event if it's the deleted one
-      if (selectedEvent && selectedEvent._id === eventId) {
-        setSelectedEvent(null);
-      }
-      
-      navigateTo('home');
     } catch (error) {
       setError(error.message || 'Failed to delete event.');
       throw error;
     }
   };
   
-  // Navigation functions
-  // Stable identity so screens can list it in effect dependencies
-  const navigateTo = useCallback((screen) => {
-    setCurrentScreen(screen);
-  }, []);
-  
-  const selectEvent = async (event) => {
-    try {
-      // Fetch full event details
-      const eventDetails = await eventService.getEventById(event._id);
-      
-      setSelectedEvent(eventDetails);
-      navigateTo('eventDetails');
-    } catch (error) {
-      console.error('Select event error:', error);
-      setError('Failed to load event details.');
-    }
-  };
-
   // Clear any errors
   const clearError = () => {
     setError(null);
@@ -203,10 +165,6 @@ export const AppProvider = ({ children }) => {
     currentUser,
     isAuthenticated,
     isLoading,
-    currentScreen,
-    navigateTo,
-    selectedEvent,
-    selectEvent,
     events,
     suggestedEvents,
     error,

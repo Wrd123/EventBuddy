@@ -1,9 +1,12 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import Header from '../common/Header';
 import { expenses } from '../../data/mockData';
 
 const Expenses = () => {
+  const { eventId } = useParams();
+
   // Calculate budget summary
   const totalBudget = 850.00;
   const spentSoFar = 560.00;
@@ -16,9 +19,9 @@ const Expenses = () => {
         title="Group Expenses" 
         type="screen" 
         showBack={true} 
-        showMenu={false} 
+        showProfile={false} 
         showNotifications={false} 
-        backScreen="eventDetails"
+        backTo={`/events/${eventId}`}
       />
       
       <div className="p-4 flex-1 overflow-y-auto">

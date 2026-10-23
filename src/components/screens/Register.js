@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Button } from '../common';
 
 const Register = () => {
-  const { register, navigateTo } = useAppContext();
+  const { register } = useAppContext();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -45,7 +46,7 @@ const Register = () => {
       const { confirmPassword, ...userData } = formData;
       
       await register(userData);
-      // Navigation is handled in the AppContext
+      // On success the PublicOnly route redirects to Home
     } catch (error) {
       setError(error.message || 'Registration failed. Please try again.');
     } finally {
@@ -172,12 +173,9 @@ const Register = () => {
         <div className="mt-4 text-center">
           <p className="text-gray-600">
             Already have an account?{' '}
-            <button
-              onClick={() => navigateTo('login')}
-              className="text-purple-600 font-medium"
-            >
+            <Link to="/login" className="text-purple-600 font-medium">
               Login
-            </button>
+            </Link>
           </p>
         </div>
       </div>

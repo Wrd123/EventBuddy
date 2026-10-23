@@ -1,21 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Plus } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
+import { useParams } from 'react-router-dom';
 import Header from '../common/Header';
+import { ScreenLoader } from '../common';
+import NotFound from './NotFound';
+import { useEvent } from '../../hooks/useEvent';
 import { eachDay, formatDay, defaultScheduleDay } from '../../utils/dates';
 
 const Schedule = () => {
-  const { selectedEvent, navigateTo } = useAppContext();
-  // Lazy initial state: computed once, and only if there is an event
-  const [activeDay, setActiveDay] = useState(() =>
-    selectedEvent ? defaultScheduleDay(selectedEvent) : null
-  );
-  
-  useEffect(() => {
-    if (!selectedEvent) navigateTo('home');
-  }, [selectedEvent, navigateTo]);
+  const { eventId } = useParams();
+  const { event, status } = useEvent(eventId);
+  // null until the user picks a tab; until then show the default day.
+  // Derived rather than initial state, since the event may still be loading.
+  const [chosenDay, setChosenDay] = useState(null);
 
-  if (!selectedEvent) return null;
+  if (status === 'loading') return <ScreenLoader />;
+  if (status === 'not-found') {
+    return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
+  }
+
+  const activeDay = chosenDay ?? defaultScheduleDay(event);
 
   return (
     <div className="flex flex-col h-full">
@@ -23,19 +27,19 @@ const Schedule = () => {
         title="Schedule" 
         type="screen" 
         showBack={true} 
-        showMenu={false} 
+        showProfile={false} 
         showNotifications={false} 
-        backScreen="eventDetails"
+        backTo={`/events/${eventId}`}
       />
       
       <div className="p-4 flex-1 overflow-y-auto">
         <DaySelector 
-          days={eachDay(selectedEvent.startDate, selectedEvent.endDate)} 
+          days={eachDay(event.startDate, event.endDate)} 
           activeDay={activeDay} 
-          setActiveDay={setActiveDay} 
+          setActiveDay={setChosenDay} 
         />
         
-        <ScheduleItems items={selectedEvent.schedule.filter(item => item.date === activeDay)} />
+        <ScheduleItems items={event.schedule.filter(item => item.date === activeDay)} />
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { useLocation } from '../../hooks/useLocation';
 import Header from '../common/Header';
@@ -11,7 +12,9 @@ import { todayISO, getEventStatus, formatDateRange } from '../../utils/dates';
 const byStartDate = (a, b) => a.startDate.localeCompare(b.startDate);
 
 const Home = () => {
-  const { events, suggestedEvents, selectEvent, currentUser } = useAppContext();
+  const { events, suggestedEvents, currentUser } = useAppContext();
+  const navigate = useNavigate();
+  const openEvent = (event) => navigate(`/events/${event._id}`);
   const {
     nearbyEvents,
     isLoadingLocation,
@@ -114,7 +117,7 @@ const Home = () => {
                   key={event._id} 
                   event={event} 
                   status={status}
-                  onSelect={() => selectEvent(event)} 
+                  onSelect={() => openEvent(event)} 
                 />
               ))}
             </div>
@@ -132,7 +135,7 @@ const Home = () => {
                   key={event._id} 
                   event={event} 
                   status={status}
-                  onSelect={() => selectEvent(event)} 
+                  onSelect={() => openEvent(event)} 
                 />
               ))}
             </div>

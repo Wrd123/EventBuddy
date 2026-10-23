@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Button } from '../common';
 
 const Login = () => {
-  const { login, navigateTo } = useAppContext();
+  const { login } = useAppContext();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -25,7 +26,7 @@ const Login = () => {
     
     try {
       await login(formData);
-      // Navigation is handled in the AppContext
+      // On success the PublicOnly route redirects to where the user was going
     } catch (error) {
       setError(error.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -92,12 +93,9 @@ const Login = () => {
         <div className="mt-4 text-center">
           <p className="text-gray-600">
             Don't have an account?{' '}
-            <button
-              onClick={() => navigateTo('register')}
-              className="text-purple-600 font-medium"
-            >
+            <Link to="/register" className="text-purple-600 font-medium">
               Sign up
-            </button>
+            </Link>
           </p>
         </div>
       </div>

@@ -1,35 +1,35 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Calendar, MessageSquare, DollarSign, Map, Plus } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
+import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../common/Header';
-import { Avatar } from '../common';
+import { Avatar, ScreenLoader } from '../common';
+import NotFound from './NotFound';
+import { useEvent } from '../../hooks/useEvent';
 import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay } from '../../utils/dates';
 
 const EventDetails = () => {
-  const { selectedEvent, navigateTo } = useAppContext();
+  const { eventId } = useParams();
+  const { event, status } = useEvent(eventId);
 
-  // Redirect in an effect: calling navigateTo during render updates
-  // AppProvider state mid-render, which React warns about.
-  useEffect(() => {
-    if (!selectedEvent) navigateTo('home');
-  }, [selectedEvent, navigateTo]);
-
-  if (!selectedEvent) return null;
+  if (status === 'loading') return <ScreenLoader />;
+  if (status === 'not-found') {
+    return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
+  }
 
   return (
     <div className="flex flex-col h-full">
       <Header 
-        title={selectedEvent.name} 
+        title={event.name} 
         type="screen" 
         showBack={true} 
-        showMenu={false} 
+        showProfile={false} 
         showNotifications={false}
       />
       
       <div className="flex-1 overflow-y-auto pb-16">
-        <EventCover event={selectedEvent} />
-        <EventActions navigateTo={navigateTo} />
-        <EventContent event={selectedEvent} />
+        <EventCover event={event} />
+        <EventActions eventId={eventId} />
+        <EventContent event={event} />
       </div>
     </div>
   );
@@ -49,30 +49,34 @@ const EventCover = ({ event }) => (
   </div>
 );
 
-const EventActions = ({ navigateTo }) => (
-  <div className="flex justify-around p-3 bg-white border-b border-gray-200">
-    <ActionButton 
-      Icon={Calendar} 
-      label="Schedule"
-      onClick={() => navigateTo('schedule')}
-    />
-    <ActionButton 
-      Icon={MessageSquare} 
-      label="Group Chat"
-      onClick={() => navigateTo('groupChat')}
-    />
-    <ActionButton 
-      Icon={DollarSign} 
-      label="Expenses"
-      onClick={() => navigateTo('expenses')}
-    />
-    <ActionButton 
-      Icon={Map} 
-      label="Map"
-      onClick={() => navigateTo('map')}
-    />
-  </div>
-);
+const EventActions = ({ eventId }) => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex justify-around p-3 bg-white border-b border-gray-200">
+      <ActionButton 
+        Icon={Calendar} 
+        label="Schedule"
+        onClick={() => navigate(`/events/${eventId}/schedule`)}
+      />
+      <ActionButton 
+        Icon={MessageSquare} 
+        label="Group Chat"
+        onClick={() => navigate(`/events/${eventId}/chat`)}
+      />
+      <ActionButton 
+        Icon={DollarSign} 
+        label="Expenses"
+        onClick={() => navigate(`/events/${eventId}/expenses`)}
+      />
+      <ActionButton 
+        Icon={Map} 
+        label="Map"
+        onClick={() => navigate('/map')}
+      />
+    </div>
+  );
+};
 
 const ActionButton = ({ Icon, label, onClick }) => (
   <button 

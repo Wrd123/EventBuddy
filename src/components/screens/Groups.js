@@ -1,12 +1,12 @@
 import React from 'react';
 import { Music, Map, Users, Plus } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
+import { useNavigate } from 'react-router-dom';
 import Header from '../common/Header';
 import Footer from '../layout/Footer';
 import { groups } from '../../data/mockData';
 
 const Groups = () => {
-  const { navigateTo } = useAppContext();
+  const navigate = useNavigate();
   
   // Filter active and inactive groups
   const activeGroups = groups.filter(group => group.isActive);
@@ -30,7 +30,7 @@ const Groups = () => {
             <GroupCard 
               key={group._id} 
               group={group} 
-              onClick={() => navigateTo('eventDetails')} 
+              onClick={group.eventId ? () => navigate(`/events/${group.eventId}`) : undefined} 
             />
           ))}
         </div>

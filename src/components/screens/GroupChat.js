@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import Header from '../common/Header';
 import { chatMessages } from '../../data/mockData';
 
 const GroupChat = () => {
+  const { eventId } = useParams();
   const [message, setMessage] = useState('');
 
   const handleSendMessage = (e) => {
@@ -17,9 +19,9 @@ const GroupChat = () => {
         title="Festival Squad" 
         type="screen" 
         showBack={true} 
-        showMenu={false} 
+        showProfile={false} 
         showNotifications={false} 
-        backScreen="eventDetails"
+        backTo={`/events/${eventId}`}
       />
       
       <ChatMessages messages={chatMessages} />

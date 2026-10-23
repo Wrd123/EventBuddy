@@ -1,19 +1,19 @@
 import React from 'react';
 import { ArrowLeft, Plus } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
+import { useNavigate } from 'react-router-dom';
 import Footer from '../layout/Footer';
 import { Button, Avatar } from '../common';
 import { nearbyFriends } from '../../data/mockData';
 
 const Map = () => {
-  const { navigateTo } = useAppContext();
+  const navigate = useNavigate();
   
   return (
     <div className="flex flex-col h-full">
       <div className="relative flex-1">
         <MapView />
-        <MapControls navigateTo={navigateTo} />
-        <MapSearch navigateTo={navigateTo} />
+        <MapControls />
+        <MapSearch onBack={() => navigate('/')} />
       </div>
       
       <NearbyFriends friends={nearbyFriends} />
@@ -84,10 +84,12 @@ const MapControls = () => (
 );
 
 // Search bar on map
-const MapSearch = ({ navigateTo }) => (
+const MapSearch = ({ onBack }) => (
   <div className="absolute top-4 left-4 right-4">
     <div className="bg-white rounded-full shadow px-4 py-2 flex items-center">
-      <ArrowLeft size={20} onClick={() => navigateTo('home')} className="mr-2" />
+      <button onClick={onBack} className="mr-2" aria-label="Back">
+        <ArrowLeft size={20} />
+      </button>
       <input
         type="text"
         className="flex-1 outline-none"
