@@ -32,3 +32,6 @@ Thumbs.db
 __pycache__/
 *.pyc
 .DS_Store
+
+# Local Claude Code settings (dev-server launch config)
+.claude/
