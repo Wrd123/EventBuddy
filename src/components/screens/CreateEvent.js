@@ -4,10 +4,11 @@ import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 import { Button } from '../common';
 
-const MAX_NAME_LENGTH = 60;
+export const MAX_NAME_LENGTH = 60;
 
-// Returns the first problem as a user-facing message, or '' if valid
-const validateEvent = ({ name, date }) => {
+// Returns the first problem as a user-facing message, or '' if valid.
+// Expects trimmed values; handleSubmit trims before calling it.
+export const validateEvent = ({ name, date }) => {
   if (!name) return 'Please enter an event name.';
   if (name.length > MAX_NAME_LENGTH) return `Event name must be ${MAX_NAME_LENGTH} characters or fewer.`;
   if (!date) return 'Please enter a date.';
