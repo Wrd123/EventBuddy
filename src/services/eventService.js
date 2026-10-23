@@ -1,5 +1,6 @@
 // Mock event service
 import { events as mockEvents, suggestedEvents as mockSuggestedEvents } from '../data/mockData';
+import { getCurrentUser } from './authService';
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -40,17 +41,25 @@ export const getEventById = async (eventId) => {
 export const createEvent = async (eventData) => {
   await delay(1000);
   
+  // A real API would take the creator from the auth token, not the request body
+  const creator = getCurrentUser();
+  if (!creator) {
+    throw new Error('You need to be logged in to create an event.');
+  }
+  
+  const invitedMembers = (eventData.invitedFriends || []).map((name, index) => ({
+    name,
+    color: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899'][index % 5],
+    _id: `user${Date.now()}_${index}`
+  }));
+  
   const newEvent = {
     ...eventData,
     _id: Date.now().toString(),
-    members: eventData.invitedFriends ? 
-      eventData.invitedFriends.map((name, index) => ({
-        name,
-        color: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899'][index % 5],
-        _id: `user${Date.now()}_${index}`
-      })) : [],
+    // Creator is always the first member; purple matches "you" in GroupChat
+    members: [{ _id: creator._id, name: creator.name, color: '#7c3aed' }, ...invitedMembers],
     schedule: [],
-    createdBy: 'current_user',
+    createdBy: creator._id,
     createdAt: new Date().toISOString()
   };
   

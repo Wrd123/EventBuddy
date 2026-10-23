@@ -43,7 +43,7 @@ const EventCover = ({ event }) => (
     />
     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
       <h2 className="text-white text-xl font-bold">{event.name}</h2>
-      <p className="text-white">{event.date} • {event.location}</p>
+      <p className="text-white">{[event.date, event.location].filter(Boolean).join(' • ')}</p>
     </div>
   </div>
 );

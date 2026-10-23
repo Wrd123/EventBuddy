@@ -6,7 +6,7 @@ const EventCard = ({ event, onSelect }) => (
       <img src="https://placehold.co/80x80" alt="Event" className="w-20 h-20 object-cover rounded-lg mr-3" />
       <div className="flex-1">
         <div className="font-medium">{event.name}</div>
-        <div className="text-sm text-gray-500 mb-1">{event.date} • {event.location}</div>
+        <div className="text-sm text-gray-500 mb-1">{[event.date, event.location].filter(Boolean).join(' • ')}</div>
         <div className="flex items-center">
           <div className="flex -space-x-2 mr-2">
             {event.members.slice(0, 3).map((member) => (

@@ -4,8 +4,17 @@ import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
 import { Button } from '../common';
 
+const MAX_NAME_LENGTH = 60;
+
+// Returns the first problem as a user-facing message, or '' if valid
+const validateEvent = ({ name, date }) => {
+  if (!name) return 'Please enter an event name.';
+  if (name.length > MAX_NAME_LENGTH) return `Event name must be ${MAX_NAME_LENGTH} characters or fewer.`;
+  if (!date) return 'Please enter a date.';
+  return '';
+};
+
 const CreateEvent = () => {
-  // eslint-disable-next-line no-unused-vars -- TODO(you): delete once handleSubmit uses it
   const { createEvent } = useAppContext();
   const [eventData, setEventData] = useState({
     name: '',
@@ -14,9 +23,7 @@ const CreateEvent = () => {
     location: '',
     invitedFriends: ['Alex', 'Taylor', 'Jordan']
   });
-  // eslint-disable-next-line no-unused-vars -- TODO(you): delete once handleSubmit uses it
   const [error, setError] = useState('');
-  // eslint-disable-next-line no-unused-vars -- TODO(you): delete once handleSubmit uses it
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (field, value) => {
@@ -31,20 +38,34 @@ const CreateEvent = () => {
   };
 
   const handleSubmit = async () => {
-    // TODO(you): validate eventData and save it.
-    //
-    // Available here:
-    //   eventData        -> { name, type, date, location, invitedFriends }
-    //   createEvent(data) -> async; on success it adds the event to state
-    //                        and navigates to its details screen; on failure
-    //                        it throws an Error with a .message
-    //   setError(msg)     -> shows a red banner above the form ('' hides it)
-    //   setIsSubmitting(bool) -> disables the button while saving
-    //
-    // Decisions to make:
-    //   - Which fields are required? (name? date? at least one friend?)
-    //   - Trim whitespace before checking / saving?
-    //   - On failure, keep the form filled in so the user can retry?
+    if (isSubmitting) return;
+    setError('');
+
+    // Validate and save the trimmed values, not the raw input
+    const cleaned = {
+      ...eventData,
+      name: eventData.name.trim(),
+      date: eventData.date.trim(),
+      location: eventData.location.trim()
+    };
+
+    const validationError = validateEvent(cleaned);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // createEvent navigates to the new event itself
+      await createEvent(cleaned);
+    } catch (err) {
+      setError(err.message || 'Could not create the event. Please try again.');
+      // Only re-enable on failure: on success createEvent returns before the
+      // screen changes, and re-enabling would allow a duplicate submit.
+      // The form keeps its values so the user can retry.
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -66,6 +87,7 @@ const CreateEvent = () => {
 
         <EventNameInput 
           value={eventData.name} 
+          maxLength={MAX_NAME_LENGTH}
           onChange={(value) => handleChange('name', value)} 
         />
         
@@ -110,7 +132,7 @@ const CreateEvent = () => {
   );
 };
 
-const EventNameInput = ({ value, onChange }) => (
+const EventNameInput = ({ value, maxLength, onChange }) => (
   <div className="mb-4">
     <label className="block text-sm font-medium text-gray-700 mb-1">
       Event Name
@@ -119,6 +141,7 @@ const EventNameInput = ({ value, onChange }) => (
       type="text"
       className="w-full p-2 border border-gray-300 rounded-lg"
       placeholder="Summer Music Festival 2025"
+      maxLength={maxLength}
       value={value}
       onChange={(e) => onChange(e.target.value)}
     />
