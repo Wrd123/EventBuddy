@@ -29,14 +29,14 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       // You can render any custom fallback UI
       return (
-        <div className="w-full h-full max-w-md mx-auto bg-white flex items-center justify-center p-4">
+        <div className="w-full h-full max-w-md mx-auto bg-night flex items-center justify-center p-4">
           <div className="text-center">
-            <h2 className="text-2xl text-red-600 font-bold mb-4">Something went wrong</h2>
-            <p className="mb-4 text-gray-700">We're sorry, an error occurred while rendering this screen.</p>
+            <h2 className="text-2xl text-red-400 font-bold mb-4">Something went wrong</h2>
+            <p className="mb-4 text-fg/80">We're sorry, an error occurred while rendering this screen.</p>
             
             <div className="mb-4">
               <button 
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium"
+                className="bg-violet text-white px-4 py-2 rounded-xl font-medium"
                 onClick={this.handleRetry}
               >
                 Try Again
@@ -44,12 +44,12 @@ class ErrorBoundary extends Component {
             </div>
             
             {process.env.NODE_ENV !== 'production' && this.state.error && (
-              <details className="text-left bg-gray-100 p-4 rounded-lg mt-4 overflow-auto max-h-60">
+              <details className="text-left bg-raised p-4 rounded-xl mt-4 overflow-auto max-h-60">
                 <summary className="font-semibold cursor-pointer">Error Details (Development Only)</summary>
-                <pre className="text-sm text-red-700 mt-2 whitespace-pre-wrap">
+                <pre className="text-sm text-red-300 mt-2 whitespace-pre-wrap">
                   {this.state.error.toString()}
                 </pre>
-                <pre className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">
+                <pre className="text-sm text-fg/80 mt-2 whitespace-pre-wrap">
                   {this.state.errorInfo?.componentStack}
                 </pre>
               </details>

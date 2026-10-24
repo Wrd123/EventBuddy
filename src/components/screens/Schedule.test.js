@@ -23,7 +23,7 @@ const openSchedule = async () => {
 };
 
 // The card for a schedule item, found by its activity name
-const card = (activity) => screen.getByText(activity).closest('.shadow');
+const card = (activity) => screen.getByText(activity).closest('.card');
 
 const activities = () =>
   screen.getAllByText(/Arctic Monkeys|Tame Impala|Sound Check/).map((el) => el.textContent);

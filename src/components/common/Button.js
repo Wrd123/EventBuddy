@@ -13,10 +13,10 @@ const Button = ({
   ...rest
 }) => {
   const variantClasses = {
-    primary: 'bg-purple-600 text-white',
-    secondary: 'bg-white text-gray-700 border border-gray-200',
-    outline: 'bg-white text-purple-600 border border-purple-600',
-    text: 'text-purple-600'
+    primary: 'bg-violet text-white shadow-glow-sm hover:bg-violet-deep',
+    secondary: 'bg-raised text-fg border border-line',
+    outline: 'bg-transparent text-violet-soft border border-violet/60',
+    text: 'text-violet-soft'
   };
 
   const sizeClasses = {
@@ -34,7 +34,7 @@ const Button = ({
         ${variantClasses[variant]}
         ${sizeClasses[size]}
         ${fullWidth ? 'w-full' : ''}
-        rounded-lg font-medium flex items-center justify-center
+        rounded-xl font-semibold flex items-center justify-center
         disabled:opacity-50 disabled:cursor-not-allowed
         ${className}
       `}

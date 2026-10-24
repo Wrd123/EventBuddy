@@ -90,8 +90,8 @@ const DaySelector = ({ days, activeDay, setActiveDay }) => {
           ref={activeDay === day ? activeRef : null}
           className={`flex-shrink-0 px-4 py-2 rounded-full ${
             activeDay === day
-              ? 'bg-purple-600 text-white'
-              : 'bg-white text-gray-700 border border-gray-200'
+              ? 'bg-violet text-white'
+              : 'bg-surface text-fg/80 border border-line'
           }`}
           onClick={() => setActiveDay(day)}
         >
@@ -104,7 +104,7 @@ const DaySelector = ({ days, activeDay, setActiveDay }) => {
 
 const ScheduleItems = ({ event, items, onEdit }) => {
   if (items.length === 0) {
-    return <p className="text-sm text-gray-500">Nothing scheduled for this day yet.</p>;
+    return <p className="text-sm text-muted">Nothing scheduled for this day yet.</p>;
   }
 
   return (
@@ -138,14 +138,14 @@ const ScheduleItem = ({ event, item, onEdit }) => {
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow p-3 ${isPopular ? 'border-l-4 border-purple-600' : ''}`}>
+    <div className={`card p-3 ${isPopular ? 'border-l-4 border-violet' : ''}`}>
       <div className="flex justify-between items-start">
         <div className="min-w-0">
-          <div className="text-sm text-gray-500 mb-1">{formatTimeRange(item.startTime, item.endTime)}</div>
+          <div className="text-sm text-muted mb-1">{formatTimeRange(item.startTime, item.endTime)}</div>
           <div className="font-medium mb-1">{item.activity}</div>
           {item.location && <div className="text-sm mb-2">{item.location}</div>}
         </div>
-        <button onClick={onEdit} className="text-gray-400 p-1 -mr-1" aria-label={`Edit ${item.activity}`}>
+        <button onClick={onEdit} className="text-faint p-1 -mr-1" aria-label={`Edit ${item.activity}`}>
           <Pencil size={16} />
         </button>
       </div>
@@ -158,7 +158,7 @@ const ScheduleItem = ({ event, item, onEdit }) => {
           disabled={isSaving}
           aria-pressed={going}
           className={`text-xs font-medium flex items-center px-3 py-1 rounded-full disabled:opacity-50 ${
-            going ? 'bg-purple-600 text-white' : 'text-purple-600 border border-purple-600'
+            going ? 'bg-violet text-white' : 'text-violet-soft border border-violet'
           }`}
         >
           {going ? <Check size={14} className="mr-1" /> : <Plus size={14} className="mr-1" />}
@@ -166,7 +166,7 @@ const ScheduleItem = ({ event, item, onEdit }) => {
         </button>
       </div>
 
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
     </div>
   );
 };
@@ -182,7 +182,7 @@ const colorFor = (attendee, members) => {
 
 const AttendeesList = ({ attendees, members }) => {
   if (attendees.length === 0) {
-    return <div className="text-xs text-gray-400">No one going yet</div>;
+    return <div className="text-xs text-faint">No one going yet</div>;
   }
 
   return (
@@ -191,7 +191,7 @@ const AttendeesList = ({ attendees, members }) => {
         {attendees.slice(0, 3).map((attendee) => (
           <div
             key={attendee.user || attendee.name}
-            className="w-6 h-6 rounded-full border border-white flex items-center justify-center text-white text-xs"
+            className="w-6 h-6 rounded-full border border-night flex items-center justify-center text-white text-xs"
             style={{ backgroundColor: colorFor(attendee, members) }}
             title={attendee.name}
           >
@@ -200,12 +200,12 @@ const AttendeesList = ({ attendees, members }) => {
         ))}
 
         {attendees.length > 3 && (
-          <div className="w-6 h-6 bg-gray-500 rounded-full border border-white flex items-center justify-center text-white text-xs">
+          <div className="w-6 h-6 bg-faint rounded-full border border-night flex items-center justify-center text-white text-xs">
             +{attendees.length - 3}
           </div>
         )}
       </div>
-      <div className="text-xs text-gray-500 self-center ml-1">{attendees.length} going</div>
+      <div className="text-xs text-muted self-center ml-1">{attendees.length} going</div>
     </div>
   );
 };
@@ -263,44 +263,44 @@ const ScheduleItemForm = ({ event, days, item, defaultDay, onClose, onSaved }) =
     run(() => deleteScheduleItem(event._id, item._id), item.date);
   };
 
-  const inputClass = 'w-full p-2 border border-gray-300 rounded-lg bg-white';
+  const inputClass = 'field';
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-40" role="dialog" aria-modal="true" aria-labelledby="schedule-form-title">
-      <form onSubmit={handleSubmit} className="bg-white rounded-t-2xl p-4 max-h-full overflow-y-auto">
+      <form onSubmit={handleSubmit} className="bg-surface border-t border-line rounded-t-3xl p-4 max-h-full overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 id="schedule-form-title" className="text-lg font-semibold">
             {item ? 'Edit schedule item' : 'Add to schedule'}
           </h2>
-          <button type="button" onClick={onClose} className="text-gray-400" aria-label="Close">
+          <button type="button" onClick={onClose} className="text-faint" aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
+          <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded mb-4">{error}</div>
         )}
 
-        <label htmlFor="item-activity" className="block text-sm font-medium text-gray-700 mb-1">What's happening</label>
+        <label htmlFor="item-activity" className="block text-sm font-medium text-fg/80 mb-1">What's happening</label>
         <input id="item-activity" className={`${inputClass} mb-3`} maxLength={80} placeholder="Arctic Monkeys" value={fields.activity} onChange={handleChange('activity')} />
 
-        <label htmlFor="item-day" className="block text-sm font-medium text-gray-700 mb-1">Day</label>
+        <label htmlFor="item-day" className="block text-sm font-medium text-fg/80 mb-1">Day</label>
         <select id="item-day" className={`${inputClass} mb-3`} value={fields.date} onChange={handleChange('date')}>
           {days.map(day => <option key={day} value={day}>{formatDay(day)}</option>)}
         </select>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div>
-            <label htmlFor="item-start" className="block text-sm font-medium text-gray-700 mb-1">Starts</label>
+            <label htmlFor="item-start" className="block text-sm font-medium text-fg/80 mb-1">Starts</label>
             <input id="item-start" type="time" className={inputClass} value={fields.startTime} onChange={handleChange('startTime')} />
           </div>
           <div>
-            <label htmlFor="item-end" className="block text-sm font-medium text-gray-700 mb-1">Ends (optional)</label>
+            <label htmlFor="item-end" className="block text-sm font-medium text-fg/80 mb-1">Ends (optional)</label>
             <input id="item-end" type="time" className={inputClass} value={fields.endTime} onChange={handleChange('endTime')} />
           </div>
         </div>
 
-        <label htmlFor="item-location" className="block text-sm font-medium text-gray-700 mb-1">Location (optional)</label>
+        <label htmlFor="item-location" className="block text-sm font-medium text-fg/80 mb-1">Location (optional)</label>
         <input id="item-location" className={`${inputClass} mb-4`} maxLength={80} placeholder="Main Stage" value={fields.location} onChange={handleChange('location')} />
 
         <Button type="submit" fullWidth size="lg" disabled={isSaving}>
@@ -312,7 +312,7 @@ const ScheduleItemForm = ({ event, days, item, defaultDay, onClose, onSaved }) =
             type="button"
             onClick={handleDelete}
             disabled={isSaving}
-            className="w-full mt-2 py-3 text-red-600 font-medium disabled:opacity-50"
+            className="w-full mt-2 py-3 text-red-400 font-medium disabled:opacity-50"
           >
             {confirmingDelete ? 'Tap again to delete' : 'Delete from schedule'}
           </button>

@@ -53,25 +53,25 @@ const Invite = () => {
       <Header title="You're invited" type="screen" showBack={true} showProfile={false} showNotifications={false} />
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="bg-white rounded-lg shadow p-5 text-center">
-          <p className="text-sm text-gray-500 mb-1">
+        <div className="card p-5 text-center">
+          <p className="text-sm text-muted mb-1">
             {invite.organizerName ? `${invite.organizerName} invited you to` : "You're invited to"}
           </p>
           <h2 className="text-2xl font-bold mb-4">{invite.name}</h2>
 
-          <div className="space-y-2 text-left text-gray-700 mb-2">
+          <div className="space-y-2 text-left text-fg/80 mb-2">
             <div className="flex items-center">
-              <Calendar size={18} className="mr-2 text-purple-600 shrink-0" />
+              <Calendar size={18} className="mr-2 text-violet-soft shrink-0" />
               {formatDateRange(invite.startDate, invite.endDate)}
             </div>
             {invite.location && (
               <div className="flex items-center">
-                <MapPin size={18} className="mr-2 text-purple-600 shrink-0" />
+                <MapPin size={18} className="mr-2 text-violet-soft shrink-0" />
                 {invite.location}
               </div>
             )}
             <div className="flex items-center">
-              <Users size={18} className="mr-2 text-purple-600 shrink-0" />
+              <Users size={18} className="mr-2 text-violet-soft shrink-0" />
               {invite.memberCount} {invite.memberCount === 1 ? 'person' : 'people'} going
               {others > 0 && invite.organizerName ? ` (${invite.organizerName} + ${others})` : ''}
             </div>
@@ -79,11 +79,11 @@ const Invite = () => {
         </div>
 
         {joinError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mt-4">{joinError}</div>
+          <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded mt-4">{joinError}</div>
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-line">
         <Button onClick={handleJoin} fullWidth size="lg" disabled={isJoining}>
           {isJoining ? 'Joining...' : 'Join event'}
         </Button>

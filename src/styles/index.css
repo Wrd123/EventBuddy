@@ -3,48 +3,72 @@
 @tailwind utilities;
 
 /* Global styles */
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-night text-fg font-sans;
+    /* Native controls (date/time pickers, selects) draw in dark mode too */
+    color-scheme: dark;
+  }
+
+  /* Track the visible viewport so the footer isn't hidden behind mobile
+     browser toolbars; browsers without dvh keep height: 100% */
+  #root {
+    height: 100dvh;
+  }
+
+  /* Inputs take the background of whatever they sit on, rather than the
+     browser's default dark-mode gray */
+  input, select, textarea {
+    background-color: transparent;
+  }
+
+  /* A visible focus ring for keyboard users on every control */
+  :focus-visible {
+    outline: 2px solid theme('colors.violet.soft');
+    outline-offset: 2px;
+  }
 }
 
-/* Track the visible viewport so the fixed footer isn't hidden behind
-   mobile browser toolbars; browsers without dvh keep height: 100% */
-#root {
-  height: 100dvh;
+@layer components {
+  /* The one card surface every screen uses */
+  .card {
+    @apply bg-surface border border-line rounded-card;
+  }
+
+  /* Text inputs, selects and date/time fields */
+  .field {
+    @apply w-full p-2.5 rounded-xl bg-raised border border-line text-fg placeholder-faint;
+  }
+
+  .field:focus {
+    @apply border-violet outline-none;
+  }
+
+  /* Small rounded label, e.g. "Split equally (4)" */
+  .chip {
+    @apply text-xs px-2 py-1 rounded-full bg-violet/15 text-violet-soft;
+  }
 }
 
-/* Custom styles for EventBuddy */
-.app-container {
-  max-width: 480px;
-  margin: 0 auto;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background-color: #f9fafb;
-}
-
-/* Custom scrollbar */
+/* Thin dark scrollbar for the scrolling panes */
 ::-webkit-scrollbar {
   width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c7c7c7;
+  background: rgba(167, 139, 250, 0.25);
   border-radius: 6px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a3a3a3;
 }
 
 /* Horizontal chip/tab strips scroll by swipe; hide their scrollbar */
@@ -56,17 +80,9 @@ html, body, #root {
   display: none;
 }
 
-/* Animation for transitions */
-.screen-transition {
-  transition: all 0.3s ease;
-}
-
-/* Image placeholders (for development) */
-.img-placeholder {
-  background-color: #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #9ca3af;
-  font-size: 14px;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -12,7 +12,15 @@ export const getInitials = (name = '') =>
     .map(part => part[0].toUpperCase())
     .join('');
 
-// Generic header component with options for different types
+// The two-tone wordmark from the design: "Event" in white, "Buddy" in violet
+export const Wordmark = () => (
+  <span>
+    Event<span className="text-violet-soft">Buddy</span>
+  </span>
+);
+
+// Screen header on the night background. Top-level tabs show the bell and
+// your avatar; inner screens show a back arrow instead.
 const Header = ({
   title,
   type = 'default',
@@ -31,26 +39,26 @@ const Header = ({
   };
 
   return (
-    <header className="p-4 bg-purple-600 text-white">
+    <header className="relative z-10 px-4 pt-4 pb-3 text-fg">
       <div className="flex items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center min-w-0">
           {showBack && (
-            <button onClick={handleBack} className="mr-2" aria-label="Back">
-              <ArrowLeft size={20} />
+            <button onClick={handleBack} className="mr-2 -ml-1 p-1 rounded-full text-muted hover:text-fg" aria-label="Back">
+              <ArrowLeft size={22} />
             </button>
           )}
-          <h1 className={type === 'default' ? "text-xl font-bold" : "text-lg font-bold"}>
-            {title}
+          <h1 className={`${type === 'default' ? 'text-2xl font-extrabold tracking-tight' : 'text-lg font-bold'} truncate`}>
+            {title === 'EventBuddy' ? <Wordmark /> : title}
           </h1>
         </div>
 
         {(showNotifications || showProfile) && (
-          <div className="flex items-center space-x-3">
-            {showNotifications && <Bell size={20} />}
+          <div className="flex items-center space-x-3 shrink-0">
+            {showNotifications && <Bell size={22} className="text-muted" aria-hidden="true" />}
             {showProfile && (
               <button
                 onClick={() => navigate('/profile')}
-                className="w-8 h-8 rounded-full bg-white text-purple-600 text-sm font-semibold flex items-center justify-center"
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-soft to-violet-deep text-white text-sm font-bold flex items-center justify-center shadow-glow-sm"
                 aria-label="Open profile"
               >
                 {getInitials(currentUser?.name) || '?'}

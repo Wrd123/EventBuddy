@@ -4,9 +4,9 @@
 
 // Suggested events (eventService.getSuggestedEvents; discovery has no backend yet)
 export const suggestedEvents = [
-  { _id: '3', name: "Coachella 2027", startDate: "2027-04-09", endDate: "2027-04-18", location: "Indio, CA" },
-  { _id: '4', name: "Lollapalooza", startDate: "2027-07-29", endDate: "2027-08-01", location: "Chicago, IL" },
-  { _id: '5', name: "Bonnaroo", startDate: "2027-06-10", endDate: "2027-06-13", location: "Manchester, TN" }
+  { _id: '3', name: "Coachella 2027", type: 'music-festival', startDate: "2027-04-09", endDate: "2027-04-18", location: "Indio, CA" },
+  { _id: '4', name: "Lollapalooza", type: 'music-festival', startDate: "2027-07-29", endDate: "2027-08-01", location: "Chicago, IL" },
+  { _id: '5', name: "Bonnaroo", type: 'music-festival', startDate: "2027-06-10", endDate: "2027-06-13", location: "Manchester, TN" }
 ];
 
 // Mock chat messages
@@ -87,6 +87,7 @@ export const popularEvents = [
   {
     _id: '6',
     name: "Summer Music Festival",
+    type: 'music-festival',
     startDate: "2027-05-14",
     endDate: "2027-05-16",
     location: "Nashville, TN",
@@ -95,6 +96,7 @@ export const popularEvents = [
   {
     _id: '7',
     name: "Food & Wine Festival",
+    type: 'group-travel',
     startDate: "2027-06-04",
     endDate: "2027-06-06",
     location: "Memphis, TN",
@@ -103,6 +105,7 @@ export const popularEvents = [
   {
     _id: '8',
     name: "Outdoor Adventure Weekend",
+    type: 'outdoor',
     startDate: "2027-07-09",
     endDate: "2027-07-11",
     location: "Smoky Mountains",

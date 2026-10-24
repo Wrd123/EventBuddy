@@ -19,12 +19,12 @@ const Profile = () => {
       />
 
       <div className="p-4 flex-1 flex flex-col overflow-y-auto">
-        <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full bg-purple-600 text-white text-2xl font-semibold flex items-center justify-center mb-3">
+        <div className="card p-6 flex flex-col items-center text-center">
+          <div className="w-20 h-20 rounded-full bg-violet text-white text-2xl font-semibold flex items-center justify-center mb-3">
             {getInitials(currentUser?.name) || '?'}
           </div>
           <div className="text-lg font-semibold">{currentUser?.name}</div>
-          <div className="text-sm text-gray-500">{currentUser?.email}</div>
+          <div className="text-sm text-muted">{currentUser?.email}</div>
         </div>
 
         <GetPaid handles={currentUser?.paymentHandles} />
@@ -33,7 +33,7 @@ const Profile = () => {
             the way, rather than as a prominent primary button */}
         <button
           onClick={logout}
-          className="mt-auto w-full flex items-center justify-center py-3 text-red-600 font-medium"
+          className="mt-auto w-full flex items-center justify-center py-3 text-red-400 font-medium"
         >
           <LogOut size={18} className="mr-2" />
           Log Out
@@ -74,24 +74,24 @@ const GetPaid = ({ handles = {} }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-4 mt-4">
+    <form onSubmit={handleSubmit} className="card p-4 mt-4">
       <h2 className="text-lg font-semibold">Get paid</h2>
-      <p className="text-sm text-gray-500 mb-3">
+      <p className="text-sm text-muted mb-3">
         Add how friends can pay you back. Only people in your events can see these.
       </p>
 
       {status.error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-3 text-sm">{status.error}</div>
+        <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-3 py-2 rounded mb-3 text-sm">{status.error}</div>
       )}
 
       {FIELDS.map(({ key, label, prefix, placeholder }) => (
         <div key={key} className="mb-3">
-          <label htmlFor={`handle-${key}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-          <div className="flex items-center border border-gray-300 rounded-lg bg-white overflow-hidden">
-            {prefix && <span className="pl-2 text-gray-400 text-sm select-none">{prefix}</span>}
+          <label htmlFor={`handle-${key}`} className="block text-sm font-medium text-fg/80 mb-1">{label}</label>
+          <div className="flex items-center border border-line rounded-xl bg-raised overflow-hidden focus-within:border-violet">
+            {prefix && <span className="pl-2 text-faint text-sm select-none">{prefix}</span>}
             <input
               id={`handle-${key}`}
-              className="flex-1 p-2 outline-none min-w-0"
+              className="flex-1 p-2.5 outline-none min-w-0 bg-transparent placeholder-faint"
               placeholder={placeholder}
               autoCapitalize="none"
               autoCorrect="off"
@@ -108,7 +108,7 @@ const GetPaid = ({ handles = {} }) => {
       ))}
 
       <div className="flex items-center justify-between">
-        <span className="text-sm text-green-700" role="status">{status.message}</span>
+        <span className="text-sm text-go" role="status">{status.message}</span>
         <Button type="submit" size="sm" disabled={status.saving || !changed}>
           {status.saving ? 'Saving...' : 'Save'}
         </Button>

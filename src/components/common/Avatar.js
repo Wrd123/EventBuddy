@@ -10,13 +10,13 @@ const Avatar = ({ initial, color, size = 'md', status, onClick }) => {
   return (
     <div className="relative" onClick={onClick}>
       <div 
-        className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-white`}
+        className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-white font-semibold`}
         style={{ backgroundColor: color }}
       >
         {initial}
       </div>
       {status && (
-        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border border-white"></div>
+        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-go rounded-full border-2 border-night"></div>
       )}
     </div>
   );

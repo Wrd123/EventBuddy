@@ -56,29 +56,29 @@ const Register = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full">
       <div className="p-4 overflow-y-auto">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-purple-600 mb-2">Join EventBuddy</h1>
-          <p className="text-gray-600">Create your account</p>
+          <h1 className="text-2xl font-bold text-violet-soft mb-2">Join EventBuddy</h1>
+          <p className="text-muted">Create your account</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+            <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded relative">
               {error}
             </div>
           )}
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-fg/80 mb-1">
                 First Name
               </label>
               <input
                 type="text"
                 name="firstName"
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                className="field"
                 placeholder="John"
                 value={formData.firstName}
                 onChange={handleChange}
@@ -86,13 +86,13 @@ const Register = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-fg/80 mb-1">
                 Last Name
               </label>
               <input
                 type="text"
                 name="lastName"
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                className="field"
                 placeholder="Doe"
                 value={formData.lastName}
                 onChange={handleChange}
@@ -101,13 +101,13 @@ const Register = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg/80 mb-1">
               Username
             </label>
             <input
               type="text"
               name="username"
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="field"
               placeholder="johndoe"
               value={formData.username}
               onChange={handleChange}
@@ -116,13 +116,13 @@ const Register = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg/80 mb-1">
               Email
             </label>
             <input
               type="email"
               name="email"
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="field"
               placeholder="john@example.com"
               value={formData.email}
               onChange={handleChange}
@@ -131,13 +131,13 @@ const Register = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg/80 mb-1">
               Password
             </label>
             <input
               type="password"
               name="password"
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="field"
               placeholder="••••••••"
               value={formData.password}
               onChange={handleChange}
@@ -146,13 +146,13 @@ const Register = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg/80 mb-1">
               Confirm Password
             </label>
             <input
               type="password"
               name="confirmPassword"
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="field"
               placeholder="••••••••"
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -172,9 +172,9 @@ const Register = () => {
         </form>
         
         <div className="mt-4 text-center">
-          <p className="text-gray-600">
+          <p className="text-muted">
             Already have an account?{' '}
-            <Link to="/login" state={location.state} className="text-purple-600 font-medium">
+            <Link to="/login" state={location.state} className="text-violet-soft font-medium">
               Login
             </Link>
           </p>

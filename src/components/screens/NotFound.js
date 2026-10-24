@@ -18,7 +18,7 @@ const NotFound = ({ title = 'Page not found', message = "We couldn't find what y
       />
 
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <p className="text-gray-600 mb-6">{message}</p>
+        <p className="text-muted mb-6">{message}</p>
         <Button onClick={() => navigate('/')} variant="primary">
           Go to Home
         </Button>

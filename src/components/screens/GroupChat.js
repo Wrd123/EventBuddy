@@ -37,13 +37,13 @@ const GroupChat = () => {
 
 const ChatMessages = ({ messages }) => {
   return (
-    <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+    <div className="flex-1 p-4 overflow-y-auto bg-raised">
       <div className="flex flex-col space-y-3">
         {messages.map((msg) => (
           <React.Fragment key={msg._id}>
             {msg.newDay && (
               <div className="flex items-center justify-center my-2">
-                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                <div className="text-xs text-muted bg-raised px-2 py-1 rounded-full">
                   Today
                 </div>
               </div>
@@ -60,11 +60,11 @@ const ChatMessage = ({ message }) => {
   if (message.isCurrentUser) {
     return (
       <div className="flex items-end justify-end">
-        <div className="bg-purple-100 rounded-lg p-3 shadow-sm max-w-xs">
+        <div className="bg-violet/15 rounded-xl p-3 max-w-xs">
           <div className="text-sm">{message.message}</div>
-          <div className="text-right text-xs text-gray-500 mt-1">{message.time}</div>
+          <div className="text-right text-xs text-muted mt-1">{message.time}</div>
         </div>
-        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white ml-2">
+        <div className="w-8 h-8 bg-violet rounded-full flex items-center justify-center text-white ml-2">
           {message.senderInitial}
         </div>
       </div>
@@ -79,27 +79,27 @@ const ChatMessage = ({ message }) => {
       >
         {message.senderInitial}
       </div>
-      <div className="bg-white rounded-lg p-3 shadow-sm max-w-xs">
+      <div className="bg-surface rounded-xl p-3 max-w-xs">
         <div className="text-sm">{message.message}</div>
-        <div className="text-right text-xs text-gray-500 mt-1">{message.time}</div>
+        <div className="text-right text-xs text-muted mt-1">{message.time}</div>
       </div>
     </div>
   );
 };
 
 const MessageInput = ({ message, setMessage, handleSendMessage }) => (
-  <div className="p-3 bg-white border-t border-gray-200">
+  <div className="p-3 bg-surface border-t border-line">
     <form onSubmit={handleSendMessage} className="flex items-center">
       <input
         type="text"
-        className="flex-1 border border-gray-300 rounded-full py-2 px-4 mr-2"
+        className="flex-1 border border-line rounded-full py-2 px-4 mr-2"
         placeholder="Type a message..."
         value={message}
         onChange={(e) => setMessage(e.target.value)}
       />
       <button 
         type="submit"
-        className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white"
+        className="w-10 h-10 bg-violet rounded-full flex items-center justify-center text-white"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="22" y1="2" x2="11" y2="13"></line>

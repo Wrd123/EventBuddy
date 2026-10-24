@@ -55,14 +55,14 @@ const InviteSheet = ({ event, isOrganizer, onClose }) => {
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-40" role="dialog" aria-modal="true" aria-labelledby="invite-title">
-      <div className="bg-white rounded-t-2xl p-4">
+      <div className="bg-surface border-t border-line rounded-t-3xl p-4">
         <div className="flex items-center justify-between mb-2">
           <h2 id="invite-title" className="text-lg font-semibold">Invite friends</h2>
-          <button onClick={onClose} className="text-gray-400" aria-label="Close">
+          <button onClick={onClose} className="text-faint" aria-label="Close">
             <X size={20} />
           </button>
         </div>
-        <p className="text-sm text-gray-600 mb-3">
+        <p className="text-sm text-muted mb-3">
           Anyone with this link can join {event.name}. They'll sign up first if they're new.
         </p>
 
@@ -71,11 +71,11 @@ const InviteSheet = ({ event, isOrganizer, onClose }) => {
           value={url}
           aria-label="Invite link"
           onFocus={(e) => e.target.select()}
-          className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm mb-3"
+          className="field bg-raised text-sm mb-3"
         />
 
-        {message && <p className="text-sm text-green-700 mb-3" role="status">{message}</p>}
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+        {message && <p className="text-sm text-go mb-3" role="status">{message}</p>}
+        {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
         <div className={canShare ? 'grid grid-cols-2 gap-2' : ''}>
           {canShare && (
@@ -90,7 +90,7 @@ const InviteSheet = ({ event, isOrganizer, onClose }) => {
           <button
             onClick={reset}
             disabled={isResetting}
-            className="w-full mt-3 py-2 text-sm text-red-600 font-medium disabled:opacity-50"
+            className="w-full mt-3 py-2 text-sm text-red-400 font-medium disabled:opacity-50"
           >
             {confirmingReset ? 'Tap again: the current link will stop working' : 'Reset link'}
           </button>

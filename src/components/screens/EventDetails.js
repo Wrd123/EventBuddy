@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Calendar, MessageSquare, DollarSign, Map, Plus } from 'lucide-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Header from '../common/Header';
-import { Avatar, ScreenLoader } from '../common';
+import { Avatar, EventArt, ScreenLoader } from '../common';
 import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
 import { useAppContext } from '../../context/AppContext';
@@ -54,15 +54,12 @@ const EventDetails = () => {
 };
 
 const EventCover = ({ event }) => (
-  <div className="relative">
-    <img 
-      src="https://placehold.co/400x200" 
-      alt="Event cover" 
-      className="w-full h-48 object-cover" 
-    />
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-      <h2 className="text-white text-xl font-bold">{event.name}</h2>
-      <p className="text-white">{[formatDateRange(event.startDate, event.endDate), event.location].filter(Boolean).join(' • ')}</p>
+  <div className="relative mx-4 h-52 rounded-card overflow-hidden border border-violet/40 shadow-glow-sm">
+    <EventArt type={event.type} seed={event._id} className="absolute inset-0 w-full h-full" />
+    <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-night/90 via-night/30 to-transparent" />
+    <div className="absolute bottom-3 left-4 right-4">
+      <h2 className="text-white text-2xl font-extrabold tracking-tight">{event.name}</h2>
+      <p className="text-white/90">{[formatDateRange(event.startDate, event.endDate), event.location].filter(Boolean).join(' • ')}</p>
     </div>
   </div>
 );
@@ -71,7 +68,7 @@ const EventActions = ({ eventId }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="flex justify-around p-3 bg-white border-b border-gray-200">
+    <div className="grid grid-cols-4 gap-2 px-4 pt-4">
       <ActionButton 
         Icon={Calendar} 
         label="Schedule"
@@ -99,10 +96,10 @@ const EventActions = ({ eventId }) => {
 const ActionButton = ({ Icon, label, onClick }) => (
   <button 
     onClick={onClick} 
-    className="flex flex-col items-center text-gray-700"
+    className="card flex flex-col items-center py-3 text-fg/90"
   >
-    <Icon size={20} />
-    <span className="text-xs mt-1">{label}</span>
+    <Icon size={20} className="text-violet-soft" />
+    <span className="text-xs mt-1.5 font-medium">{label}</span>
   </button>
 );
 
@@ -115,7 +112,7 @@ const EventContent = ({ event, onInvite }) => {
 
   return (
     <div className="p-4">
-      <h3 className="text-lg font-semibold mb-2">Group Members</h3>
+      <h3 className="text-xl font-bold mb-3">Group Members</h3>
       <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar">
         {event.members.map((member) => (
           // shrink-0 so a big group scrolls instead of squashing
@@ -129,14 +126,14 @@ const EventContent = ({ event, onInvite }) => {
           </div>
         ))}
         <button onClick={onInvite} className="flex flex-col items-center shrink-0">
-          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 border border-dashed border-purple-300">
+          <div className="w-8 h-8 bg-violet/15 rounded-full flex items-center justify-center text-violet-soft border border-dashed border-violet/40">
             <Plus size={16} />
           </div>
           <span className="text-xs mt-1">Invite</span>
         </button>
       </div>
     
-      <h3 className="text-lg font-semibold mb-2">{heading}</h3>
+      <h3 className="text-xl font-bold mb-3">{heading}</h3>
       {items.length > 0 ? (
         <div className="flex flex-col space-y-3">
           {items.map((item) => (
@@ -144,21 +141,21 @@ const EventContent = ({ event, onInvite }) => {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">Nothing scheduled for this day yet.</p>
+        <p className="text-sm text-muted">Nothing scheduled for this day yet.</p>
       )}
     </div>
   );
 };
 
 const ScheduleItem = ({ item }) => (
-  <div className="border border-gray-200 rounded-lg p-3">
+  <div className="card p-3">
     <div className="flex justify-between items-start">
       <div>
-        <div className="text-sm text-gray-500">{formatTimeRange(item.startTime, item.endTime)}</div>
-        <div className="font-medium">{item.activity}</div>
-        <div className="text-sm">{item.location}</div>
+        <div className="text-sm text-muted">{formatTimeRange(item.startTime, item.endTime)}</div>
+        <div className="font-semibold">{item.activity}</div>
+        <div className="text-sm text-muted">{item.location}</div>
       </div>
-      <div className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs shrink-0 ml-2">
+      <div className="chip shrink-0 ml-2">
         {item.attendees.length} going
       </div>
     </div>

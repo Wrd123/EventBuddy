@@ -93,7 +93,7 @@ const CreateEvent = () => {
       
       <div className="p-4 flex-1 overflow-y-auto">
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded mb-4">
             {error}
           </div>
         )}
@@ -121,12 +121,12 @@ const CreateEvent = () => {
           onChange={(value) => handleChange('location', value)} 
         />
 
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           You'll get a link to invite friends once the event is created.
         </p>
       </div>
       
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-line">
         <Button 
           onClick={handleSubmit}
           fullWidth
@@ -143,12 +143,12 @@ const CreateEvent = () => {
 
 const EventNameInput = ({ value, maxLength, onChange }) => (
   <div className="mb-4">
-    <label className="block text-sm font-medium text-gray-700 mb-1">
+    <label className="block text-sm font-medium text-fg/80 mb-1">
       Event Name
     </label>
     <input
       type="text"
-      className="w-full p-2 border border-gray-300 rounded-lg"
+      className="field"
       placeholder="Summer Music Festival 2025"
       maxLength={maxLength}
       value={value}
@@ -167,7 +167,7 @@ const EventTypeSelector = ({ selectedType, onSelect }) => {
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-sm font-medium text-fg/80 mb-1">
         Event Type
       </label>
       <div className="grid grid-cols-2 gap-2">
@@ -178,10 +178,10 @@ const EventTypeSelector = ({ selectedType, onSelect }) => {
           return (
             <button
               key={type.id}
-              className={`border p-2 rounded-lg flex items-center justify-center ${
+              className={`border p-2 rounded-xl flex items-center justify-center ${
                 isSelected 
-                  ? 'border-purple-600 bg-purple-50 text-purple-600' 
-                  : 'border-gray-300 text-gray-700'
+                  ? 'border-violet bg-violet/10 text-violet-soft' 
+                  : 'border-line text-fg/80'
               }`}
               onClick={() => onSelect(type.id)}
             >
@@ -203,7 +203,7 @@ const DateFields = ({ isMultiDay, startDate, endDate, onChange }) => {
 
   return (
     <div className="mb-4">
-      <label className="flex items-center mb-2 text-sm text-gray-700">
+      <label className="flex items-center mb-2 text-sm text-fg/80">
         <input
           type="checkbox"
           className="mr-2 h-4 w-4 accent-purple-600"
@@ -215,13 +215,13 @@ const DateFields = ({ isMultiDay, startDate, endDate, onChange }) => {
 
       <div className={isMultiDay ? 'grid grid-cols-2 gap-2' : ''}>
         <div>
-          <label htmlFor="event-start-date" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="event-start-date" className="block text-sm font-medium text-fg/80 mb-1">
             {isMultiDay ? 'Start date' : 'Date'}
           </label>
           <input
             id="event-start-date"
             type="date"
-            className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+            className="field"
             min={today}
             value={startDate}
             onChange={(e) => onChange('startDate', e.target.value)}
@@ -230,13 +230,13 @@ const DateFields = ({ isMultiDay, startDate, endDate, onChange }) => {
 
         {isMultiDay && (
           <div>
-            <label htmlFor="event-end-date" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="event-end-date" className="block text-sm font-medium text-fg/80 mb-1">
               End date
             </label>
             <input
               id="event-end-date"
               type="date"
-              className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              className="field"
               min={startDate || today}
               value={endDate}
               onChange={(e) => onChange('endDate', e.target.value)}
@@ -250,12 +250,12 @@ const DateFields = ({ isMultiDay, startDate, endDate, onChange }) => {
 
 const LocationInput = ({ value, onChange }) => (
   <div className="mb-4">
-    <label className="block text-sm font-medium text-gray-700 mb-1">
+    <label className="block text-sm font-medium text-fg/80 mb-1">
       Location
     </label>
     <input
       type="text"
-      className="w-full p-2 border border-gray-300 rounded-lg"
+      className="field"
       placeholder="Indio, CA"
       value={value}
       onChange={(e) => onChange(e.target.value)}

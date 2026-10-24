@@ -93,37 +93,37 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
     run(() => eventService.deleteExpense(event._id, expense._id));
   };
 
-  const inputClass = 'w-full p-2 border border-gray-300 rounded-lg bg-white';
+  const inputClass = 'field';
   const eachCents = amountCents && includedIds.length ? Math.floor(amountCents / includedIds.length) : null;
   const remaining = amountCents !== null ? amountCents - exactTotal : null;
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-40" role="dialog" aria-modal="true" aria-labelledby="expense-form-title">
-      <form onSubmit={handleSubmit} className="bg-white rounded-t-2xl p-4 max-h-full overflow-y-auto">
+      <form onSubmit={handleSubmit} className="bg-surface border-t border-line rounded-t-3xl p-4 max-h-full overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 id="expense-form-title" className="text-lg font-semibold">{expense ? 'Edit expense' : 'Add expense'}</h2>
-          <button type="button" onClick={onClose} className="text-gray-400" aria-label="Close">
+          <button type="button" onClick={onClose} className="text-faint" aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
-        {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>}
+        {error && <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded mb-4">{error}</div>}
 
-        <label htmlFor="expense-description" className="block text-sm font-medium text-gray-700 mb-1">What was it for</label>
+        <label htmlFor="expense-description" className="block text-sm font-medium text-fg/80 mb-1">What was it for</label>
         <input id="expense-description" className={`${inputClass} mb-3`} maxLength={80} placeholder="Airbnb" value={fields.description} onChange={set('description')} />
 
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div>
-            <label htmlFor="expense-amount" className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label>
+            <label htmlFor="expense-amount" className="block text-sm font-medium text-fg/80 mb-1">Amount ($)</label>
             <input id="expense-amount" inputMode="decimal" className={inputClass} placeholder="0.00" value={fields.amount} onChange={set('amount')} />
           </div>
           <div>
-            <label htmlFor="expense-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <label htmlFor="expense-date" className="block text-sm font-medium text-fg/80 mb-1">Date</label>
             <input id="expense-date" type="date" className={inputClass} value={fields.date} onChange={set('date')} />
           </div>
         </div>
 
-        <label htmlFor="expense-paid-by" className="block text-sm font-medium text-gray-700 mb-1">Paid by</label>
+        <label htmlFor="expense-paid-by" className="block text-sm font-medium text-fg/80 mb-1">Paid by</label>
         <select id="expense-paid-by" className={`${inputClass} mb-3`} value={fields.paidBy} onChange={set('paidBy')}>
           {members.map(m => (
             <option key={m.user} value={m.user}>{m.user === currentUser?._id ? `${m.name} (you)` : m.name}</option>
@@ -131,7 +131,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
         </select>
 
         <fieldset className="mb-3">
-          <legend className="block text-sm font-medium text-gray-700 mb-1">Split</legend>
+          <legend className="block text-sm font-medium text-fg/80 mb-1">Split</legend>
           <div className="grid grid-cols-2 gap-2 mb-2" role="radiogroup">
             {[['equal', 'Equally'], ['exact', 'Exact amounts']].map(([value, label]) => (
               <button
@@ -140,7 +140,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
                 role="radio"
                 aria-checked={fields.splitType === value}
                 onClick={() => setFields(prev => ({ ...prev, splitType: value }))}
-                className={`border p-2 rounded-lg text-sm ${fields.splitType === value ? 'border-purple-600 bg-purple-50 text-purple-600' : 'border-gray-300 text-gray-700'}`}
+                className={`border p-2 rounded-xl text-sm ${fields.splitType === value ? 'border-violet bg-violet/10 text-violet-soft' : 'border-line text-fg/80'}`}
               >
                 {label}
               </button>
@@ -156,7 +156,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
                 </label>
               ))}
               {eachCents !== null && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted">
                   {formatCents(eachCents)}{amountCents % includedIds.length ? '+' : ''} each
                 </p>
               )}
@@ -169,7 +169,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
                   <input
                     id={`exact-${m.user}`}
                     inputMode="decimal"
-                    className="w-28 p-1.5 border border-gray-300 rounded-lg text-right"
+                    className="w-28 p-1.5 border border-line rounded-xl text-right"
                     placeholder="0.00"
                     value={exact[m.user]}
                     onChange={e => setExact(prev => ({ ...prev, [m.user]: e.target.value }))}
@@ -177,7 +177,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
                 </div>
               ))}
               {remaining !== null && (
-                <p className={`text-sm ${remaining === 0 ? 'text-green-700' : 'text-orange-600'}`}>
+                <p className={`text-sm ${remaining === 0 ? 'text-go' : 'text-orange-400'}`}>
                   {remaining === 0 ? 'Adds up to the total' : remaining > 0 ? `${formatCents(remaining)} left to assign` : `${formatCents(-remaining)} too much`}
                 </p>
               )}
@@ -190,7 +190,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
         </Button>
 
         {expense && (
-          <button type="button" onClick={handleDelete} disabled={isSaving} className="w-full mt-2 py-3 text-red-600 font-medium disabled:opacity-50">
+          <button type="button" onClick={handleDelete} disabled={isSaving} className="w-full mt-2 py-3 text-red-400 font-medium disabled:opacity-50">
             {confirmingDelete ? 'Tap again to delete' : 'Delete expense'}
           </button>
         )}

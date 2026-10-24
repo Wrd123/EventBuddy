@@ -21,7 +21,7 @@ import Invite from '../screens/Invite';
 // Every screen has a URL, so refresh, the back button and deep links work.
 // Each screen renders its own Footer when it needs one.
 const MainLayout = () => (
-  <div className="w-full h-full max-w-md mx-auto bg-gray-100 overflow-hidden relative">
+  <div className="w-full h-full max-w-md mx-auto bg-night overflow-hidden relative">
     <Routes>
       <Route element={<PublicOnly />}>
         <Route path="/login" element={<Login />} />
@@ -75,13 +75,13 @@ const PublicOnly = () => {
 
 // Loading screen component
 const LoadingScreen = () => (
-  <div className="w-full h-full bg-white flex items-center justify-center">
+  <div className="w-full h-full bg-night flex items-center justify-center">
     <div className="text-center">
-      <div className="animate-pulse text-3xl text-purple-600 font-bold mb-4">
+      <div className="animate-pulse text-3xl text-violet-soft font-bold mb-4">
         EventBuddy
       </div>
-      <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-      <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="w-12 h-12 border-4 border-violet border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p className="mt-4 text-muted">Loading...</p>
     </div>
   </div>
 );

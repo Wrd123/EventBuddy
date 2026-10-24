@@ -1,113 +1,100 @@
 import React from 'react';
+import { Search } from 'lucide-react';
 import Header from '../common/Header';
 import Footer from '../layout/Footer';
 import { useAppContext } from '../../context/AppContext';
+import { EventArt, SuggestedEventCard } from '../common';
 import { recommendedArtists, popularEvents } from '../../data/mockData';
 import { formatDateRange } from '../../utils/dates';
 
+// Discovery is still preview data (no event source yet)
 const Discover = () => {
   const { suggestedEvents } = useAppContext();
 
   return (
     <div className="flex flex-col h-full">
       <Header title="Discover" />
-      
-      <div className="flex-1 overflow-y-auto">
+
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
         <SearchBar />
-        
-        <EventRecommendations events={suggestedEvents} />
-        
+
+        <section className="mt-5">
+          <h2 className="text-xl font-bold mb-3">Based on your preferences</h2>
+          <div className="flex overflow-x-auto no-scrollbar space-x-3 -mx-4 px-4 pb-1">
+            {suggestedEvents.map(event => <SuggestedEventCard key={event._id} event={event} />)}
+          </div>
+        </section>
+
         <ArtistRecommendations />
-        
+
         <NearbyEvents />
       </div>
-      
+
       <Footer />
     </div>
   );
 };
 
 const SearchBar = () => (
-  <div className="p-4">
-    <div className="relative">
-      <input
-        type="text"
-        className="w-full bg-gray-100 rounded-full py-2 px-4 pl-10"
-        placeholder="Search events, artists, venues..."
-      />
-      <div className="absolute left-3 top-2.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-      </div>
-    </div>
+  <div className="relative mt-1">
+    <Search size={18} className="absolute left-3.5 top-3 text-faint" aria-hidden="true" />
+    <input
+      type="search"
+      aria-label="Search events, artists and venues"
+      className="field rounded-full pl-10"
+      placeholder="Search events, artists, venues..."
+    />
   </div>
 );
 
-const EventRecommendations = ({ events }) => (
-  <div className="p-4">
-    <h2 className="text-lg font-semibold mb-3">Based on Your Preferences</h2>
-    <div className="flex overflow-x-auto space-x-3 pb-3">
-      {events.map(event => (
-        <div key={event._id} className="flex-shrink-0 w-40">
-          <img 
-            src="https://placehold.co/160x120" 
-            alt={event.name} 
-            className="w-full h-20 object-cover rounded-lg mb-2" 
-          />
-          <div className="font-medium text-sm">{event.name}</div>
-          <div className="text-xs text-gray-500">{formatDateRange(event.startDate, event.endDate)}</div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+// No artist photos yet: a gradient tile with their initial
+const ARTIST_GRADIENTS = [
+  'from-fuchsia-500 to-violet-deep',
+  'from-sky-500 to-indigo-700',
+  'from-amber-400 to-rose-600'
+];
 
 const ArtistRecommendations = () => (
-  <div className="p-4">
-    <h2 className="text-lg font-semibold mb-3">Artists You Might Like</h2>
+  <section className="mt-6">
+    <h2 className="text-xl font-bold mb-3">Artists you might like</h2>
     <div className="grid grid-cols-3 gap-3">
-      {recommendedArtists.map(artist => (
+      {recommendedArtists.map((artist, i) => (
         <div key={artist._id} className="text-center">
-          <div className="w-full aspect-square bg-gray-200 rounded-lg mb-2 overflow-hidden">
-            <img 
-              src="https://placehold.co/120x120" 
-              alt={artist.name} 
-              className="w-full h-full object-cover" 
-            />
+          <div
+            className={`w-full aspect-square rounded-2xl mb-2 bg-gradient-to-br ${ARTIST_GRADIENTS[i % ARTIST_GRADIENTS.length]} flex items-center justify-center text-4xl font-extrabold text-white/90`}
+            aria-hidden="true"
+          >
+            {artist.name.replace(/^The /, '').charAt(0)}
           </div>
-          <div className="text-sm font-medium">{artist.name}</div>
+          <div className="text-sm font-semibold">{artist.name}</div>
         </div>
       ))}
     </div>
-  </div>
+  </section>
 );
 
 const NearbyEvents = () => (
-  <div className="p-4">
-    <h2 className="text-lg font-semibold mb-3">Popular Near You</h2>
+  <section className="mt-6">
+    <h2 className="text-xl font-bold mb-3">Popular near you</h2>
     <div className="space-y-3">
       {popularEvents.map(event => (
-        <div key={event._id} className="bg-white rounded-lg shadow p-3 flex">
-          <img 
-            src="https://placehold.co/80x80" 
-            alt={event.name} 
-            className="w-20 h-20 object-cover rounded-lg mr-3" 
-          />
-          <div className="flex-1">
-            <div className="font-medium">{event.name}</div>
-            <div className="text-sm text-gray-500 mb-1">
+        <div key={event._id} className="card p-3 flex items-center">
+          <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 mr-3">
+            <EventArt type={event.type} seed={event._id} className="w-full h-full" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold">{event.name}</div>
+            <div className="text-sm text-muted mb-1">
               {formatDateRange(event.startDate, event.endDate)} • {event.location}
             </div>
-            <div className="text-xs text-purple-600">
+            <div className="text-xs text-violet-soft">
               {event.interestedFriends} friends interested
             </div>
           </div>
         </div>
       ))}
     </div>
-  </div>
+  </section>
 );
 
 export default Discover;
