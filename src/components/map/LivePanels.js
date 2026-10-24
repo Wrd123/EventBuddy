@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Flag, Navigation, Radio, X } from 'lucide-react';
 import { Button } from '../common';
 import { agoText, directionsUrl, shareDurations, untilText } from '../../utils/live';
+import { tracksInBackground } from '../../services/locationTracker';
 
 const DirectionsLink = ({ to }) => (
   <a
@@ -90,7 +91,9 @@ export const ShareSheet = ({ event, onShare, onClose }) => {
         </div>
         <p className="text-sm text-muted mb-4">
           Everyone in {event.name} will see where you are on the map until it ends or you stop.
-          On the web, updates pause while EventBuddy isn't open.
+          {tracksInBackground
+            ? ' It keeps working with your phone locked, and your phone shows that location is in use.'
+            : " On the web, updates pause while EventBuddy isn't open."}
         </p>
         {error && <p className="text-sm text-red-300 mb-3" role="alert">{error}</p>}
         <div className="space-y-2">

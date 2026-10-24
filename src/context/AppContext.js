@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback } fr
 import * as authService from '../services/authService';
 import * as eventService from '../services/eventService';
 import { setUnauthorizedHandler } from '../services/api';
+import { SharingProvider, stopStoredShare } from './SharingContext';
 
 // Create context
 const AppContext = createContext();
@@ -140,6 +141,9 @@ export const AppProvider = ({ children }) => {
   };
   
   const logout = () => {
+    // Friends shouldn't keep seeing where you were; this needs the login
+    // token, so it goes before the session is cleared
+    stopStoredShare();
     clearSession();
     setLoggedOutByUser(true);
   };
@@ -261,7 +265,13 @@ export const AppProvider = ({ children }) => {
     resetInviteLink
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <SharingProvider isAuthenticated={isAuthenticated} isLoading={isLoading}>
+        {children}
+      </SharingProvider>
+    </AppContext.Provider>
+  );
 };
 
 // Custom hook for using the context

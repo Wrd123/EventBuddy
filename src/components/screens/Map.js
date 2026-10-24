@@ -7,7 +7,8 @@ import { FriendPanel, LiveBar, MeetupForm, MeetupPanel, ShareSheet } from '../ma
 import { Button, EventArt, LocalEventCard, LocalEventSheet, PlaceSheet } from '../common';
 import { useMapEvents } from '../../hooks/useMapEvents';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
-import { useLive, useShareMyLocation } from '../../hooks/useLive';
+import { useLive } from '../../hooks/useLive';
+import { useSharing } from '../../context/SharingContext';
 import { usePlace } from '../../hooks/usePlace';
 import { formatDateRange, getEventStatus } from '../../utils/dates';
 import { groupByVenue, listNames } from '../../utils/map';
@@ -42,7 +43,12 @@ const Map = () => {
 
   const liveEvent = pickLiveEvent(mine.events, location.state?.focus);
   const live = useLive(liveEvent?._id ?? null);
-  const me = useShareMyLocation(liveEvent?._id ?? null, live.sharing, live.reload);
+  // Your own position comes from app-wide sharing, which keeps running when
+  // you leave the map; shown here when it's for this event
+  const sharing = useSharing();
+  const me = sharing.share && sharing.share.eventId === liveEvent?._id
+    ? { position: sharing.position, error: sharing.error }
+    : { position: null, error: '' };
 
   const upcoming = mine.events.filter(e => getEventStatus(e) !== 'past');
   const mapped = upcoming.filter(hasPosition);

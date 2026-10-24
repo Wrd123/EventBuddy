@@ -23,6 +23,14 @@
     height: 100dvh;
   }
 
+  /* Keep clear of the notch / Dynamic Island and the home indicator when
+     the app fills the whole screen (the iPhone app, or Safari with
+     viewport-fit=cover). Zero everywhere else. */
+  #root {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   /* Inputs take the background of whatever they sit on, rather than the
      browser's default dark-mode gray */
   input, select, textarea {

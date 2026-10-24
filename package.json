@@ -3,6 +3,9 @@
     "version": "0.1.0",
     "private": true,
     "dependencies": {
+        "@capacitor-community/background-geolocation": "~1.2.26",
+        "@capacitor/core": "~7.6.9",
+        "@capacitor/ios": "~7.6.9",
         "leaflet": "^1.9.4",
         "leaflet.markercluster": "^1.5.3",
         "lucide-react": "^0.263.1",
@@ -16,6 +19,8 @@
         "start": "react-scripts start",
         "server": "npm --prefix server run dev",
         "build": "react-scripts build",
+        "build:ios": "REACT_APP_API_URL=${EVENTBUDDY_API_URL:-http://localhost:4000/api} react-scripts build && cap sync ios",
+        "ios": "npm run build:ios && cap open ios",
         "test": "react-scripts test",
         "test:server": "npm --prefix server test",
         "eject": "react-scripts eject"
@@ -39,6 +44,7 @@
         ]
     },
     "devDependencies": {
+        "@capacitor/cli": "~7.6.9",
         "@testing-library/jest-dom": "^5.17.0",
         "@testing-library/react": "^13.4.0",
         "@testing-library/user-event": "^13.5.0",

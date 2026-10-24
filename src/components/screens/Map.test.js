@@ -185,6 +185,8 @@ describe('Map during an event', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Share my location' }));
     const sheet = screen.getByRole('dialog', { name: 'Share your location' });
+    // In a browser, sharing pauses when the app isn't open, and it says so
+    expect(sheet).toHaveTextContent("On the web, updates pause while EventBuddy isn't open.");
     fireEvent.click(within(sheet).getByRole('button', { name: '1 hour' }));
 
     // Asked for an hour from now
@@ -289,5 +291,85 @@ describe('Map with no event happening', () => {
     expect(screen.queryByRole('region', { name: /^Live at/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Friends' })).not.toBeInTheDocument();
     expect(requests('GET', '/api/events/1/live')).toHaveLength(0);
+  });
+});
+
+describe('Sharing across the app', () => {
+  const HOUR_AHEAD = () => new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const storedShare = () => JSON.parse(localStorage.getItem('eventbuddy_share'));
+
+  // As if sharing had started earlier: on the server, and remembered here
+  const alreadySharing = async () => {
+    const until = HOUR_AHEAD();
+    await global.fetch('/api/events/5/live/share', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer fake-token' },
+      body: JSON.stringify({ until })
+    });
+    localStorage.setItem('eventbuddy_share', JSON.stringify({ eventId: '5', until }));
+    global.fetch.mockClear();
+  };
+
+  let report;
+  let geolocation;
+  beforeEach(() => {
+    installFakeApi({ liveEvent: true }).logIn();
+    geolocation = mockWatchPosition((success) => {
+      report = success;
+      return 3;
+    });
+  });
+
+  it('keeps sending your position after you leave the map', async () => {
+    renderAt('/map');
+    await pin('Friend: Alex');
+    fireEvent.click(screen.getByRole('button', { name: 'Share my location' }));
+    fireEvent.click(screen.getByRole('button', { name: '1 hour' }));
+    await waitFor(() => expect(report).toBeDefined());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Groups' }));
+    await screen.findByRole('heading', { name: 'Groups' });
+    act(() => report({ coords: HERE }));
+
+    await waitFor(() => expect(requests('PUT', '/api/events/5/live/position')).toHaveLength(1));
+    expect(geolocation.clearWatch).not.toHaveBeenCalled();
+    expect(storedShare()).toMatchObject({ eventId: '5' });
+    await screen.findByRole('button', { name: /^Picnic in the Park/ });
+  });
+
+  it('picks sharing back up when the app is reopened, on any screen', async () => {
+    await alreadySharing();
+    renderAt('/groups');
+
+    await waitFor(() => expect(report).toBeDefined());
+    act(() => report({ coords: HERE }));
+    await waitFor(() => expect(requests('PUT', '/api/events/5/live/position')).toHaveLength(1));
+    await screen.findByRole('button', { name: /^Picnic in the Park/ });
+  });
+
+  it('stops when sharing was ended somewhere else', async () => {
+    // Remembered here, but no longer on the server
+    localStorage.setItem('eventbuddy_share', JSON.stringify({ eventId: '5', until: HOUR_AHEAD() }));
+    renderAt('/groups');
+    await waitFor(() => expect(report).toBeDefined());
+
+    act(() => report({ coords: HERE }));
+
+    await waitFor(() => expect(geolocation.clearWatch).toHaveBeenCalledWith(3));
+    expect(storedShare()).toBeNull();
+    await screen.findByRole('button', { name: /^Picnic in the Park/ });
+  });
+
+  it('stops sharing when you log out', async () => {
+    await alreadySharing();
+    renderAt('/profile');
+    await waitFor(() => expect(report).toBeDefined());
+
+    fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
+
+    await screen.findByPlaceholderText('your@email.com');
+    expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(1);
+    expect(geolocation.clearWatch).toHaveBeenCalledWith(3);
+    expect(storedShare()).toBeNull();
   });
 });
