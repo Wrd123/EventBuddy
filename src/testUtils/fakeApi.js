@@ -211,6 +211,77 @@ const scheduleRoute = (event, method, itemId, action, body) => {
   return respond(method === 'POST' && !itemId ? 201 : 200, { event });
 };
 
+// Event 1's chat: yesterday's planning, then two messages from Alex this
+// morning that John hasn't read. Ids sort in sending order, like real ones.
+const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60 * 1000).toISOString();
+const chatMessage = (id, user, name, text, minutes) => ({ _id: id, sender: { user, name }, text, createdAt: minutesAgo(minutes) });
+
+const demoChats = () => ({
+  '1': [
+    chatMessage('c001', 'u2', 'Alex', 'Has anyone looked at the schedule?', 26 * 60),
+    chatMessage('c002', 'u3', 'Taylor', "I'm going to Tame Impala too.", 26 * 60 - 2),
+    chatMessage('c003', 'u1', 'John Doe', "Let's meet at the main stage at 1:30.", 26 * 60 - 4),
+    chatMessage('c004', 'u2', 'Alex', "Who's bringing a charger?", 30),
+    chatMessage('c005', 'u2', 'Alex', 'I can grab snacks too.', 29)
+  ]
+});
+
+let chats = demoChats();
+// John's read point in each chat
+let chatReads = { '1': 'c003' };
+let nextMessageId = 100;
+
+const messagesFor = (eventId) => {
+  chats[eventId] = chats[eventId] || [];
+  return chats[eventId];
+};
+
+// A message from someone else arriving while the app is open
+export const receiveMessage = (eventId, { user = 'u2', name = 'Alex', text }) => {
+  const message = chatMessage(`c${nextMessageId++}`, user, name, text, 0);
+  messagesFor(eventId).push(message);
+  return message;
+};
+
+const CHAT_PAGE = 50;
+
+const chatRoute = (event, method, action, body, params) => {
+  const messages = messagesFor(event._id);
+  if (action === 'read' && method === 'PUT') {
+    chatReads[event._id] = body.lastRead > (chatReads[event._id] || '') ? body.lastRead : chatReads[event._id];
+    return respond(204);
+  }
+  if (method === 'POST') {
+    if (fakeOptions.chatSendError) return respond(503, { message: fakeOptions.chatSendError });
+    const message = chatMessage(`c${nextMessageId++}`, demoUser._id, demoUser.name, body.text.trim(), 0);
+    messages.push(message);
+    return respond(201, { message });
+  }
+  if (params.has('after')) {
+    return respond(200, { messages: messages.filter((m) => m._id > params.get('after')) });
+  }
+  const older = params.has('before') ? messages.filter((m) => m._id < params.get('before')) : messages;
+  return respond(200, { messages: older.slice(-CHAT_PAGE), hasMore: older.length > CHAT_PAGE });
+};
+
+const chatList = () => {
+  const list = events.filter(isMember).map((event) => {
+    const messages = messagesFor(event._id);
+    const read = chatReads[event._id] || '';
+    return {
+      eventId: event._id,
+      name: event.name,
+      type: event.type || 'music-festival',
+      startDate: event.startDate,
+      endDate: event.endDate,
+      memberCount: event.members.length,
+      lastMessage: messages.at(-1) || null,
+      unread: messages.filter((m) => m._id > read && m.sender.user !== demoUser._id).length
+    };
+  });
+  return respond(200, { chats: list });
+};
+
 let fakeOptions = {};
 
 const discoverRoute = (path, params) => {
@@ -266,6 +337,15 @@ const route = (method, path, body, authed, params) => {
     return respond(201, { event });
   }
   if (path === '/events') return respond(200, { events: events.filter(isMember) });
+  if (path === '/chats') return chatList();
+
+  // /events/:id/messages[/read]
+  const chatMatch = path.match(/^\/events\/([^/]+)\/messages(?:\/(read))?$/);
+  if (chatMatch) {
+    const event = events.find((e) => e._id === decodeURIComponent(chatMatch[1]) && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    return chatRoute(event, method, chatMatch[2], body, params);
+  }
 
   const inviteMatch = path.match(/^\/invites\/([^/]+)(\/join)?$/);
   if (inviteMatch) {
@@ -336,10 +416,14 @@ const route = (method, path, body, authed, params) => {
 // Installs the fake with fresh data. Returns logIn(), which saves a session
 // the way a past login would have, so the app opens already logged in.
 // options.handles replaces the starting payment handles ({ userId: handles });
-// options.noLocalEvents / options.discoverError change Discover's results
+// options.noLocalEvents / options.discoverError change Discover's results;
+// options.chats replaces the starting chats ({ eventId: [messages] });
+// options.chatSendError makes sending a message fail with that message
 export const installFakeApi = (options = {}) => {
   fakeOptions = options;
   events = demoEvents();
+  chats = options.chats || demoChats();
+  chatReads = options.chats ? {} : { '1': 'c003' };
   ledgers = demoLedger();
   handles = { ...demoHandles(), ...options.handles };
   global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) => {

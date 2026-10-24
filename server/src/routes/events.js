@@ -11,6 +11,9 @@ const scheduleRoutes = require('./schedule');
 const { expenses: expenseRoutes, payments: paymentRoutes } = require('./expenses');
 const Expense = require('../models/Expense');
 const Payment = require('../models/Payment');
+const Message = require('../models/Message');
+const ChatRead = require('../models/ChatRead');
+const messageRoutes = require('./messages');
 const { MAX_CENTS } = require('../models/Expense');
 
 const router = express.Router();
@@ -18,6 +21,7 @@ router.use(requireAuth);
 router.use('/:id/schedule', scheduleRoutes);
 router.use('/:id/expenses', expenseRoutes);
 router.use('/:id/payments', paymentRoutes);
+router.use('/:id/messages', messageRoutes);
 
 router.get('/', async (req, res) => {
   const events = await Event.find(visibleTo(req.user)).sort({ startDate: 1 });
@@ -109,10 +113,12 @@ router.post('/:id/invite/reset', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const event = await findOwnEvent(req.params.id, req.user);
-  // Its money records go with it
+  // Its money records and chat go with it
   await Promise.all([
     Expense.deleteMany({ event: event._id }),
     Payment.deleteMany({ event: event._id }),
+    Message.deleteMany({ event: event._id }),
+    ChatRead.deleteMany({ event: event._id }),
     event.deleteOne()
   ]);
   res.status(204).end();

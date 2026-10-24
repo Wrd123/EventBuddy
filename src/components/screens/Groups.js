@@ -1,93 +1,115 @@
 import React from 'react';
-import { Music, Map, Users, Plus } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../common/Header';
 import Footer from '../layout/Footer';
-import { groups } from '../../data/mockData';
+import { Button, EventArt, ScreenLoader } from '../common';
+import { useChats } from '../../hooks/useChats';
+import { useAppContext } from '../../context/AppContext';
+import { getEventStatus } from '../../utils/dates';
+import { shortTime } from '../../utils/chat';
 
+// Every event you plan or join is a group with its own chat. Upcoming and
+// ongoing events first, past ones below, each by latest activity.
 const Groups = () => {
-  const navigate = useNavigate();
-  
-  // Filter active and inactive groups
-  const activeGroups = groups.filter(group => group.isActive);
-  const pastGroups = groups.filter(group => !group.isActive);
-  
+  const { status, chats, error, reload } = useChats();
+
+  if (status === 'loading') return <ScreenLoader />;
+
+  const current = chats.filter(chat => getEventStatus(chat) !== 'past');
+  const past = chats.filter(chat => getEventStatus(chat) === 'past');
+
   return (
     <div className="flex flex-col h-full">
-      <Header title="Your Groups" />
-      
-      <div className="p-4 flex-1 overflow-y-auto">
-        <div className="flex justify-between mb-4">
-          <h2 className="text-lg font-semibold">Active Groups</h2>
-          <button className="text-violet-soft text-sm font-medium flex items-center">
-            <Plus size={16} className="mr-1" />
-            Create New
-          </button>
-        </div>
-        
-        <div className="space-y-3 mb-6">
-          {activeGroups.map(group => (
-            <GroupCard 
-              key={group._id} 
-              group={group} 
-              onClick={group.eventId ? () => navigate(`/events/${group.eventId}`) : undefined} 
-            />
-          ))}
-        </div>
-        
-        <h2 className="text-lg font-semibold mb-3">Past Groups</h2>
-        <div className="space-y-3">
-          {pastGroups.map(group => (
-            <GroupCard 
-              key={group._id} 
-              group={group} 
-              isPast={true}
-            />
-          ))}
-        </div>
+      <Header title="Groups" />
+
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {status === 'error' ? (
+          <div className="card p-5 text-center">
+            <p className="font-semibold mb-1">Couldn't load your groups</p>
+            <p className="text-sm text-muted mb-3">{error}</p>
+            <Button variant="secondary" onClick={reload} className="mx-auto">Try again</Button>
+          </div>
+        ) : chats.length === 0 ? (
+          <NoGroups />
+        ) : (
+          <>
+            <ChatList chats={current} />
+            {past.length > 0 && (
+              <>
+                <h2 className="text-sm font-semibold text-muted mt-6 mb-2">Past events</h2>
+                <ChatList chats={past} />
+              </>
+            )}
+          </>
+        )}
       </div>
-      
+
       <Footer />
     </div>
   );
 };
 
-const GroupCard = ({ group, isPast = false, onClick }) => {
-  // Map icon string to component
-  const iconMap = {
-    Music: Music,
-    Map: Map,
-    Users: Users
-  };
-  
-  const GroupIcon = iconMap[group.icon];
-  
-  // Color classes based on group color
-  const colorClasses = {
-    purple: 'bg-violet/15 text-violet-soft',
-    blue: 'bg-blue-500/15 text-blue-400',
-    green: 'bg-go/15 text-go',
-    gray: 'bg-raised text-muted'
-  };
-  
+const NoGroups = () => {
+  const navigate = useNavigate();
   return (
-    <div 
-      className={`card p-3 flex items-center ${isPast ? 'opacity-70' : ''}`}
-      onClick={onClick}
-    >
-      <div className={`w-12 h-12 ${colorClasses[group.color]} rounded-xl flex items-center justify-center mr-3`}>
-        <GroupIcon size={24} />
+    <div className="card p-6 text-center mt-2">
+      <div className="w-14 h-14 rounded-full bg-violet/15 text-violet-soft flex items-center justify-center mx-auto mb-3">
+        <MessageCircle size={26} />
       </div>
-      <div className="flex-1">
-        <div className="font-medium">{group.name}</div>
-        <div className="text-sm text-muted">{group.memberCount} members • {group.eventName}</div>
-      </div>
-      {group.notifications > 0 && (
-        <div className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-          {group.notifications}
-        </div>
-      )}
+      <h2 className="text-xl font-bold mb-1">No groups yet</h2>
+      <p className="text-sm text-muted mb-4">Every event you plan or join gets a group chat for everyone going.</p>
+      <Button onClick={() => navigate('/create')} fullWidth>Plan an event</Button>
     </div>
+  );
+};
+
+const ChatList = ({ chats }) => (
+  <ul className="space-y-2">
+    {chats.map(chat => <ChatRow key={chat.eventId} chat={chat} />)}
+  </ul>
+);
+
+const ChatRow = ({ chat }) => {
+  const navigate = useNavigate();
+  const { currentUser } = useAppContext();
+  const { lastMessage, unread } = chat;
+
+  const preview = lastMessage
+    ? `${lastMessage.sender.user === currentUser?._id ? 'You' : lastMessage.sender.name}: ${lastMessage.text}`
+    : `No messages yet • ${chat.memberCount} ${chat.memberCount === 1 ? 'member' : 'members'}`;
+  const label = unread > 0 ? `${chat.name}, ${unread} unread` : chat.name;
+
+  return (
+    <li>
+      <button
+        onClick={() => navigate(`/events/${chat.eventId}/chat`, { state: { from: 'groups' } })}
+        className="card w-full p-3 flex items-center text-left"
+        aria-label={label}
+      >
+        <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 mr-3">
+          <EventArt type={chat.type} seed={chat.eventId} className="w-full h-full" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between">
+            <span className={`truncate ${unread > 0 ? 'font-bold' : 'font-semibold'}`}>{chat.name}</span>
+            {lastMessage && (
+              <span className={`text-xs shrink-0 ml-2 ${unread > 0 ? 'text-violet-soft font-semibold' : 'text-faint'}`}>
+                {shortTime(lastMessage.createdAt)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-between mt-0.5">
+            <span className={`text-sm truncate ${unread > 0 ? 'text-fg' : 'text-muted'}`}>{preview}</span>
+            {unread > 0 && (
+              <span className="ml-2 shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-violet text-white text-xs font-bold flex items-center justify-center" aria-hidden="true">
+                {unread > 99 ? '99+' : unread}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+    </li>
   );
 };
 

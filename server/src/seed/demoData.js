@@ -5,6 +5,8 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const Expense = require('../models/Expense');
 const Payment = require('../models/Payment');
+const Message = require('../models/Message');
+const ChatRead = require('../models/ChatRead');
 const { ORGANIZER_COLOR } = require('../colors');
 
 const DEMO_PASSWORD = 'password';
@@ -91,6 +93,34 @@ const demoEvents = (users) => {
   ];
 };
 
+// The festival chat: yesterday's planning and two new messages this morning,
+// which John hasn't read yet. Chats are ordered by id, so ids are made from
+// the send times.
+const demoChat = (users) => {
+  const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60 * 1000);
+  const message = (minutes, name, text) => {
+    const createdAt = minutesAgo(minutes);
+    return {
+      _id: mongoose.Types.ObjectId.createFromTime(Math.floor(createdAt.getTime() / 1000)),
+      event: DEMO_EVENT_IDS.festival,
+      sender: { user: users[name]._id, name: users[name].name },
+      text,
+      createdAt
+    };
+  };
+
+  const messages = [
+    message(26 * 60, 'Alex', 'Has anyone looked at the schedule? I added Arctic Monkeys on the first day.'),
+    message(26 * 60 - 3, 'Taylor', "Yes! I'm going to Tame Impala right after too."),
+    message(26 * 60 - 5, 'me', "Let's meet at the main stage around 1:30 so we get a good spot."),
+    message(25 * 60, 'Jordan', 'I put the Airbnb in expenses. Check what you owe when you get a sec.'),
+    message(90, 'Alex', "Who's bringing a portable charger?"),
+    message(85, 'Jamie', "I've got two, I'll bring both 🔋")
+  ];
+  const read = { event: DEMO_EVENT_IDS.festival, user: users.me._id, lastRead: messages[3]._id };
+  return { messages, read };
+};
+
 // Festival money: who paid for what, and one payment already settled
 const demoLedger = (users) => {
   const event = DEMO_EVENT_IDS.festival;
@@ -143,6 +173,9 @@ const seedDemoData = async () => {
   const ledger = demoLedger(users);
   await Expense.insertMany(ledger.expenses);
   await Payment.insertMany(ledger.payments);
+  const chat = demoChat(users);
+  await Message.insertMany(chat.messages);
+  await ChatRead.create(chat.read);
   return me;
 };
 
