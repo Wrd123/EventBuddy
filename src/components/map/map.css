@@ -84,3 +84,65 @@
     transition: none;
   }
 }
+
+/* Venue bubbles: several venues merged at this zoom */
+.eb-cluster {
+  font-size: 13px;
+  box-shadow: 0 0 0 4px rgba(236, 72, 153, 0.25), 0 0 14px rgba(236, 72, 153, 0.5);
+}
+
+/* Friends: their initial in their member color, like their chat avatar */
+.eb-pin-friend {
+  border: 3px solid white;
+  font-size: 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Not updated for a while: they may have moved since */
+.eb-pin-stale {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+
+/* The meetup point: amber, so it stands apart from people and events */
+.eb-pin-meetup {
+  background: #f59e0b;
+  color: theme('colors.night');
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3), 0 0 16px rgba(245, 158, 11, 0.6);
+}
+
+/* You, while sharing: the familiar blue dot */
+.eb-pin-me {
+  background: #3b82f6;
+  border: 3px solid white;
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.25);
+}
+
+/* Name and "2 min ago" under a friend's pin */
+.leaflet-tooltip.eb-tip {
+  background: rgba(22, 19, 47, 0.92);
+  color: theme('colors.fg');
+  border: 1px solid theme('colors.line');
+  border-radius: 9999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: none;
+  white-space: nowrap;
+}
+.leaflet-tooltip.eb-tip::before {
+  display: none;
+}
+
+/* The crosshair shown while choosing where the meetup point goes */
+.eb-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  z-index: 1100;
+  color: #f59e0b;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+}

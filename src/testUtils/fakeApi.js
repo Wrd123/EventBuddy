@@ -109,7 +109,7 @@ export const localEvents = [
 
 // Map positions of the demo events. The hiking trip's "Smoky Mountains"
 // couldn't be found, so it has none.
-const EVENT_POSITIONS = { '1': [33.7206, -116.2156] };
+const EVENT_POSITIONS = { '1': [33.7206, -116.2156], '5': [33.7851, -84.3738] };
 
 const CATEGORY_TYPES = { music: ['concert', 'music-festival'], sports: ['sports'], arts: ['arts'], family: [] };
 
@@ -289,6 +289,67 @@ const chatList = () => {
   return respond(200, { chats: list });
 };
 
+// options.liveEvent adds a picnic happening today, where Alex is sharing
+// his location and Taylor set a meetup point
+const localToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const picnicEvent = () => ({
+  _id: '5',
+  inviteCode: 'picnic-code',
+  name: 'Picnic in the Park',
+  type: 'outdoor',
+  startDate: localToday(),
+  endDate: localToday(),
+  location: 'Piedmont Park, Atlanta, GA',
+  members: [taylor, me, alex],
+  schedule: [],
+  createdBy: 'u3'
+});
+
+const demoLive = () => ({
+  '5': {
+    sharing: null,
+    people: [{
+      user: 'u2', name: 'Alex', color: '#3b82f6', lat: 33.7866, lng: -84.3727, accuracy: 10,
+      positionAt: minutesAgo(2), until: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+    }],
+    meetup: {
+      lat: 33.7857, lng: -84.3741, note: 'By the lake', time: '',
+      setBy: { user: 'u3', name: 'Taylor' }, setAt: minutesAgo(20)
+    }
+  }
+});
+
+let live = {};
+
+const liveRoute = (event, method, action, body) => {
+  const state = live[event._id] = live[event._id] || { sharing: null, people: [], meetup: null };
+  if (!action && method === 'GET') return respond(200, state);
+  if (action === 'share' && method === 'PUT') {
+    state.sharing = { until: body.until };
+    return respond(200, { sharing: state.sharing });
+  }
+  if (action === 'share' && method === 'DELETE') {
+    state.sharing = null;
+    return respond(204);
+  }
+  if (action === 'position' && method === 'PUT') {
+    return state.sharing ? respond(204) : respond(409, { message: "You're not sharing your location right now." });
+  }
+  if (action === 'meetup' && method === 'PUT') {
+    state.meetup = { ...body, setBy: { user: demoUser._id, name: demoUser.name }, setAt: new Date().toISOString() };
+    return respond(200, { meetup: state.meetup });
+  }
+  if (action === 'meetup' && method === 'DELETE') {
+    state.meetup = null;
+    return respond(204);
+  }
+  return respond(404, { message: 'Not found.' });
+};
+
 let fakeOptions = {};
 
 const discoverRoute = (path, params) => {
@@ -352,6 +413,14 @@ const route = (method, path, body, authed, params) => {
         return { _id, name, type: type || 'music-festival', startDate, endDate, location, lat, lng };
       })
     });
+  }
+
+  // /events/:id/live[/share|/position|/meetup]
+  const liveMatch = path.match(/^\/events\/([^/]+)\/live(?:\/(share|position|meetup))?$/);
+  if (liveMatch) {
+    const event = events.find((e) => e._id === decodeURIComponent(liveMatch[1]) && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    return liveRoute(event, method, liveMatch[2], body);
   }
 
   // /events/:id/messages[/read]
@@ -433,10 +502,12 @@ const route = (method, path, body, authed, params) => {
 // options.handles replaces the starting payment handles ({ userId: handles });
 // options.noLocalEvents / options.discoverError change Discover's results;
 // options.chats replaces the starting chats ({ eventId: [messages] });
-// options.chatSendError makes sending a message fail with that message
+// options.chatSendError makes sending a message fail with that message;
+// options.liveEvent adds an event happening today with live locations
 export const installFakeApi = (options = {}) => {
   fakeOptions = options;
-  events = demoEvents();
+  events = options.liveEvent ? [...demoEvents(), picnicEvent()] : demoEvents();
+  live = options.liveEvent ? demoLive() : {};
   chats = options.chats || demoChats();
   chatReads = options.chats ? {} : { '1': 'c003' };
   ledgers = demoLedger();

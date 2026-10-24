@@ -1,66 +1,126 @@
-import React, { useState } from 'react';
-import { MapPin } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Flag, MapPin } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Footer from '../layout/Footer';
 import MapCanvas from '../map/MapCanvas';
+import { FriendPanel, LiveBar, MeetupForm, MeetupPanel, ShareSheet } from '../map/LivePanels';
 import { Button, EventArt, LocalEventCard, LocalEventSheet, PlaceSheet } from '../common';
 import { useMapEvents } from '../../hooks/useMapEvents';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
+import { useLive, useShareMyLocation } from '../../hooks/useLive';
 import { usePlace } from '../../hooks/usePlace';
 import { formatDateRange, getEventStatus } from '../../utils/dates';
 import { groupByVenue, listNames } from '../../utils/map';
+import { agoText, isStale } from '../../utils/live';
 
 const hasPosition = (e) => e.lat !== null && e.lng !== null;
 
-// Your upcoming events and nearby Ticketmaster events on one map. Nobody's
-// own location is on it: "nearby" is around the place you chose in Discover.
-// Opening it from an event (state.focus = event id) starts on that event.
+// The event whose friends the map shows: the one it was opened from, if
+// that's happening now, otherwise the first of yours that is
+const pickLiveEvent = (events, focusEventId) => {
+  const happening = events.filter(e => getEventStatus(e) === 'ongoing');
+  return happening.find(e => e._id === focusEventId) || happening[0] || null;
+};
+
+// Your upcoming events and nearby Ticketmaster events on one map, and while
+// one of your events is happening, the friends there who are sharing where
+// they are, plus a meetup point. "Nearby" is around the place you chose in
+// Discover. Opening it from an event (state.focus = event id) starts there.
 const Map = () => {
   const location = useLocation();
   const { place } = usePlace();
   const mine = useMapEvents();
   const nearby = useNearbyEvents(place, { radius: 25, category: 'all' });
-  const [show, setShow] = useState({ mine: true, nearby: true });
+  const [show, setShow] = useState({ mine: true, nearby: true, friends: true });
   const focusId = location.state?.focus ? `mine:${location.state.focus}` : null;
   const [selectedId, setSelectedId] = useState(focusId);
   const [choosingPlace, setChoosingPlace] = useState(false);
   const [openEvent, setOpenEvent] = useState(null);
+  const [sharingOpen, setSharingOpen] = useState(false);
+  const [placingMeetup, setPlacingMeetup] = useState(false);
+  const canvasRef = useRef(null);
+
+  const liveEvent = pickLiveEvent(mine.events, location.state?.focus);
+  const live = useLive(liveEvent?._id ?? null);
+  const me = useShareMyLocation(liveEvent?._id ?? null, live.sharing, live.reload);
 
   const upcoming = mine.events.filter(e => getEventStatus(e) !== 'past');
   const mapped = upcoming.filter(hasPosition);
   const unmapped = upcoming.filter(e => !hasPosition(e));
   const venues = groupByVenue(nearby.events);
 
+  const livePins = liveEvent && show.friends
+    ? [
+        ...live.people.map(p => ({
+          id: `friend:${p.user}`,
+          kind: 'friend',
+          lat: p.lat,
+          lng: p.lng,
+          label: p.name,
+          color: p.color,
+          initial: p.name.charAt(0),
+          caption: `${p.name} • ${agoText(p.positionAt)}`,
+          stale: isStale(p.positionAt)
+        })),
+        ...(live.meetup
+          ? [{ id: 'meetup', kind: 'meetup', lat: live.meetup.lat, lng: live.meetup.lng, label: live.meetup.note || 'Meetup point' }]
+          : []),
+        ...(me.position ? [{ id: 'me', kind: 'me', lat: me.position.lat, lng: me.position.lng, label: 'You' }] : [])
+      ]
+    : [];
+
   const pins = [
     ...(show.mine ? mapped.map(e => ({ id: `mine:${e._id}`, kind: 'mine', lat: e.lat, lng: e.lng, label: e.name })) : []),
     ...(show.nearby
       ? venues.map(v => ({ id: v.id, kind: 'nearby', lat: v.lat, lng: v.lng, label: v.venue || 'Venue', count: v.events.length }))
-      : [])
+      : []),
+    ...livePins
   ];
 
   // Selections that are hidden (layer off) or gone count as nothing selected
   const selectedPin = pins.find(p => p.id === selectedId);
   const selectedEvent = selectedPin?.kind === 'mine' && mapped.find(e => `mine:${e._id}` === selectedId);
   const selectedVenue = selectedPin?.kind === 'nearby' && venues.find(v => v.id === selectedId);
+  const selectedPerson = selectedPin?.kind === 'friend' && live.people.find(p => `friend:${p.user}` === selectedId);
+  const selectedMeetup = selectedPin?.kind === 'meetup' && live.meetup;
 
   const toggle = (layer) => setShow(prev => ({ ...prev, [layer]: !prev[layer] }));
-  const fitKey = [show.mine, show.nearby, mine.status, nearby.status, place?.lat, place?.lng].join('|');
+  // While an event is happening, the map frames the people there (and the
+  // event itself) rather than everything
+  const liveIds = livePins.length > 0 ? [...livePins.map(p => p.id), `mine:${liveEvent._id}`] : null;
+  const fitKey = [show.mine, show.nearby, show.friends, mine.status, nearby.status, live.status, place?.lat, place?.lng].join('|');
+
+  const saveMeetup = async ({ note, time }) => {
+    await live.setMeetup({ ...canvasRef.current.getCenter(), note, time });
+    setPlacingMeetup(false);
+    setSelectedId('meetup');
+  };
 
   return (
     <div className="flex flex-col h-full relative">
       <div className="relative flex-1 overflow-hidden">
         <MapCanvas
+          ref={canvasRef}
           pins={pins}
           selectedId={selectedPin ? selectedId : null}
-          onSelect={setSelectedId}
+          onSelect={placingMeetup ? () => {} : setSelectedId}
           fitKey={fitKey}
+          fitIds={liveIds}
           fallbackCenter={place}
           focusId={focusId}
         />
+        {placingMeetup && (
+          <div className="eb-crosshair" aria-hidden="true">
+            <Flag size={36} fill="currentColor" />
+          </div>
+        )}
 
         {/* Above Leaflet's own layers, which go up to z-index 1000 */}
         <div className="absolute top-0 inset-x-0 z-[1100] p-4 space-y-2 pointer-events-none">
-          <div className="flex space-x-2 pointer-events-auto" role="group" aria-label="Show on map">
+          <div className="flex flex-wrap gap-2 pointer-events-auto" role="group" aria-label="Show on map">
+            {liveEvent && (
+              <LayerChip active={show.friends} dotClass="bg-go" onClick={() => toggle('friends')}>Friends</LayerChip>
+            )}
             <LayerChip active={show.mine} dotClass="bg-violet" onClick={() => toggle('mine')}>Your events</LayerChip>
             <LayerChip active={show.nearby} dotClass="bg-pink-500" onClick={() => toggle('nearby')}>Nearby</LayerChip>
           </div>
@@ -75,21 +135,41 @@ const Map = () => {
         </div>
       </div>
 
-      <div className="bg-surface border-t border-line px-4 pt-3 pb-4 max-h-[45%] overflow-y-auto">
-        {selectedEvent ? (
+      <div className="bg-surface border-t border-line px-4 pt-3 pb-4 max-h-[50%] overflow-y-auto">
+        {placingMeetup ? (
+          <MeetupForm existing={live.meetup} onSave={saveMeetup} onCancel={() => setPlacingMeetup(false)} />
+        ) : selectedPerson ? (
+          <FriendPanel person={selectedPerson} />
+        ) : selectedMeetup ? (
+          <MeetupPanel meetup={selectedMeetup} onClear={async () => { await live.clearMeetup(); setSelectedId(null); }} />
+        ) : selectedEvent ? (
           <EventPanel event={selectedEvent} />
         ) : selectedVenue ? (
           <VenuePanel venue={selectedVenue} onOpen={setOpenEvent} />
         ) : (
-          <Summary
-            mine={mine}
-            mappedCount={mapped.length}
-            unmapped={unmapped}
-            place={place}
-            nearby={nearby}
-            venueCount={venues.length}
-            onChoosePlace={() => setChoosingPlace(true)}
-          />
+          <>
+            {liveEvent && (
+              <LiveBar
+                event={liveEvent}
+                live={live}
+                trackingError={me.error}
+                onShare={() => setSharingOpen(true)}
+                onSetMeetup={() => {
+                  setSelectedId(null);
+                  setPlacingMeetup(true);
+                }}
+              />
+            )}
+            <Summary
+              mine={mine}
+              mappedCount={mapped.length}
+              unmapped={unmapped}
+              place={place}
+              nearby={nearby}
+              venueCount={venues.length}
+              onChoosePlace={() => setChoosingPlace(true)}
+            />
+          </>
         )}
       </div>
 
@@ -97,6 +177,9 @@ const Map = () => {
 
       {choosingPlace && <PlaceSheet onClose={() => setChoosingPlace(false)} />}
       {openEvent && <LocalEventSheet event={openEvent} onClose={() => setOpenEvent(null)} />}
+      {sharingOpen && liveEvent && (
+        <ShareSheet event={liveEvent} onShare={live.startSharing} onClose={() => setSharingOpen(false)} />
+      )}
     </div>
   );
 };

@@ -68,6 +68,23 @@ const eventSchema = new mongoose.Schema(
       type: new mongoose.Schema({ for: String, lat: Number, lng: Number }, { _id: false }),
       default: null
     },
+    // Where to regroup during the event, set by any member from the map.
+    // Shown until expiresAt (it's about today, not the whole trip).
+    meetup: {
+      type: new mongoose.Schema(
+        {
+          lat: { type: Number, required: true, min: -90, max: 90 },
+          lng: { type: Number, required: true, min: -180, max: 180 },
+          note: { type: String, default: '', trim: true, maxlength: 80 },
+          time: { type: String, default: '', match: [/^$|^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid meetup time'] },
+          setBy: { user: mongoose.Schema.Types.ObjectId, name: String },
+          setAt: { type: Date, required: true },
+          expiresAt: { type: Date, required: true }
+        },
+        { _id: false }
+      ),
+      default: null
+    },
     // Optional trip budget in whole cents, set by the organizer
     budgetCents: {
       type: Number,
@@ -86,8 +103,9 @@ eventSchema.index({ createdBy: 1 });
 eventSchema.set('toJSON', {
   transform: (doc, ret) => {
     delete ret.__v;
-    // Only the map uses it, through /api/map
+    // Only the map uses these, through /api/map and /api/events/:id/live
     delete ret.geo;
+    delete ret.meetup;
     return ret;
   }
 });

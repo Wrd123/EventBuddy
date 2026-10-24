@@ -7,6 +7,7 @@ const Expense = require('../models/Expense');
 const Payment = require('../models/Payment');
 const Message = require('../models/Message');
 const ChatRead = require('../models/ChatRead');
+const LocationShare = require('../models/LocationShare');
 const { ORGANIZER_COLOR } = require('../colors');
 
 const DEMO_PASSWORD = 'password';
@@ -27,7 +28,8 @@ const DEMO_FRIENDS = [
 const DEMO_EVENT_IDS = {
   festival: new mongoose.Types.ObjectId('000000000000000000000001'),
   hiking: new mongoose.Types.ObjectId('000000000000000000000002'),
-  beach: new mongoose.Types.ObjectId('000000000000000000000003')
+  beach: new mongoose.Types.ObjectId('000000000000000000000003'),
+  picnic: new mongoose.Types.ObjectId('000000000000000000000004')
 };
 
 // users: { me, Alex, Taylor, ... } as created below. Map positions are
@@ -125,6 +127,54 @@ const demoChat = (users) => {
   return { messages, read };
 };
 
+// A picnic happening today, so live locations can be tried right away:
+// three friends are already sharing where they are in the park and Taylor
+// has set a meetup point. Dated by the server's clock when seeded.
+const PARK = { lat: 33.7851, lng: -84.3738 };
+
+const demoPicnic = (users) => {
+  const now = Date.now();
+  const minutesAgo = (minutes) => new Date(now - minutes * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  const today = new Date(now);
+  const todayISO = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const color = (name) => DEMO_FRIENDS.find((f) => f.name === name)?.color || ORGANIZER_COLOR;
+  const member = (name) => ({ user: users[name]._id, name: users[name].name, color: color(name) });
+  const until = new Date(now + 6 * 60 * 60 * 1000);
+  const share = (name, lat, lng, minutes) =>
+    ({ event: DEMO_EVENT_IDS.picnic, user: users[name]._id, until, lat, lng, accuracy: 12, positionAt: minutesAgo(minutes) });
+
+  const event = {
+    _id: DEMO_EVENT_IDS.picnic,
+    name: 'Picnic in the Park',
+    type: 'outdoor',
+    startDate: todayISO,
+    endDate: todayISO,
+    location: 'Piedmont Park, Atlanta, GA',
+    geo: { for: 'Piedmont Park, Atlanta, GA', ...PARK },
+    description: 'Blankets, snacks and frisbee by the lake',
+    members: ['Taylor', 'me', 'Alex', 'Jordan'].map(member),
+    schedule: [],
+    meetup: {
+      lat: 33.7857,
+      lng: -84.3741,
+      note: 'By the lake, near the dock',
+      time: '',
+      setBy: { user: users.Taylor._id, name: users.Taylor.name },
+      setAt: minutesAgo(20),
+      expiresAt: new Date(now + 12 * 60 * 60 * 1000)
+    },
+    createdBy: users.Taylor._id
+  };
+  const shares = [
+    share('Alex', 33.7866, -84.3727, 2),
+    share('Taylor', 33.7856, -84.3745, 6),
+    // Hasn't moved or opened the app in a while: shown as last seen
+    share('Jordan', 33.7832, -84.3768, 25)
+  ];
+  return { event, shares };
+};
+
 // Festival money: who paid for what, and one payment already settled
 const demoLedger = (users) => {
   const event = DEMO_EVENT_IDS.festival;
@@ -180,6 +230,9 @@ const seedDemoData = async () => {
   const chat = demoChat(users);
   await Message.insertMany(chat.messages);
   await ChatRead.create(chat.read);
+  const picnic = demoPicnic(users);
+  await Event.insertMany([picnic.event]);
+  await LocationShare.insertMany(picnic.shares);
   return me;
 };
 

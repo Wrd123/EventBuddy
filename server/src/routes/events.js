@@ -14,6 +14,8 @@ const Payment = require('../models/Payment');
 const Message = require('../models/Message');
 const ChatRead = require('../models/ChatRead');
 const messageRoutes = require('./messages');
+const liveRoutes = require('./live');
+const LocationShare = require('../models/LocationShare');
 const { MAX_CENTS } = require('../models/Expense');
 
 const router = express.Router();
@@ -22,6 +24,7 @@ router.use('/:id/schedule', scheduleRoutes);
 router.use('/:id/expenses', expenseRoutes);
 router.use('/:id/payments', paymentRoutes);
 router.use('/:id/messages', messageRoutes);
+router.use('/:id/live', liveRoutes);
 
 router.get('/', async (req, res) => {
   const events = await Event.find(visibleTo(req.user)).sort({ startDate: 1 });
@@ -113,12 +116,13 @@ router.post('/:id/invite/reset', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const event = await findOwnEvent(req.params.id, req.user);
-  // Its money records and chat go with it
+  // Its money records, chat and shared locations go with it
   await Promise.all([
     Expense.deleteMany({ event: event._id }),
     Payment.deleteMany({ event: event._id }),
     Message.deleteMany({ event: event._id }),
     ChatRead.deleteMany({ event: event._id }),
+    LocationShare.deleteMany({ event: event._id }),
     event.deleteOne()
   ]);
   res.status(204).end();
