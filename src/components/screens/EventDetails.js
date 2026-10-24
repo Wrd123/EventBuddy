@@ -98,7 +98,7 @@ const EventActions = ({ eventId }) => {
       <ActionButton 
         Icon={Map} 
         label="Map"
-        onClick={() => navigate('/map')}
+        onClick={() => navigate('/map', { state: { focus: eventId } })}
       />
     </div>
   );

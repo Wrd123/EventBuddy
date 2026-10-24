@@ -85,9 +85,35 @@ const search = async (query) => {
   return place;
 };
 
+const fine = (n) => Math.round(n * 10000) / 10000; // about 10 m
+
+const searchAnywhere = async (q) => {
+  const params = new URLSearchParams({ format: 'jsonv2', limit: '1', q });
+  const [match] = await getJson(`/search?${params}`);
+  return match;
+};
+
+// An event's location as typed ("Indio, CA", "State Farm Arena, Atlanta, GA")
+// -> { lat, lng }, or null if nothing matches. Anywhere in the world, unlike
+// search(). When the whole text doesn't match, its last two parts usually
+// name the city, which still puts the pin in the right place.
+const geocode = async (text) => {
+  const key = `geo:${text.toLowerCase()}`;
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached;
+
+  const parts = text.split(',').map((part) => part.trim()).filter(Boolean);
+  const match = (await searchAnywhere(text)) ||
+    (parts.length > 2 ? await searchAnywhere(parts.slice(-2).join(', ')) : undefined);
+  const point = match ? { lat: fine(Number(match.lat)), lng: fine(Number(match.lon)) } : null;
+  cache.set(key, point);
+  return point;
+};
+
 module.exports = {
   reverse,
   search,
+  geocode,
   labelFor,
   USER_AGENT,
   clearCache: () => {

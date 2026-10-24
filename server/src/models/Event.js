@@ -61,6 +61,13 @@ const eventSchema = new mongoose.Schema(
     // Anyone with the link can join, so only members ever see it (events are
     // only sent to members) and the organizer can replace it
     inviteCode: { type: String, default: newInviteCode, unique: true },
+    // Where the location is on a map, looked up the first time the map needs
+    // it. `for` is the text that was looked up, so editing the location
+    // makes it stale. lat/lng are null when nothing matched.
+    geo: {
+      type: new mongoose.Schema({ for: String, lat: Number, lng: Number }, { _id: false }),
+      default: null
+    },
     // Optional trip budget in whole cents, set by the organizer
     budgetCents: {
       type: Number,
@@ -79,6 +86,8 @@ eventSchema.index({ createdBy: 1 });
 eventSchema.set('toJSON', {
   transform: (doc, ret) => {
     delete ret.__v;
+    // Only the map uses it, through /api/map
+    delete ret.geo;
     return ret;
   }
 });

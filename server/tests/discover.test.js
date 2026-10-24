@@ -73,8 +73,28 @@ describe('GET /api/discover/events', () => {
       location: 'Atlanta, GA',
       distanceMiles: 4.3,
       ticketUrl: 'https://www.ticketmaster.com/event/abc123',
-      imageUrl: ''
+      imageUrl: '',
+      lat: null,
+      lng: null
     }]);
+  });
+
+  it("includes the venue's position for the map, when it's valid", async () => {
+    const at = (location) => tmEvent({
+      _embedded: { venues: [{ name: 'State Farm Arena', city: { name: 'Atlanta' }, location }] }
+    });
+    ticketmasterReply = () => json(200, {
+      _embedded: {
+        events: [
+          at({ latitude: '33.7573', longitude: '-84.3963' }),
+          at({ latitude: 'unknown', longitude: '-84.3963' }),
+          at({ latitude: '133.7', longitude: '-84.3963' })
+        ]
+      }
+    });
+
+    const res = await getEvents({ lat: 33.749, lng: -84.388 });
+    assert.deepEqual(res.body.events.map((e) => [e.lat, e.lng]), [[33.7573, -84.3963], [null, null], [null, null]]);
   });
 
   it('asks Ticketmaster for upcoming events around the point, soonest first', async () => {

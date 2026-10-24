@@ -66,6 +66,11 @@ const normalize = (event) => {
   const region = venue?.state?.stateCode || venue?.country?.countryCode;
   const startDate = event.dates?.start?.localDate;
   const imageUrl = pickImage(event.images || []);
+  const lat = Number(venue?.location?.latitude);
+  const lng = Number(venue?.location?.longitude);
+  // The venue's position, for the map; null when Ticketmaster doesn't have it
+  const located = venue?.location && Number.isFinite(lat) && Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 
   return {
     _id: `tm_${event.id}`,
@@ -81,7 +86,9 @@ const normalize = (event) => {
     distanceMiles: typeof event.distance === 'number' ? Math.round(event.distance * 10) / 10 : null,
     ticketUrl: event.url || '',
     // https only, so the app never loads insecure content
-    imageUrl: /^https:\/\//.test(imageUrl || '') ? imageUrl : ''
+    imageUrl: /^https:\/\//.test(imageUrl || '') ? imageUrl : '',
+    lat: located ? lat : null,
+    lng: located ? lng : null
   };
 };
 

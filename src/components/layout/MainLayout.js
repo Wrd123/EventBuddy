@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 
@@ -6,7 +6,6 @@ import { useAppContext } from '../../context/AppContext';
 import Home from '../screens/Home';
 import EventDetails from '../screens/EventDetails';
 import CreateEvent from '../screens/CreateEvent';
-import Map from '../screens/Map';
 import Expenses from '../screens/Expenses';
 import Schedule from '../screens/Schedule';
 import GroupChat from '../screens/GroupChat';
@@ -17,6 +16,10 @@ import Register from '../screens/Register';
 import Profile from '../screens/Profile';
 import NotFound from '../screens/NotFound';
 import Invite from '../screens/Invite';
+import { ScreenLoader } from '../common';
+
+// The map brings in Leaflet, so it loads only when the Map tab is opened
+const Map = lazy(() => import('../screens/Map'));
 
 // Every screen has a URL, so refresh, the back button and deep links work.
 // Each screen renders its own Footer when it needs one.
@@ -32,7 +35,7 @@ const MainLayout = () => (
         <Route path="/" element={<Home />} />
         <Route path="/groups" element={<Groups />} />
         <Route path="/discover" element={<Discover />} />
-        <Route path="/map" element={<Map />} />
+        <Route path="/map" element={<Suspense fallback={<ScreenLoader />}><Map /></Suspense>} />
         <Route path="/create" element={<CreateEvent />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/events/:eventId" element={<EventDetails />} />

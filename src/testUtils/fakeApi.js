@@ -88,21 +88,28 @@ export const localEvents = [
     startDate: '2099-11-20', endDate: '2099-11-20', startTime: '19:30',
     venue: 'State Farm Arena', location: 'Atlanta, GA', distanceMiles: 4.3,
     ticketUrl: 'https://www.ticketmaster.com/event/1',
-    imageUrl: 'https://s1.ticketm.net/dam/a/123/arctic-monkeys_16_9.jpg'
+    imageUrl: 'https://s1.ticketm.net/dam/a/123/arctic-monkeys_16_9.jpg',
+    lat: 33.7573, lng: -84.3963
   },
   {
     _id: 'tm_2', source: 'ticketmaster', name: 'Atlanta Hawks vs. Boston Celtics', type: 'sports',
     startDate: '2099-11-22', endDate: '2099-11-22', startTime: '19:00',
     venue: 'State Farm Arena', location: 'Atlanta, GA', distanceMiles: 4.3,
-    ticketUrl: 'https://www.ticketmaster.com/event/2', imageUrl: ''
+    ticketUrl: 'https://www.ticketmaster.com/event/2', imageUrl: '',
+    lat: 33.7573, lng: -84.3963
   },
   {
     _id: 'tm_3', source: 'ticketmaster', name: 'Hamilton', type: 'arts',
     startDate: '2099-12-01', endDate: '2099-12-01', startTime: '',
     venue: 'Fox Theatre', location: 'Atlanta, GA', distanceMiles: 1.2,
-    ticketUrl: '', imageUrl: ''
+    ticketUrl: '', imageUrl: '',
+    lat: 33.7725, lng: -84.3857
   }
 ];
+
+// Map positions of the demo events. The hiking trip's "Smoky Mountains"
+// couldn't be found, so it has none.
+const EVENT_POSITIONS = { '1': [33.7206, -116.2156] };
 
 const CATEGORY_TYPES = { music: ['concert', 'music-festival'], sports: ['sports'], arts: ['arts'], family: [] };
 
@@ -338,6 +345,14 @@ const route = (method, path, body, authed, params) => {
   }
   if (path === '/events') return respond(200, { events: events.filter(isMember) });
   if (path === '/chats') return chatList();
+  if (path === '/map/events') {
+    return respond(200, {
+      events: events.filter(isMember).map(({ _id, name, type, startDate, endDate, location }) => {
+        const [lat, lng] = EVENT_POSITIONS[_id] || [null, null];
+        return { _id, name, type: type || 'music-festival', startDate, endDate, location, lat, lng };
+      })
+    });
+  }
 
   // /events/:id/messages[/read]
   const chatMatch = path.match(/^\/events\/([^/]+)\/messages(?:\/(read))?$/);

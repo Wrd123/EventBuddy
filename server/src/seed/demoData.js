@@ -30,7 +30,8 @@ const DEMO_EVENT_IDS = {
   beach: new mongoose.Types.ObjectId('000000000000000000000003')
 };
 
-// users: { me, Alex, Taylor, ... } as created below
+// users: { me, Alex, Taylor, ... } as created below. Map positions are
+// filled in, so the demo map works without looking anything up.
 const demoEvents = (users) => {
   const { me } = users;
   const member = (name) => {
@@ -50,6 +51,7 @@ const demoEvents = (users) => {
       startDate: '2027-04-15',
       endDate: '2027-04-18',
       location: 'Indio, CA',
+      geo: { for: 'Indio, CA', lat: 33.7206, lng: -116.2156 },
       description: 'Annual summer music festival with top artists',
       budgetCents: 85000,
       members: ['me', 'Alex', 'Taylor', 'Jordan', 'Jamie'].map(member),
@@ -68,6 +70,7 @@ const demoEvents = (users) => {
       startDate: '2026-11-13',
       endDate: '2026-11-15',
       location: 'Smoky Mountains',
+      geo: { for: 'Smoky Mountains', lat: 35.6532, lng: -83.507 },
       description: 'Weekend hiking adventure in the mountains',
       members: ['me', 'Alex', 'Jordan', 'Casey'].map(member),
       schedule: [
@@ -83,6 +86,7 @@ const demoEvents = (users) => {
       startDate: '2026-08-08',
       endDate: '2026-08-08',
       location: 'Tybee Island, GA',
+      geo: { for: 'Tybee Island, GA', lat: 32.0002, lng: -80.8454 },
       description: 'Day trip to the beach',
       members: ['me', 'Taylor', 'Jamie'].map(member),
       schedule: [

@@ -6,6 +6,7 @@ const eventRoutes = require('./routes/events');
 const inviteRoutes = require('./routes/invites');
 const discoverRoutes = require('./routes/discover');
 const chatRoutes = require('./routes/chats');
+const mapRoutes = require('./routes/map');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const { clientOrigin, trustProxy } = require('./config');
 
@@ -24,6 +25,7 @@ const createApp = () => {
   app.use('/api/invites', inviteRoutes);
   app.use('/api/discover', discoverRoutes);
   app.use('/api/chats', chatRoutes);
+  app.use('/api/map', mapRoutes);
 
   app.use('/api', notFound);
   app.use(errorHandler);

@@ -1,145 +1,196 @@
-import React from 'react';
-import { ArrowLeft, Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { MapPin } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Footer from '../layout/Footer';
-import { Button, Avatar } from '../common';
-import { nearbyFriends } from '../../data/mockData';
+import MapCanvas from '../map/MapCanvas';
+import { Button, EventArt, LocalEventCard, LocalEventSheet, PlaceSheet } from '../common';
+import { useMapEvents } from '../../hooks/useMapEvents';
+import { useNearbyEvents } from '../../hooks/useNearbyEvents';
+import { usePlace } from '../../hooks/usePlace';
+import { formatDateRange, getEventStatus } from '../../utils/dates';
+import { groupByVenue, listNames } from '../../utils/map';
 
+const hasPosition = (e) => e.lat !== null && e.lng !== null;
+
+// Your upcoming events and nearby Ticketmaster events on one map. Nobody's
+// own location is on it: "nearby" is around the place you chose in Discover.
+// Opening it from an event (state.focus = event id) starts on that event.
 const Map = () => {
-  const navigate = useNavigate();
-  
+  const location = useLocation();
+  const { place } = usePlace();
+  const mine = useMapEvents();
+  const nearby = useNearbyEvents(place, { radius: 25, category: 'all' });
+  const [show, setShow] = useState({ mine: true, nearby: true });
+  const focusId = location.state?.focus ? `mine:${location.state.focus}` : null;
+  const [selectedId, setSelectedId] = useState(focusId);
+  const [choosingPlace, setChoosingPlace] = useState(false);
+  const [openEvent, setOpenEvent] = useState(null);
+
+  const upcoming = mine.events.filter(e => getEventStatus(e) !== 'past');
+  const mapped = upcoming.filter(hasPosition);
+  const unmapped = upcoming.filter(e => !hasPosition(e));
+  const venues = groupByVenue(nearby.events);
+
+  const pins = [
+    ...(show.mine ? mapped.map(e => ({ id: `mine:${e._id}`, kind: 'mine', lat: e.lat, lng: e.lng, label: e.name })) : []),
+    ...(show.nearby
+      ? venues.map(v => ({ id: v.id, kind: 'nearby', lat: v.lat, lng: v.lng, label: v.venue || 'Venue', count: v.events.length }))
+      : [])
+  ];
+
+  // Selections that are hidden (layer off) or gone count as nothing selected
+  const selectedPin = pins.find(p => p.id === selectedId);
+  const selectedEvent = selectedPin?.kind === 'mine' && mapped.find(e => `mine:${e._id}` === selectedId);
+  const selectedVenue = selectedPin?.kind === 'nearby' && venues.find(v => v.id === selectedId);
+
+  const toggle = (layer) => setShow(prev => ({ ...prev, [layer]: !prev[layer] }));
+  const fitKey = [show.mine, show.nearby, mine.status, nearby.status, place?.lat, place?.lng].join('|');
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="relative flex-1">
-        <MapView />
-        <MapControls />
-        <MapSearch onBack={() => navigate('/')} />
+    <div className="flex flex-col h-full relative">
+      <div className="relative flex-1 overflow-hidden">
+        <MapCanvas
+          pins={pins}
+          selectedId={selectedPin ? selectedId : null}
+          onSelect={setSelectedId}
+          fitKey={fitKey}
+          fallbackCenter={place}
+          focusId={focusId}
+        />
+
+        {/* Above Leaflet's own layers, which go up to z-index 1000 */}
+        <div className="absolute top-0 inset-x-0 z-[1100] p-4 space-y-2 pointer-events-none">
+          <div className="flex space-x-2 pointer-events-auto" role="group" aria-label="Show on map">
+            <LayerChip active={show.mine} dotClass="bg-violet" onClick={() => toggle('mine')}>Your events</LayerChip>
+            <LayerChip active={show.nearby} dotClass="bg-pink-500" onClick={() => toggle('nearby')}>Nearby</LayerChip>
+          </div>
+          <button
+            onClick={() => setChoosingPlace(true)}
+            className="pointer-events-auto inline-flex items-center max-w-full rounded-full bg-surface/90 border border-line backdrop-blur px-3 py-1.5 text-sm"
+            aria-label={place ? `Change location, now near ${place.label}` : 'Choose a location for nearby events'}
+          >
+            <MapPin size={16} className="mr-1.5 text-violet-soft shrink-0" aria-hidden="true" />
+            <span className="truncate">{place ? `Near ${place.label}` : 'Choose a location'}</span>
+          </button>
+        </div>
       </div>
-      
-      <NearbyFriends friends={nearbyFriends} />
+
+      <div className="bg-surface border-t border-line px-4 pt-3 pb-4 max-h-[45%] overflow-y-auto">
+        {selectedEvent ? (
+          <EventPanel event={selectedEvent} />
+        ) : selectedVenue ? (
+          <VenuePanel venue={selectedVenue} onOpen={setOpenEvent} />
+        ) : (
+          <Summary
+            mine={mine}
+            mappedCount={mapped.length}
+            unmapped={unmapped}
+            place={place}
+            nearby={nearby}
+            venueCount={venues.length}
+            onChoosePlace={() => setChoosingPlace(true)}
+          />
+        )}
+      </div>
+
       <Footer />
+
+      {choosingPlace && <PlaceSheet onClose={() => setChoosingPlace(false)} />}
+      {openEvent && <LocalEventSheet event={openEvent} onClose={() => setOpenEvent(null)} />}
     </div>
   );
 };
 
-// Map visualization component
-// Positions are CSS percentages of the map area. (Preview only: the map
-// isn't connected to real locations yet.)
-const MapView = () => (
-  <div className="absolute inset-0 bg-night overflow-hidden">
-    <MapArt />
-    
-    {/* Friend locations */}
-    <FriendMarker initial="A" color="#3b82f6" top="28%" left="30%" />
-    <FriendMarker initial="T" color="#10b981" top="50%" right="22%" />
-    <FriendMarker initial="J" color="#8b5cf6" bottom="22%" left="48%" />
-    
-    {/* Points of interest */}
-    <PointOfInterest label="Main Stage" top="36%" right="34%" />
-    <PointOfInterest label="Food Court" bottom="36%" left="18%" />
-  </div>
-);
-
-// A dark, stylized street map: blocks, a park, a lake and main roads
-const MapArt = () => (
-  <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" aria-hidden="true">
-    <rect width="400" height="500" fill="#100d28" />
-    <path d="M40 300 Q90 250 150 280 T220 360 Q180 420 110 400 T40 300 Z" fill="#163a35" />
-    <ellipse cx="320" cy="120" rx="60" ry="38" fill="#152a52" />
-    <g stroke="#2a2552" strokeWidth="10">
-      {[60, 140, 220, 300, 380, 460].map(y => <line key={y} x1="0" y1={y} x2="400" y2={y} />)}
-      {[50, 130, 210, 290, 370].map(x => <line key={x} x1={x} y1="0" x2={x} y2="500" />)}
-    </g>
-    <path d="M-10 420 L410 80" stroke="#3b2f78" strokeWidth="18" />
-    <path d="M-10 420 L410 80" stroke="#6d5bd0" strokeWidth="2" strokeDasharray="10 10" />
-  </svg>
-);
-
-// Friend location marker on map
-const FriendMarker = ({ initial, color, top, left, right, bottom }) => (
-  <div 
-    className="absolute w-8 h-8 rounded-full border-2 border-night flex items-center justify-center text-white text-xs"
-    style={{ 
-      backgroundColor: color,
-      top: top ? `${top}` : 'auto',
-      left: left ? `${left}` : 'auto',
-      right: right ? `${right}` : 'auto',
-      bottom: bottom ? `${bottom}` : 'auto'
-    }}
+const LayerChip = ({ active, dotClass, onClick, children }) => (
+  <button
+    onClick={onClick}
+    aria-pressed={active}
+    className={`flex items-center px-3 py-1.5 rounded-full text-sm font-semibold border backdrop-blur ${
+      active ? 'bg-surface/90 text-fg border-violet/60' : 'bg-surface/60 text-faint border-line'
+    }`}
   >
-    {initial}
-  </div>
+    <span className={`w-2.5 h-2.5 rounded-full mr-2 ${dotClass} ${active ? '' : 'opacity-40'}`} aria-hidden="true" />
+    {children}
+  </button>
 );
 
-// Point of interest marker on map
-const PointOfInterest = ({ label, top, left, right, bottom }) => (
-  <div 
-    className="absolute bg-surface p-1 rounded text-xs"
-    style={{ 
-      top: top ? `${top}` : 'auto',
-      left: left ? `${left}` : 'auto',
-      right: right ? `${right}` : 'auto',
-      bottom: bottom ? `${bottom}` : 'auto'
-    }}
-  >
-    {label}
-  </div>
-);
-
-// Map zoom controls
-const MapControls = () => (
-  <div className="absolute bottom-4 right-4 flex flex-col space-y-2">
-    <button className="w-10 h-10 bg-surface rounded-full flex items-center justify-center">
-      <Plus size={20} />
-    </button>
-    <button className="w-10 h-10 bg-surface rounded-full flex items-center justify-center">
-      <div className="rotate-45">
-        <Plus size={20} />
-      </div>
-    </button>
-  </div>
-);
-
-// Search bar on map
-const MapSearch = ({ onBack }) => (
-  <div className="absolute top-4 left-4 right-4">
-    <div className="bg-surface/95 border border-line backdrop-blur rounded-full px-4 py-2.5 flex items-center">
-      <button onClick={onBack} className="mr-2" aria-label="Back">
-        <ArrowLeft size={20} />
-      </button>
-      <input
-        type="search"
-        aria-label="Search venues and friends"
-        className="flex-1 outline-none bg-transparent placeholder-faint"
-        placeholder="Search venues, friends, etc."
-      />
-    </div>
-  </div>
-);
-
-// Nearby friends section at bottom of map
-const NearbyFriends = ({ friends }) => (
-  <div className="bg-surface border-t border-line p-4">
-    <h3 className="font-medium mb-2">Nearby Friends</h3>
-    <div className="flex space-x-4 mb-4">
-      {friends.map((friend) => (
-        <div key={friend._id} className="flex flex-col items-center">
-          <Avatar 
-            initial={friend.initial} 
-            color={friend.color}
-            size="lg"
-            status={friend.status === 'online'}
-          />
-          <span className="text-xs mt-1">{friend.name}</span>
-          <span className="text-xs text-muted">{friend.minutes} min away</span>
+const EventPanel = ({ event }) => {
+  const navigate = useNavigate();
+  return (
+    <div>
+      <div className="flex items-center mb-3">
+        <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 mr-3">
+          <EventArt type={event.type} seed={event._id} className="w-full h-full" />
         </div>
-      ))}
+        <div className="min-w-0">
+          <h2 className="font-bold truncate">{event.name}</h2>
+          <p className="text-sm text-violet-soft">{formatDateRange(event.startDate, event.endDate)}</p>
+          <p className="text-sm text-muted truncate">{event.location}</p>
+        </div>
+      </div>
+      <Button fullWidth onClick={() => navigate(`/events/${event._id}`)}>Open event</Button>
     </div>
-    
-    <Button fullWidth variant="primary">
-      Create Meetup Point
-    </Button>
+  );
+};
+
+const VenuePanel = ({ venue, onOpen }) => (
+  <div>
+    <h2 className="font-bold">{venue.venue || 'Venue'}</h2>
+    <p className="text-sm text-muted mb-3">
+      {venue.events.length} upcoming {venue.events.length === 1 ? 'event' : 'events'}
+    </p>
+    <div className="space-y-2">
+      {venue.events.map(event => <LocalEventCard key={event._id} event={event} onOpen={() => onOpen(event)} />)}
+    </div>
+    <p className="text-xs text-faint text-center mt-3">Event data from Ticketmaster</p>
   </div>
+);
+
+const Summary = ({ mine, mappedCount, unmapped, place, nearby, venueCount, onChoosePlace }) => (
+  <div className="space-y-2 text-sm">
+    {mine.status === 'error' ? (
+      <div className="flex items-center justify-between">
+        <span className="text-muted">Couldn't load your events.</span>
+        <button onClick={mine.reload} className="font-semibold text-violet-soft">Try again</button>
+      </div>
+    ) : (
+      <Line dotClass="bg-violet">
+        {mine.status === 'loading'
+          ? 'Finding your events...'
+          : `${mappedCount} upcoming ${mappedCount === 1 ? 'event' : 'events'} of yours`}
+      </Line>
+    )}
+
+    {!place ? (
+      <div className="flex items-center justify-between">
+        <span className="text-muted">See concerts, games and shows nearby.</span>
+        <button onClick={onChoosePlace} className="font-semibold text-violet-soft shrink-0 ml-2">Choose a location</button>
+      </div>
+    ) : (
+      <Line dotClass="bg-pink-500">
+        {nearby.status === 'error'
+          ? nearby.error
+          : nearby.status === 'ready'
+            ? `${nearby.events.length} nearby ${nearby.events.length === 1 ? 'event' : 'events'} at ${venueCount} ${venueCount === 1 ? 'venue' : 'venues'}`
+            : 'Finding events nearby...'}
+      </Line>
+    )}
+
+    {unmapped.length > 0 && (
+      <p className="text-muted">
+        {listNames(unmapped.map(e => e.name))} {unmapped.length === 1 ? "isn't" : "aren't"} on the map. A location like
+        "City, ST" puts {unmapped.length === 1 ? 'it' : 'them'} here.
+      </p>
+    )}
+    {(mappedCount > 0 || venueCount > 0) && <p className="text-faint">Tap a pin for details.</p>}
+  </div>
+);
+
+const Line = ({ dotClass, children }) => (
+  <p className="flex items-center text-fg/90">
+    <span className={`w-2.5 h-2.5 rounded-full mr-2 shrink-0 ${dotClass}`} aria-hidden="true" />
+    {children}
+  </p>
 );
 
 export default Map;
