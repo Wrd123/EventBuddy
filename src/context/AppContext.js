@@ -6,6 +6,27 @@ import { setUnauthorizedHandler } from '../services/api';
 // Create context
 const AppContext = createContext();
 
+// Where Discover and Home search for local events, remembered on this
+// device. Storage can be unavailable (e.g. private browsing).
+const PLACE_KEY = 'eventbuddy_place';
+
+const readStoredPlace = () => {
+  try {
+    return JSON.parse(localStorage.getItem(PLACE_KEY)) || null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredPlace = (place) => {
+  try {
+    if (place) localStorage.setItem(PLACE_KEY, JSON.stringify(place));
+    else localStorage.removeItem(PLACE_KEY);
+  } catch {
+    // Not remembered, but it still works for this visit
+  }
+};
+
 // Context provider component: auth and event data. Navigation lives in the
 // router (see MainLayout), so nothing here changes screens.
 export const AppProvider = ({ children }) => {
@@ -13,7 +34,7 @@ export const AppProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [events, setEvents] = useState([]);
-  const [suggestedEvents, setSuggestedEvents] = useState([]);
+  const [place, setPlace] = useState(readStoredPlace);
   const [error, setError] = useState(null);
   // True after the user taps Log Out (vs. a session that expired), so the
   // login guard doesn't send the next login back to the page they left
@@ -26,7 +47,14 @@ export const AppProvider = ({ children }) => {
     setCurrentUser(null);
     setIsAuthenticated(false);
     setEvents([]);
-    setSuggestedEvents([]);
+    // Someone else may use this device next
+    setPlace(null);
+    writeStoredPlace(null);
+  }, []);
+
+  const savePlace = useCallback((next) => {
+    setPlace(next);
+    writeStoredPlace(next);
   }, []);
 
   // If the server rejects our token mid-session (expired), log out
@@ -70,10 +98,6 @@ export const AppProvider = ({ children }) => {
           // Fetch user events
           const userEvents = await eventService.getUserEvents();
           setEvents(userEvents);
-          
-          // Fetch suggested events
-          const suggestedEventsData = await eventService.getSuggestedEvents();
-          setSuggestedEvents(suggestedEventsData);
         } catch (error) {
           console.error('Fetch events error:', error);
           setError('Failed to load events. Please try again.');
@@ -218,7 +242,8 @@ export const AppProvider = ({ children }) => {
     isLoading,
     loggedOutByUser,
     events,
-    suggestedEvents,
+    place,
+    savePlace,
     error,
     clearError,
     login,

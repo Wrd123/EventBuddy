@@ -80,6 +80,32 @@ const demoEvents = () => [
   }
 ];
 
+// Discover's local (Ticketmaster) events, as the API returns them. Only the
+// first has artwork; the others show illustrated covers.
+export const localEvents = [
+  {
+    _id: 'tm_1', source: 'ticketmaster', name: 'Arctic Monkeys', type: 'concert',
+    startDate: '2099-11-20', endDate: '2099-11-20', startTime: '19:30',
+    venue: 'State Farm Arena', location: 'Atlanta, GA', distanceMiles: 4.3,
+    ticketUrl: 'https://www.ticketmaster.com/event/1',
+    imageUrl: 'https://s1.ticketm.net/dam/a/123/arctic-monkeys_16_9.jpg'
+  },
+  {
+    _id: 'tm_2', source: 'ticketmaster', name: 'Atlanta Hawks vs. Boston Celtics', type: 'sports',
+    startDate: '2099-11-22', endDate: '2099-11-22', startTime: '19:00',
+    venue: 'State Farm Arena', location: 'Atlanta, GA', distanceMiles: 4.3,
+    ticketUrl: 'https://www.ticketmaster.com/event/2', imageUrl: ''
+  },
+  {
+    _id: 'tm_3', source: 'ticketmaster', name: 'Hamilton', type: 'arts',
+    startDate: '2099-12-01', endDate: '2099-12-01', startTime: '',
+    venue: 'Fox Theatre', location: 'Atlanta, GA', distanceMiles: 1.2,
+    ticketUrl: '', imageUrl: ''
+  }
+];
+
+const CATEGORY_TYPES = { music: ['concert', 'music-festival'], sports: ['sports'], arts: ['arts'], family: [] };
+
 // Round-trip through JSON like a real response, so the app never holds the
 // fake's own objects (which it changes in place)
 const respond = (status, body) =>
@@ -185,7 +211,25 @@ const scheduleRoute = (event, method, itemId, action, body) => {
   return respond(method === 'POST' && !itemId ? 201 : 200, { event });
 };
 
-const route = (method, path, body, authed) => {
+let fakeOptions = {};
+
+const discoverRoute = (path, params) => {
+  if (path === '/discover/place') {
+    if (params.has('q')) {
+      const q = params.get('q');
+      if (/nowhere/i.test(q)) return respond(404, { message: `Couldn't find "${q}". Try a city name or ZIP code.` });
+      return respond(200, { place: { label: q === '30030' ? 'Decatur, GA' : 'Atlanta, GA', lat: 33.77, lng: -84.3 } });
+    }
+    return respond(200, { place: { label: 'Atlanta, GA', lat: Number(params.get('lat')), lng: Number(params.get('lng')) } });
+  }
+  if (fakeOptions.discoverError) return respond(503, { message: fakeOptions.discoverError });
+  if (fakeOptions.noLocalEvents) return respond(200, { events: [], attribution: 'Ticketmaster' });
+  const category = params.get('category') || 'all';
+  const events = category === 'all' ? localEvents : localEvents.filter((e) => CATEGORY_TYPES[category].includes(e.type));
+  return respond(200, { events, attribution: 'Ticketmaster' });
+};
+
+const route = (method, path, body, authed, params) => {
   if (method === 'POST' && path === '/auth/register') {
     return respond(201, { token: TOKEN, user: currentUser() });
   }
@@ -196,6 +240,8 @@ const route = (method, path, body, authed) => {
       : respond(401, { message: 'Invalid email or password' });
   }
   if (!authed) return respond(401, { message: 'Please log in.' });
+
+  if (path.startsWith('/discover/')) return discoverRoute(path, params);
 
   if (path === '/auth/me' && method === 'PATCH') {
     const next = { ...handles.u1, ...body.paymentHandles };
@@ -289,19 +335,23 @@ const route = (method, path, body, authed) => {
 
 // Installs the fake with fresh data. Returns logIn(), which saves a session
 // the way a past login would have, so the app opens already logged in.
-// options.handles replaces the starting payment handles ({ userId: handles })
+// options.handles replaces the starting payment handles ({ userId: handles });
+// options.noLocalEvents / options.discoverError change Discover's results
 export const installFakeApi = (options = {}) => {
+  fakeOptions = options;
   events = demoEvents();
   ledgers = demoLedger();
   handles = { ...demoHandles(), ...options.handles };
-  global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) =>
-    route(
+  global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) => {
+    const [path, search = ''] = url.replace(/^\/api/, '').split('?');
+    return route(
       method,
-      url.replace(/^\/api/, ''),
+      path,
       body ? JSON.parse(body) : undefined,
-      headers.Authorization === `Bearer ${TOKEN}`
-    )
-  );
+      headers.Authorization === `Bearer ${TOKEN}`,
+      new URLSearchParams(search)
+    );
+  });
 
   return {
     logIn: () => {

@@ -43,5 +43,13 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:3000',
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
-  bcryptRounds: Number(process.env.BCRYPT_ROUNDS) || 10
+  bcryptRounds: Number(process.env.BCRYPT_ROUNDS) || 10,
+  // Local events for Discover; unset means Discover explains it's not set up
+  ticketmasterApiKey: process.env.TICKETMASTER_API_KEY || '',
+  // Identifies us to OpenStreetMap's place lookup, as its policy requires
+  nominatimContact: process.env.NOMINATIM_CONTACT || 'https://github.com/Wrd123/EventBuddy',
+  // Nominatim allows one request per second; tests set this to 0
+  nominatimIntervalMs: process.env.NOMINATIM_MIN_INTERVAL_MS === undefined
+    ? 1100
+    : Number(process.env.NOMINATIM_MIN_INTERVAL_MS)
 };

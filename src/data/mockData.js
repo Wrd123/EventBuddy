@@ -1,13 +1,6 @@
-// Mock fixtures for features that don't have a backend yet. Events and users
-// come from the API (server/src/seed/demoData.js holds the demo events).
+// Mock fixtures for features that don't have a backend yet (chat, groups,
+// map). Events, users and Discover come from the API.
 // Every record uses `_id` to match what the MongoDB API returns.
-
-// Suggested events (eventService.getSuggestedEvents; discovery has no backend yet)
-export const suggestedEvents = [
-  { _id: '3', name: "Coachella 2027", type: 'music-festival', startDate: "2027-04-09", endDate: "2027-04-18", location: "Indio, CA" },
-  { _id: '4', name: "Lollapalooza", type: 'music-festival', startDate: "2027-07-29", endDate: "2027-08-01", location: "Chicago, IL" },
-  { _id: '5', name: "Bonnaroo", type: 'music-festival', startDate: "2027-06-10", endDate: "2027-06-13", location: "Manchester, TN" }
-];
 
 // Mock chat messages
 export const chatMessages = [
@@ -80,42 +73,4 @@ export const nearbyFriends = [
   { _id: "user1", name: "Alex", initial: "A", color: "#3b82f6", minutes: 3, status: "online" },
   { _id: "user2", name: "Taylor", initial: "T", color: "#10b981", minutes: 5, status: "online" },
   { _id: "user3", name: "Jordan", initial: "J", color: "#8b5cf6", minutes: 8, status: "online" }
-];
-
-// Popular nearby events
-export const popularEvents = [
-  {
-    _id: '6',
-    name: "Summer Music Festival",
-    type: 'music-festival',
-    startDate: "2027-05-14",
-    endDate: "2027-05-16",
-    location: "Nashville, TN",
-    interestedFriends: 5
-  },
-  {
-    _id: '7',
-    name: "Food & Wine Festival",
-    type: 'group-travel',
-    startDate: "2027-06-04",
-    endDate: "2027-06-06",
-    location: "Memphis, TN",
-    interestedFriends: 3
-  },
-  {
-    _id: '8',
-    name: "Outdoor Adventure Weekend",
-    type: 'outdoor',
-    startDate: "2027-07-09",
-    endDate: "2027-07-11",
-    location: "Smoky Mountains",
-    interestedFriends: 2
-  }
-];
-
-// Artist recommendations
-export const recommendedArtists = [
-  { _id: 'art1', name: "Arctic Monkeys" },
-  { _id: 'art2', name: "The Strokes" },
-  { _id: 'art3', name: "Tame Impala" }
 ];

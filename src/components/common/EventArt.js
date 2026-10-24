@@ -27,6 +27,8 @@ const SKIES = {
   ],
   concert: [['#0e0a26', '#2a1663', '#5b2a9c'], ['#120b2e', '#381874', '#8a2b8f'], ['#0d0c2b', '#22207a', '#4a3bb5']],
   outdoor: [['#1d1548', '#7a3a8f', '#f08a6b'], ['#18164a', '#5b3a9c', '#f6a35c'], ['#1a1240', '#8e3b7c', '#ffb36b']],
+  sports: [['#06122e', '#132a6b', '#2f56b0'], ['#0b0f2e', '#1d2a7a', '#4b3fb5'], ['#071a2a', '#0f3b5c', '#2a7a9c']],
+  arts: [['#1a0a1e', '#4a1240', '#8a2050'], ['#160a2a', '#3d1660', '#7a2a7a'], ['#1c0d14', '#521a2e', '#9a3a3a']],
   'group-travel': [['#121a4a', '#3c3d9e', '#e78bb0'], ['#16124a', '#5040a8', '#f3a07a'], ['#0f1b46', '#2f5aa8', '#9fb7ff']]
 };
 
@@ -183,7 +185,70 @@ const Travel = ({ id, rand }) => {
   );
 };
 
-const SCENES = { 'music-festival': Festival, concert: Concert, outdoor: Outdoor, 'group-travel': Travel };
+// A night stadium: floodlights over a green field and the stands
+const Sports = ({ id, rand }) => {
+  const towers = [60 + rand() * 30, 310 + rand() * 30];
+  return (
+    <>
+      <defs>
+        <radialGradient id={`${id}-flood`}>
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#bfd7ff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      {towers.map((x) => (
+        <g key={x}>
+          <circle cx={x} cy={46} r={70} fill={`url(#${id}-flood)`} opacity="0.45" />
+          <rect x={x - 3} y={50} width="6" height="140" fill="#0a0f24" />
+          <rect x={x - 18} y={38} width="36" height="14" rx="3" fill="#e8f0ff" />
+        </g>
+      ))}
+      <path d="M0 170 Q200 120 400 170 V240 H0 Z" fill="#0d1a3c" />
+      {Array.from({ length: 30 }, (_, i) => (
+        <circle key={i} cx={i * 14 + rand() * 6} cy={160 - Math.sin((i / 30) * Math.PI) * 28 + rand() * 6} r="2.2" fill="#ffd27a" opacity={rand() > 0.5 ? 0.7 : 0.25} />
+      ))}
+      <ellipse cx="200" cy="240" rx="230" ry="55" fill="#1f7a4a" />
+      <ellipse cx="200" cy="240" rx="230" ry="55" fill="none" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="2" />
+      <line x1="200" y1="185" x2="200" y2="240" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="2" />
+      <ellipse cx="200" cy="225" rx="34" ry="10" fill="none" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="2" />
+    </>
+  );
+};
+
+// A theater stage: curtains framing a spotlight
+const Arts = ({ id, rand }) => {
+  const spotX = 150 + rand() * 100;
+  const folds = (side) => Array.from({ length: 5 }, (_, i) => {
+    const x = side === 'left' ? i * 22 : 400 - i * 22 - 22;
+    return <rect key={`${side}${i}`} x={x} y="0" width="22" height="240" fill={i % 2 ? '#7a1834' : '#962040'} />;
+  });
+  return (
+    <>
+      <defs>
+        <linearGradient id={`${id}-spot`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff3c4" stopOpacity="0.75" />
+          <stop offset="1" stopColor="#fff3c4" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <polygon points={`${spotX - 8},0 ${spotX + 8},0 ${spotX + 70},200 ${spotX - 70},200`} fill={`url(#${id}-spot)`} />
+      <ellipse cx={spotX} cy="200" rx="75" ry="14" fill="#fff3c4" opacity="0.35" />
+      <rect x="0" y="200" width="400" height="40" fill="#2a0f1e" />
+      <rect x="0" y="198" width="400" height="4" fill="#d9a441" opacity="0.8" />
+      {folds('left')}
+      {folds('right')}
+      <path d="M0 0 H400 V26 Q300 46 200 30 Q100 46 0 26 Z" fill="#b02a4a" />
+    </>
+  );
+};
+
+const SCENES = {
+  'music-festival': Festival,
+  concert: Concert,
+  outdoor: Outdoor,
+  'group-travel': Travel,
+  sports: Sports,
+  arts: Arts
+};
 
 const EventArt = ({ type, seed, className = '' }) => {
   // useId gives ":r1:"-style ids; colons break url(#...) references

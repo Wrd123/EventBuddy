@@ -35,7 +35,8 @@ router.post('/', async (req, res) => {
     startDate: text(req.body.startDate),
     endDate: text(req.body.endDate),
     location: text(req.body.location),
-    description: text(req.body.description)
+    description: text(req.body.description),
+    ticketUrl: text(req.body.ticketUrl)
   };
 
   const error = validateNewEvent(fields);
@@ -53,7 +54,7 @@ router.post('/', async (req, res) => {
   res.status(201).json({ event });
 });
 
-const EDITABLE_FIELDS = ['name', 'type', 'startDate', 'endDate', 'location', 'description'];
+const EDITABLE_FIELDS = ['name', 'type', 'startDate', 'endDate', 'location', 'description', 'ticketUrl'];
 
 router.patch('/:id', async (req, res) => {
   const event = await findOwnEvent(req.params.id, req.user);

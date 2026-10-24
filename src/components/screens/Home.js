@@ -2,24 +2,28 @@ import React, { useState } from 'react';
 import { ChevronRight, MapPin, Music2, Navigation, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
-import { useLocation } from '../../hooks/useLocation';
+import { usePlace } from '../../hooks/usePlace';
+import { useNearbyEvents } from '../../hooks/useNearbyEvents';
 import Header from '../common/Header';
 import Footer from '../layout/Footer';
-import LocationPermissionModal from '../common/LocationPermissionModal';
-import { AvatarStack, EventArt, EventCard, SuggestedEventCard } from '../common';
+import { AvatarStack, EventArt, EventCard, LocalEventSheet, PlaceSheet, SuggestedEventCard } from '../common';
 import { todayISO, getEventStatus, parseISODate } from '../../utils/dates';
 
 const byStartDate = (a, b) => a.startDate.localeCompare(b.startDate);
 
 // Lists show this many until "View all" is tapped
 const PREVIEW_COUNT = 3;
+// Local suggestions shown on Home; Discover has the full list
+const SUGGESTION_COUNT = 8;
 
 const Home = () => {
-  const { events, suggestedEvents, currentUser } = useAppContext();
+  const { events, currentUser } = useAppContext();
   const navigate = useNavigate();
   const openEvent = (event) => navigate(`/events/${event._id}`);
-  const { isLoadingLocation, hasLocation, requestLocation, getLocationString, isLocationAvailable } = useLocation();
-  const [showLocationModal, setShowLocationModal] = useState(false);
+  const { place } = usePlace();
+  const nearby = useNearbyEvents(place);
+  const [choosingPlace, setChoosingPlace] = useState(false);
+  const [openSuggestion, setOpenSuggestion] = useState(null);
 
   // Upcoming and in-progress events soonest first; past events most recent first
   const today = todayISO();
@@ -32,19 +36,10 @@ const Home = () => {
     .sort((a, b) => byStartDate(b.event, a.event));
   const nextUp = activeEvents[0];
 
-  const handleRequestLocation = async () => {
-    try {
-      await requestLocation();
-      setShowLocationModal(false);
-    } catch (error) {
-      console.error('Failed to get location:', error);
-    }
-  };
-
   const firstName = currentUser?.name?.split(' ')[0];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* The header and mountain backdrop scroll away with the page; only
           the tab bar stays put */}
       <div className="relative flex-1 overflow-y-auto pb-4">
@@ -61,26 +56,27 @@ const Home = () => {
           </p>
         </section>
 
-        <div className="flex items-center justify-between rounded-2xl bg-surface/80 border border-line backdrop-blur px-3 py-2.5 mb-4">
+        <button
+          onClick={() => setChoosingPlace(true)}
+          aria-label={place ? `Change location, now near ${place.label}` : 'Choose a location'}
+          className="w-full flex items-center justify-between rounded-2xl bg-surface/80 border border-line backdrop-blur px-3 py-2.5 mb-4 text-left"
+        >
           <span className="flex items-center font-semibold min-w-0">
             <MapPin size={20} className="mr-2 text-violet-soft shrink-0" aria-hidden="true" />
-            <span className="truncate">Near {getLocationString()}</span>
+            <span className="truncate">{place ? `Near ${place.label}` : 'Events near you'}</span>
           </span>
-          {hasLocation ? (
+          {place?.source === 'device' ? (
             <span className="flex items-center text-sm font-semibold text-go bg-go/10 border border-go/30 px-3 py-1 rounded-full shrink-0">
               <Navigation size={14} className="mr-1.5" aria-hidden="true" />
               Location On
             </span>
-          ) : isLocationAvailable && (
-            <button
-              onClick={() => setShowLocationModal(true)}
-              className="flex items-center text-sm font-semibold text-violet-soft bg-violet/10 border border-violet/30 px-3 py-1 rounded-full shrink-0"
-            >
+          ) : (
+            <span className="flex items-center text-sm font-semibold text-violet-soft bg-violet/10 border border-violet/30 px-3 py-1 rounded-full shrink-0">
               <Navigation size={14} className="mr-1.5" aria-hidden="true" />
-              Turn on location
-            </button>
+              {place ? 'Change' : 'Turn on location'}
+            </span>
           )}
-        </div>
+        </button>
 
         {nextUp && <NextUpCard event={nextUp.event} status={nextUp.status} onOpen={() => openEvent(nextUp.event)} />}
 
@@ -98,33 +94,55 @@ const Home = () => {
 
         {pastEvents.length > 0 && <EventSection title="Past Events" items={pastEvents} onOpen={openEvent} />}
 
-        {suggestedEvents.length > 0 && (
-          <section className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xl font-bold">Suggested For You</h3>
-              <Link to="/discover" className="flex items-center text-sm font-semibold text-violet-soft">
-                View all <ChevronRight size={16} aria-hidden="true" />
-              </Link>
-            </div>
-            <div className="flex overflow-x-auto no-scrollbar space-x-3 -mx-4 px-4 pb-1">
-              {suggestedEvents.map((event) => (
-                <SuggestedEventCard key={event._id} event={event} />
-              ))}
-            </div>
-          </section>
-        )}
+        <Suggestions
+          place={place}
+          nearby={nearby}
+          onChoosePlace={() => setChoosingPlace(true)}
+          onOpen={setOpenSuggestion}
+        />
         </div>
       </div>
 
-      <LocationPermissionModal
-        isOpen={showLocationModal}
-        onClose={() => setShowLocationModal(false)}
-        onRequestLocation={handleRequestLocation}
-        isLoading={isLoadingLocation}
-      />
+      {choosingPlace && <PlaceSheet onClose={() => setChoosingPlace(false)} />}
+      {openSuggestion && <LocalEventSheet event={openSuggestion} onClose={() => setOpenSuggestion(null)} />}
 
       <Footer />
     </div>
+  );
+};
+
+// Real events near you, a tap away from planning with friends
+const Suggestions = ({ place, nearby, onChoosePlace, onOpen }) => {
+  // Errors and empty areas are explained on Discover; Home just stays quiet
+  if (place && (nearby.status === 'error' || (nearby.status === 'ready' && nearby.events.length === 0))) return null;
+
+  return (
+    <section className="mt-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xl font-bold">Suggested For You</h3>
+        {place && (
+          <Link to="/discover" className="flex items-center text-sm font-semibold text-violet-soft">
+            View all <ChevronRight size={16} aria-hidden="true" />
+          </Link>
+        )}
+      </div>
+      {!place ? (
+        <button onClick={onChoosePlace} className="card w-full p-4 text-left">
+          <span className="font-semibold block">Find concerts, games and shows near you</span>
+          <span className="text-sm text-violet-soft">Choose a location</span>
+        </button>
+      ) : nearby.status === 'loading' ? (
+        <div className="flex space-x-3" aria-label="Loading suggestions">
+          {[0, 1, 2].map(i => <div key={i} className="w-36 h-32 rounded-2xl bg-surface border border-line animate-pulse shrink-0" />)}
+        </div>
+      ) : (
+        <div className="flex overflow-x-auto no-scrollbar space-x-3 -mx-4 px-4 pb-1">
+          {nearby.events.slice(0, SUGGESTION_COUNT).map((event) => (
+            <SuggestedEventCard key={event._id} event={event} onOpen={() => onOpen(event)} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 };
 

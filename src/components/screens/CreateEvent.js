@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Calendar, Map, Users } from 'lucide-react';
+import { Music, Calendar, Map, Users, Trophy, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
@@ -162,7 +162,9 @@ const EventTypeSelector = ({ selectedType, onSelect }) => {
     { id: 'music-festival', label: 'Music Festival', icon: Music },
     { id: 'concert', label: 'Concert', icon: Calendar },
     { id: 'outdoor', label: 'Outdoor Trip', icon: Map },
-    { id: 'group-travel', label: 'Group Travel', icon: Users }
+    { id: 'group-travel', label: 'Group Travel', icon: Users },
+    { id: 'sports', label: 'Sports', icon: Trophy },
+    { id: 'arts', label: 'Arts & Shows', icon: Ticket }
   ];
 
   return (

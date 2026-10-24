@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Heart } from 'lucide-react';
-import EventArt from './EventArt';
+import EventCover from './EventCover';
 import { formatDateRange } from '../../utils/dates';
 
-// Suggestions you've hearted, remembered on this device only (discovery has
-// no backend yet). Storage can be unavailable, e.g. in private browsing.
+// Suggestions you've hearted, remembered on this device only. Storage can be
+// unavailable, e.g. in private browsing.
 const SAVED_KEY = 'eventbuddy_saved_suggestions';
 
 const readSaved = () => {
@@ -23,7 +23,8 @@ const writeSaved = (saved) => {
   }
 };
 
-const SuggestedEventCard = ({ event }) => {
+// onOpen: tapping the card (not the heart) shows the event's details
+const SuggestedEventCard = ({ event, onOpen }) => {
   const [isSaved, setIsSaved] = useState(() => readSaved().has(event._id));
 
   const toggle = () => {
@@ -36,9 +37,15 @@ const SuggestedEventCard = ({ event }) => {
 
   return (
     <div className="relative flex-shrink-0 w-36 h-32 rounded-2xl overflow-hidden border border-line">
-      <EventArt type={event.type} seed={event._id} className="absolute inset-0 w-full h-full" />
-      {/* Darkens the bottom so the text stays readable on any cover */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      <button onClick={onOpen} className="absolute inset-0 w-full h-full text-left" aria-label={`See ${event.name}`}>
+        <EventCover imageUrl={event.imageUrl} type={event.type} seed={event._id} className="absolute inset-0 w-full h-full" />
+        {/* Darkens the bottom so the text stays readable on any cover */}
+        <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+        <span className="absolute bottom-2 left-3 right-3">
+          <span className="block font-bold text-sm text-white truncate">{event.name}</span>
+          <span className="block text-xs text-white/80 truncate">{formatDateRange(event.startDate, event.endDate)}</span>
+        </span>
+      </button>
       <button
         onClick={toggle}
         aria-pressed={isSaved}
@@ -47,10 +54,6 @@ const SuggestedEventCard = ({ event }) => {
       >
         <Heart size={20} className={isSaved ? 'fill-violet-soft text-violet-soft' : ''} />
       </button>
-      <div className="absolute bottom-2 left-3 right-3">
-        <div className="font-bold text-sm text-white truncate">{event.name}</div>
-        <div className="text-xs text-white/80 truncate">{formatDateRange(event.startDate, event.endDate)}</div>
-      </div>
     </div>
   );
 };

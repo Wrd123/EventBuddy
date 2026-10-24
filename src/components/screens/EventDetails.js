@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, MessageSquare, DollarSign, Map, Plus } from 'lucide-react';
+import { Calendar, MessageSquare, DollarSign, Map, Plus, ExternalLink } from 'lucide-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Header from '../common/Header';
 import { Avatar, EventArt, ScreenLoader } from '../common';
@@ -39,6 +39,17 @@ const EventDetails = () => {
       <div className="flex-1 overflow-y-auto pb-16">
         <EventCover event={event} />
         <EventActions eventId={eventId} />
+        {event.ticketUrl && (
+          // Events planned from Discover keep their ticket page
+          <a
+            href={event.ticketUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mx-4 mt-3 flex items-center justify-center py-2.5 rounded-xl border border-violet/50 text-violet-soft font-semibold"
+          >
+            Get tickets <ExternalLink size={16} className="ml-2" aria-hidden="true" />
+          </a>
+        )}
         <EventContent event={event} onInvite={() => setShowInvite(true)} />
       </div>
 

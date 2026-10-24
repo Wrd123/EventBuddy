@@ -29,7 +29,7 @@ const isRealDate = (value) => {
 const earliestTodayAnywhere = (now = new Date()) =>
   new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-const validateEventFields = ({ name, startDate, endDate }) => {
+const validateEventFields = ({ name, startDate, endDate, ticketUrl = '' }) => {
   if (!name) return 'Please enter an event name.';
   if (name.length > MAX_NAME_LENGTH) return `Event name must be ${MAX_NAME_LENGTH} characters or fewer.`;
   if (!startDate) return 'Please choose a date.';
@@ -37,7 +37,18 @@ const validateEventFields = ({ name, startDate, endDate }) => {
   if (!endDate) return 'Please choose an end date.';
   if (!isRealDate(endDate)) return 'Please choose a valid end date.';
   if (endDate < startDate) return 'The end date must be on or after the start date.';
+  if (!isTicketUrl(ticketUrl)) return 'The ticket link must be an https:// address.';
   return '';
+};
+
+// '' or an https link (tickets come from Ticketmaster and similar sites)
+const isTicketUrl = (value) => {
+  if (value === '') return true;
+  try {
+    return new URL(value).protocol === 'https:' && value.length <= 500;
+  } catch {
+    return false;
+  }
 };
 
 const validateNewEvent = (fields, now = new Date()) => {

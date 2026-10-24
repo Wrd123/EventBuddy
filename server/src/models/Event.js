@@ -46,13 +46,15 @@ const eventSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 60 },
     type: {
       type: String,
-      enum: ['music-festival', 'concert', 'outdoor', 'group-travel'],
+      enum: ['music-festival', 'concert', 'outdoor', 'group-travel', 'sports', 'arts'],
       default: 'music-festival'
     },
     startDate: { type: String, required: true, match: ISO_DATE },
     endDate: { type: String, required: true, match: ISO_DATE },
     location: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
+    // Where to buy tickets, for events planned from Discover
+    ticketUrl: { type: String, default: '', trim: true, maxlength: 500 },
     members: [memberSchema],
     schedule: [scheduleItemSchema],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

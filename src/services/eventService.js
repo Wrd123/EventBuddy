@@ -1,5 +1,4 @@
 // Events from the EventBuddy API
-import { suggestedEvents as mockSuggestedEvents } from '../data/mockData';
 import { apiRequest } from './api';
 
 const eventPath = (eventId) => `/events/${encodeURIComponent(eventId)}`;
@@ -8,9 +7,6 @@ export const getUserEvents = async () => {
   const { events } = await apiRequest('/events');
   return events;
 };
-
-// Discovery has no backend yet, so suggestions are still mock data
-export const getSuggestedEvents = async () => [...mockSuggestedEvents];
 
 export const getEventById = async (eventId) => {
   const { event } = await apiRequest(eventPath(eventId));
