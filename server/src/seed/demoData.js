@@ -127,7 +127,12 @@ const seedDemoData = async () => {
   const passwordHash = await User.hashPassword(DEMO_PASSWORD);
   const [me, ...friends] = await User.create([
     { email: DEMO_LOGIN.email, username: 'johndoe', name: 'John Doe', passwordHash },
-    ...DEMO_FRIENDS.map(({ name, username, email }) => ({ name, username, email, passwordHash }))
+    // Friends' only payment handle is Zelle at their example.com address:
+    // example.com is reserved, so no one can pay a real stranger by
+    // accident. Made-up Venmo/Cash App/PayPal names could be real people.
+    ...DEMO_FRIENDS.map(({ name, username, email }) => ({
+      name, username, email, passwordHash, paymentHandles: { zelle: email }
+    }))
   ]);
 
   const users = { me };

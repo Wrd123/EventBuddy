@@ -114,6 +114,47 @@ const validatePayment = ({ from, to, amountCents, date }, event, me) => {
   return '';
 };
 
+// Payment handles, cleaned up the way people paste them, then checked
+// against each service's username rules. '' clears a handle.
+const PAYMENT_HANDLES = {
+  venmo: {
+    clean: (v) => v.replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?venmo\.com\/(u\/)?/i, ''),
+    valid: /^[A-Za-z0-9_-]{5,30}$/,
+    message: 'Venmo usernames are 5-30 letters, numbers, dashes or underscores.'
+  },
+  cashapp: {
+    clean: (v) => v.replace(/^(https?:\/\/)?(www\.)?cash\.app\//i, '').replace(/^\$/, ''),
+    // 1-20 characters with at least one letter
+    valid: /^(?=.*[A-Za-z])[A-Za-z0-9_]{1,20}$/,
+    message: 'Cash App $cashtags are up to 20 letters, numbers or underscores.'
+  },
+  paypal: {
+    clean: (v) => v.replace(/^(https?:\/\/)?(www\.)?paypal\.me\//i, '').replace(/\/$/, ''),
+    valid: /^[A-Za-z0-9]{1,20}$/,
+    message: 'PayPal.Me names are up to 20 letters or numbers.'
+  },
+  zelle: {
+    clean: (v) => v,
+    // An email, or a US phone number in any common format
+    valid: /^([^\s@]+@[^\s@]+\.[^\s@]+|\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})$/,
+    message: 'For Zelle, enter the email or US phone number your bank uses.'
+  }
+};
+
+// input: { venmo?, cashapp?, paypal?, zelle? } -> { handles } or { error }.
+// Only the keys sent are returned, so a request can update one handle.
+const cleanPaymentHandles = (input) => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { error: 'Invalid payment info.' };
+  const handles = {};
+  for (const [service, rules] of Object.entries(PAYMENT_HANDLES)) {
+    if (!(service in input)) continue;
+    const value = rules.clean(text(input[service]));
+    if (value && !rules.valid.test(value)) return { error: rules.message };
+    handles[service] = value;
+  }
+  return { handles };
+};
+
 const validateRegistration = ({ email, username, password }) => {
   if (!email || !EMAIL.test(email)) return 'Please enter a valid email address.';
   if (!username || !USERNAME.test(username)) {
@@ -139,6 +180,7 @@ module.exports = {
   validateExpense,
   validatePayment,
   isMember,
+  cleanPaymentHandles,
   validateRegistration,
   text
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Pencil, Plus, X } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { Copy, Pencil, Plus, X } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 import Header from '../common/Header';
 import { Button, ScreenLoader } from '../common';
 import NotFound from './NotFound';
@@ -11,16 +11,22 @@ import * as eventService from '../../services/eventService';
 import { computeBalances, settleUp } from '../../utils/ledger';
 import { formatCents, parseDollars, centsToInput } from '../../utils/money';
 import { formatDay, todayISO } from '../../utils/dates';
+import { payOptions } from '../../utils/payLinks';
 
 // The event's expenses and payments, reloaded after every change so the
-// balances are always computed from what the server has
+// balances are always computed from what the server has. Also members'
+// payment handles, as { userId: { venmo, cashapp, paypal, zelle } }.
 const useLedger = (eventId) => {
-  const [ledger, setLedger] = useState({ status: 'loading', expenses: [], payments: [], error: '' });
+  const [ledger, setLedger] = useState({ status: 'loading', expenses: [], payments: [], handles: {}, error: '' });
 
   const reload = useCallback(async () => {
     try {
-      const { expenses, payments } = await eventService.getLedger(eventId);
-      setLedger({ status: 'ready', expenses, payments, error: '' });
+      const [{ expenses, payments }, handleList] = await Promise.all([
+        eventService.getLedger(eventId),
+        eventService.getPaymentHandles(eventId)
+      ]);
+      const handles = Object.fromEntries(handleList.map(h => [h.user, h]));
+      setLedger({ status: 'ready', expenses, payments, handles, error: '' });
     } catch (err) {
       setLedger(prev => ({ ...prev, status: 'error', error: err.message }));
     }
@@ -71,7 +77,14 @@ const Expenses = () => {
       <div className="p-4 flex-1 overflow-y-auto space-y-4">
         <Summary event={event} totalCents={totalCents} myBalance={myBalance} isOrganizer={isOrganizer} />
 
-        <SettleUp event={event} settlements={settlements} me={me} onRecorded={ledger.reload} />
+        <SettleUp
+          event={event}
+          settlements={settlements}
+          me={me}
+          handles={ledger.handles}
+          myHandles={currentUser?.paymentHandles}
+          onRecorded={ledger.reload}
+        />
 
         {ledger.expenses.length > 0 && <Balances balances={balances} me={me} />}
 
@@ -211,26 +224,50 @@ const BudgetEditor = ({ event }) => {
   );
 };
 
-const SettleUp = ({ event, settlements, me, onRecorded }) => (
-  <section className="bg-white rounded-lg shadow p-4">
-    <h3 className="font-medium mb-2">Settle up</h3>
-    {settlements.length === 0 ? (
-      <p className="text-sm text-gray-500">Everyone is settled up.</p>
-    ) : (
-      <ul className="space-y-2">
-        {settlements.map(s => (
-          <SettlementRow key={`${s.from.user}-${s.to.user}`} event={event} settlement={s} me={me} onRecorded={onRecorded} />
-        ))}
-      </ul>
-    )}
-  </section>
-);
+const hasAnyHandle = (handles) =>
+  Boolean(handles && (handles.venmo || handles.cashapp || handles.paypal || handles.zelle));
 
-const SettlementRow = ({ event, settlement, me, onRecorded }) => {
+const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) => {
+  // Someone owes me, but I haven't said how to pay me
+  const needsMyHandles = settlements.some(s => s.to.user === me) && !hasAnyHandle(myHandles);
+
+  return (
+    <section className="bg-white rounded-lg shadow p-4">
+      <h3 className="font-medium mb-2">Settle up</h3>
+      {settlements.length === 0 ? (
+        <p className="text-sm text-gray-500">Everyone is settled up.</p>
+      ) : (
+        <ul className="space-y-3">
+          {settlements.map(s => (
+            <SettlementRow
+              key={`${s.from.user}-${s.to.user}`}
+              event={event}
+              settlement={s}
+              me={me}
+              recipientHandles={handles[s.to.user]}
+              onRecorded={onRecorded}
+            />
+          ))}
+        </ul>
+      )}
+      {needsMyHandles && (
+        <p className="text-sm text-gray-600 mt-3">
+          <Link to="/profile" className="text-purple-600 font-medium">Add your Venmo, Cash App, PayPal or Zelle</Link>
+          {' '}so friends can pay you back.
+        </p>
+      )}
+    </section>
+  );
+};
+
+const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  // Set once a pay link is opened, to nudge recording the payment
+  const [openedPayLink, setOpenedPayLink] = useState(false);
   const { from, to, amountCents } = settlement;
   const involvesMe = from.user === me || to.user === me;
+  const iOwe = from.user === me;
 
   const markPaid = async () => {
     setError('');
@@ -263,8 +300,91 @@ const SettlementRow = ({ event, settlement, me, onRecorded }) => {
           </button>
         )}
       </div>
+      {iOwe && (
+        <PayWith
+          recipient={to}
+          handles={recipientHandles}
+          amountCents={amountCents}
+          note={`EventBuddy · ${event.name}`}
+          onOpened={() => setOpenedPayLink(true)}
+        />
+      )}
+      {openedPayLink && (
+        <p className="text-xs text-purple-700 mt-1">Sent it? Tap Mark paid so everyone's balances update.</p>
+      )}
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </li>
+  );
+};
+
+// Buttons that open the recipient's payment app with the amount filled in.
+// The money moves in that app; EventBuddy only records it via Mark paid.
+const PayWith = ({ recipient, handles, amountCents, note, onOpened }) => {
+  const [showZelle, setShowZelle] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const options = payOptions(handles, amountCents, note);
+
+  if (options.length === 0) {
+    return <p className="text-xs text-gray-500 mt-1">{recipient.name} hasn't added payment info yet.</p>;
+  }
+
+  const zelle = options.find(o => o.copy);
+  const copyZelle = async () => {
+    try {
+      await navigator.clipboard.writeText(zelle.handle);
+      setCopied(true);
+    } catch {
+      // Clipboard blocked: the address is on screen to select by hand
+    }
+  };
+
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap gap-2">
+        {options.map(option => option.copy ? (
+          <button
+            key={option.method}
+            onClick={() => {
+              setShowZelle(prev => !prev);
+              onOpened();
+            }}
+            aria-expanded={showZelle}
+            className="text-xs font-medium bg-gray-100 text-gray-800 px-3 py-1.5 rounded-full"
+          >
+            Zelle
+          </button>
+        ) : (
+          <a
+            key={option.method}
+            href={option.url}
+            // Web pages open in a new tab; an app link (venmo://) opens the
+            // app directly, and a new tab would be left behind empty
+            target={option.url.startsWith('http') ? '_blank' : undefined}
+            rel="noopener noreferrer"
+            onClick={onOpened}
+            aria-label={`Pay ${recipient.name} ${formatCents(amountCents)} with ${option.label} (${option.handle})`}
+            className="text-xs font-medium bg-purple-600 text-white px-3 py-1.5 rounded-full"
+          >
+            {option.label}
+          </a>
+        ))}
+      </div>
+
+      {showZelle && zelle && (
+        <div className="mt-2 bg-gray-50 rounded-lg p-2 text-xs text-gray-700">
+          <div className="flex items-center justify-between">
+            <span className="font-medium break-all">{zelle.handle}</span>
+            <button onClick={copyZelle} className="ml-2 flex items-center text-purple-600 font-medium shrink-0">
+              <Copy size={14} className="mr-1" />
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="mt-1">Open your bank's app, choose Zelle, and send {formatCents(amountCents)} to this address.</p>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500 mt-1">Check it's {recipient.name} before you pay.</p>
+    </div>
   );
 };
 

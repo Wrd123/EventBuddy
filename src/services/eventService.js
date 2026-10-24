@@ -98,3 +98,9 @@ export const recordPayment = async (eventId, payment) =>
 
 export const deletePayment = (eventId, paymentId) =>
   apiRequest(paymentPath(eventId, paymentId), { method: 'DELETE' });
+
+// Members' payment handles for settling up: [{ user, name, venmo, cashapp, paypal, zelle }]
+export const getPaymentHandles = async (eventId) => {
+  const { handles } = await apiRequest(`${eventPath(eventId)}/payment-handles`);
+  return handles;
+};

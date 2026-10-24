@@ -2,7 +2,21 @@
 // so screen tests run without a server. Only covers what the screens call.
 const TOKEN = 'fake-token';
 
-export const demoUser = { _id: 'u1', name: 'John Doe', email: 'user@example.com', username: 'johndoe' };
+const noHandles = { venmo: '', cashapp: '', paypal: '', zelle: '' };
+
+export const demoUser = {
+  _id: 'u1',
+  name: 'John Doe',
+  email: 'user@example.com',
+  username: 'johndoe',
+  paymentHandles: noHandles
+};
+
+// Payment handles by user id. John starts with none; Alex can be paid.
+const demoHandles = () => ({
+  u1: { ...noHandles },
+  u2: { venmo: 'alex-smith', cashapp: '', paypal: 'alexs', zelle: 'alex@example.com' }
+});
 
 const me = { _id: 'm1', user: 'u1', name: 'John Doe', color: '#7c3aed' };
 const alex = { _id: 'm2', user: 'u2', name: 'Alex', color: '#3b82f6' };
@@ -92,6 +106,9 @@ const demoLedger = () => ({
 
 let events = demoEvents();
 let ledgers = demoLedger();
+let handles = demoHandles();
+
+const currentUser = () => ({ ...demoUser, paymentHandles: handles.u1 });
 let nextItemId = 100;
 let nextEventId = 100;
 
@@ -170,17 +187,26 @@ const scheduleRoute = (event, method, itemId, action, body) => {
 
 const route = (method, path, body, authed) => {
   if (method === 'POST' && path === '/auth/register') {
-    return respond(201, { token: TOKEN, user: demoUser });
+    return respond(201, { token: TOKEN, user: currentUser() });
   }
   if (method === 'POST' && path === '/auth/login') {
     const { email, password } = body;
     return email === demoUser.email && password === 'password'
-      ? respond(200, { token: TOKEN, user: demoUser })
+      ? respond(200, { token: TOKEN, user: currentUser() })
       : respond(401, { message: 'Invalid email or password' });
   }
   if (!authed) return respond(401, { message: 'Please log in.' });
 
-  if (path === '/auth/me') return respond(200, { user: demoUser });
+  if (path === '/auth/me' && method === 'PATCH') {
+    const next = { ...handles.u1, ...body.paymentHandles };
+    // One server rule, enough to show its messages reach the form
+    if (next.venmo && next.venmo.length < 5) {
+      return respond(400, { message: 'Venmo usernames are 5-30 letters, numbers, dashes or underscores.' });
+    }
+    handles.u1 = next;
+    return respond(200, { user: currentUser() });
+  }
+  if (path === '/auth/me') return respond(200, { user: currentUser() });
   if (path === '/events' && method === 'POST') {
     const event = {
       ...body,
@@ -227,6 +253,17 @@ const route = (method, path, body, authed) => {
     return respond(200, { event });
   }
 
+  // /events/:id/payment-handles: members with at least one handle
+  const handlesMatch = path.match(/^\/events\/([^/]+)\/payment-handles$/);
+  if (handlesMatch) {
+    const event = events.find((e) => e._id === handlesMatch[1] && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    const list = event.members
+      .map((m) => ({ user: m.user, name: m.name, ...(handles[m.user] || noHandles) }))
+      .filter((h) => h.venmo || h.cashapp || h.paypal || h.zelle);
+    return respond(200, { handles: list });
+  }
+
   // /events/:id/expenses[/:expenseId], /events/:id/payments[/:paymentId]
   const moneyMatch = path.match(/^\/events\/([^/]+)\/(expenses|payments)(?:\/([^/]+))?$/);
   if (moneyMatch) {
@@ -252,9 +289,11 @@ const route = (method, path, body, authed) => {
 
 // Installs the fake with fresh data. Returns logIn(), which saves a session
 // the way a past login would have, so the app opens already logged in.
-export const installFakeApi = () => {
+// options.handles replaces the starting payment handles ({ userId: handles })
+export const installFakeApi = (options = {}) => {
   events = demoEvents();
   ledgers = demoLedger();
+  handles = { ...demoHandles(), ...options.handles };
   global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) =>
     route(
       method,
@@ -267,7 +306,7 @@ export const installFakeApi = () => {
   return {
     logIn: () => {
       localStorage.setItem('eventbuddy_token', TOKEN);
-      localStorage.setItem('eventbuddy_user', JSON.stringify(demoUser));
+      localStorage.setItem('eventbuddy_user', JSON.stringify(currentUser()));
     }
   };
 };

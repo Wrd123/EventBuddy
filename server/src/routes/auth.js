@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
-const { validateRegistration, text, MAX_NAME_LENGTH } = require('../validation');
+const { validateRegistration, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
 const { isTest, bcryptRounds } = require('../config');
 
 const router = express.Router();
@@ -77,14 +77,25 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
 
+// Update your name and/or payment handles; only the fields sent change
 router.patch('/me', requireAuth, async (req, res) => {
-  const name = text(req.body.name);
-  if (!name) throw new HttpError(400, 'Please enter your name.');
-  if (name.length > MAX_NAME_LENGTH) {
-    throw new HttpError(400, `Name must be ${MAX_NAME_LENGTH} characters or fewer.`);
+  if ('name' in req.body) {
+    const name = text(req.body.name);
+    if (!name) throw new HttpError(400, 'Please enter your name.');
+    if (name.length > MAX_NAME_LENGTH) {
+      throw new HttpError(400, `Name must be ${MAX_NAME_LENGTH} characters or fewer.`);
+    }
+    req.user.name = name;
   }
 
-  req.user.name = name;
+  if ('paymentHandles' in req.body) {
+    const { handles, error } = cleanPaymentHandles(req.body.paymentHandles);
+    if (error) throw new HttpError(400, error);
+    for (const [service, value] of Object.entries(handles)) {
+      req.user.paymentHandles[service] = value;
+    }
+  }
+
   await req.user.save();
   res.json({ user: req.user });
 });

@@ -9,7 +9,15 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     // select: false keeps the hash out of every query unless asked for
     passwordHash: { type: String, required: true, select: false },
-    avatar: { type: String, default: null }
+    avatar: { type: String, default: null },
+    // Where friends can send this person money. Shown only to people who
+    // share an event with them (see GET /api/events/:id/payment-handles).
+    paymentHandles: {
+      venmo: { type: String, default: '' },
+      cashapp: { type: String, default: '' },
+      paypal: { type: String, default: '' },
+      zelle: { type: String, default: '' }
+    }
   },
   { timestamps: true }
 );

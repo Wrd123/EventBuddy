@@ -1,5 +1,6 @@
 const express = require('express');
 const Event = require('../models/Event');
+const User = require('../models/User');
 const { newInviteCode } = require('../models/Event');
 const { ORGANIZER_COLOR } = require('../colors');
 const { requireAuth } = require('../middleware/auth');
@@ -82,6 +83,18 @@ router.patch('/:id', async (req, res) => {
 
   await event.save();
   res.json({ event });
+});
+
+// Payment handles for this event's members. Members only (404 otherwise),
+// so handles are never visible to strangers. Only people with at least one
+// handle are listed, and only their handles, not account details.
+router.get('/:id/payment-handles', async (req, res) => {
+  const event = await findVisibleEvent(req.params.id, req.user);
+  const users = await User.find({ _id: { $in: event.members.map((m) => m.user) } }).select('name paymentHandles');
+  const handles = users
+    .map((u) => ({ user: u._id, name: u.name, ...u.paymentHandles.toObject() }))
+    .filter((h) => h.venmo || h.cashapp || h.paypal || h.zelle);
+  res.json({ handles });
 });
 
 // A new invite code; the old link stops working. Organizer only, so a
