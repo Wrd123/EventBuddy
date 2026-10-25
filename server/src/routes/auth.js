@@ -78,7 +78,9 @@ router.post('/login', attemptLimiter, async (req, res) => {
 
 // One-tap sign-in as the demo user, for people trying the app. Only in
 // demo mode, where the demo data is public anyway; elsewhere it doesn't exist.
-router.post('/demo', attemptLimiter, async (req, res) => {
+// No attempt limit: there's no password to guess, and on a host where the
+// client IP can't be read reliably, a shared limit would lock everyone out
+router.post('/demo', async (req, res) => {
   if (!config.demoMode) throw new HttpError(404, 'Not found.');
   const user = await User.findOne({ email: DEMO_LOGIN.email });
   if (!user) throw new HttpError(503, 'The demo is still getting ready. Try again in a moment.');

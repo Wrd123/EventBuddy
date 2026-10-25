@@ -1,0 +1,59 @@
+# Render Blueprint for the free hosted demo: the web app as a static site
+# (always on) and the API on a free web service (sleeps after 15 idle
+# minutes; the app shows a waking-up screen meanwhile). The API runs in demo
+# mode, with an in-memory database that starts fresh from the demo data each
+# time it wakes, so there's no database to pay for or look after.
+#
+# Render asks for the values marked sync: false when the Blueprint is
+# created. See "Hosting the demo" in the README.
+services:
+  - type: web
+    name: eventbuddy-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      # Download MongoDB into the project during the build, so it's there
+      # at startup instead of being fetched on every wake
+      - key: MONGOMS_DOWNLOAD_DIR
+        value: /opt/render/project/src/server/.mongodb-binaries
+      # Proxy hops in front of the app, so login limits see the visitor's
+      # address. Erring high only matters to someone faking the header.
+      - key: TRUST_PROXY
+        value: "3"
+      # The web app's address, e.g. https://eventbuddy.onrender.com
+      - key: CLIENT_ORIGIN
+        sync: false
+      # Optional: Discover explains it's not set up without one
+      - key: TICKETMASTER_API_KEY
+        sync: false
+
+  - type: web
+    name: eventbuddy
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: build
+    routes:
+      # Client-side routing: every page is the app
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: REACT_APP_WAKE_SCREEN
+        value: "true"
+      # The API's address plus /api, e.g. https://eventbuddy-api.onrender.com/api
+      - key: REACT_APP_API_URL
+        sync: false

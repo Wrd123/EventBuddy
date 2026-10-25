@@ -48,7 +48,9 @@ module.exports = {
   mongoUri: isProduction && !demoMode ? required('MONGODB_URI') : process.env.MONGODB_URI,
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:3000',
+  // Web app addresses allowed to call the API from a browser; several can
+  // be listed, comma-separated
+  clientOrigin: (process.env.CLIENT_ORIGIN || 'http://localhost:3000').split(',').map((o) => o.trim()).filter(Boolean),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS) || 10,
   // Local events for Discover; unset means Discover explains it's not set up

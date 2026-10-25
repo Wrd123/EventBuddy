@@ -158,6 +158,19 @@ describe('POST /api/auth/demo', () => {
     await api().get('/api/auth/me').set('Authorization', `Bearer ${res.body.token}`).expect(200);
   });
 
+  it('keeps a saved demo login working after the demo restarts fresh', async () => {
+    await seedDemoData();
+    const { token } = (await api().post('/api/auth/demo').expect(200)).body;
+
+    // A sleeping host wakes up with an empty database and seeds it again
+    const mongoose = require('mongoose');
+    await mongoose.connection.dropDatabase();
+    await seedDemoData();
+
+    const res = await api().get('/api/auth/me').set('Authorization', `Bearer ${token}`).expect(200);
+    assert.equal(res.body.user.email, 'user@example.com');
+  });
+
   it('says so while the demo data is still loading', async () => {
     const res = await api().post('/api/auth/demo').expect(503);
     assert.equal(res.body.message, 'The demo is still getting ready. Try again in a moment.');

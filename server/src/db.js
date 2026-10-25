@@ -3,8 +3,8 @@ const { mongoUri, isProduction, demoMode } = require('./config');
 
 let memoryServer = null;
 
-// Connects to MONGODB_URI (e.g. Atlas). In development without one, starts
-// a throwaway in-memory MongoDB instead. Returns true when in-memory, so the
+// Connects to MONGODB_URI (e.g. Atlas). Without one (development, or a
+// hosted demo), starts a throwaway in-memory MongoDB instead. Returns true when in-memory, so the
 // caller can seed it with demo data.
 const connectDatabase = async () => {
   if (mongoUri) {
@@ -13,9 +13,12 @@ const connectDatabase = async () => {
   }
   if (isProduction && !demoMode) throw new Error('MONGODB_URI is required in production');
 
-  // Dev-only dependency, so only load it when needed
+  // Only loaded when needed. The demo data is tiny, so a small cache keeps
+  // MongoDB within a free host's 512 MB alongside the API.
   const { MongoMemoryServer } = require('mongodb-memory-server');
-  memoryServer = await MongoMemoryServer.create();
+  memoryServer = await MongoMemoryServer.create({
+    instance: { args: ['--wiredTigerCacheSizeGB', '0.25'] }
+  });
   await mongoose.connect(memoryServer.getUri());
   return true;
 };

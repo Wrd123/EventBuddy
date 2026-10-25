@@ -38,6 +38,24 @@ npm run ios
 
 This builds the web app, copies it into the native project and opens it in Xcode; run it on a simulator. To try sharing with the screen locked in the Simulator, use **Features > Location** to set or animate a location, then lock the device.
 
+### Hosting the demo for free
+
+[`render.yaml`](render.yaml) puts the demo on Render's free plan: the web app as a static site, and the API as a free web service in demo mode. There's no database to pay for or look after; the API's in-memory database starts fresh from the demo data each time it wakes.
+
+1. In Render, choose **New > Blueprint** and pick this repository.
+2. When it asks, enter the two addresses (and optionally a Ticketmaster key):
+   - `CLIENT_ORIGIN`: `https://eventbuddy.onrender.com`
+   - `REACT_APP_API_URL`: `https://eventbuddy-api.onrender.com/api`
+3. If Render gave a service a different address because the name was taken, correct these under each service's **Environment**, then redeploy the web app so its build picks up the change.
+
+The free API sleeps after 15 idle minutes and takes up to a minute to start. Meanwhile, the web app shows a "Waking up the demo" screen and opens as soon as the API answers.
+
+The iPhone app can use the hosted API too:
+
+```bash
+EVENTBUDDY_API_URL=https://eventbuddy-api.onrender.com/api npm run build:ios
+```
+
 ## How it's built
 
 ```mermaid
@@ -54,7 +72,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet |
 | iPhone | Capacitor 7, background geolocation, native HTTP |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
-| Testing | Jest and Testing Library (228 tests), Node's test runner with Supertest and an in-memory MongoDB (241 tests) |
+| Testing | Jest and Testing Library (231 tests), Node's test runner with Supertest and an in-memory MongoDB (242 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
@@ -66,7 +84,7 @@ flowchart LR
 - **Background location is one small seam.** A single tracker module uses the native background plugin in the app and the browser's geolocation on the web, and app-wide sharing state keeps it running on every screen, through a relaunch, and stops it on logout.
 - **Third-party APIs stay behind the server.** API keys never ship to the phone, results are cached (30 minutes for events, a day for places), OpenStreetMap's one-request-per-second rule is enforced with a queue, and user coordinates are rounded to about 1 km before they leave the phone for Discover.
 - **The map updates pins in place.** Friends' positions refresh every 10 seconds; markers are matched by id and moved rather than redrawn, so labels don't flicker. Debugging the first version turned up that Leaflet silently ignores a new view while a zoom animation is running, so automatic fits are instant.
-- **Demo mode instead of production infrastructure.** For a showcase, a fresh in-memory database seeded on every start is cheaper and safer than a real one: no stored personal data, nothing to clean up, and every visitor sees the same lively demo.
+- **Demo mode instead of production infrastructure.** For a showcase, a fresh in-memory database seeded on every start is cheaper and safer than a real one: no stored personal data, nothing to clean up, and every visitor sees the same lively demo. Demo accounts keep fixed ids, so a saved login still works after the server sleeps and wakes with a new database.
 
 ## Project structure
 
@@ -91,6 +109,7 @@ EventBuddy/
 │   └── tests/               # API tests
 ├── ios/                     # Native iPhone project (Capacitor)
 ├── resources/               # Icon source
+├── render.yaml              # Free hosted demo (Render Blueprint)
 └── .github/workflows/       # CI
 ```
 

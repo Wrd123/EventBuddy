@@ -26,10 +26,13 @@ export const loginDemo = async () => {
   return data;
 };
 
+// { status: 'ok', demo }. Throws if the server can't be reached.
+export const checkHealth = () => apiRequest('/health');
+
 // Whether the server offers the demo sign-in. False if it can't be reached.
 export const isDemoAvailable = async () => {
   try {
-    return Boolean((await apiRequest('/health')).demo);
+    return Boolean((await checkHealth()).demo);
   } catch {
     return false;
   }

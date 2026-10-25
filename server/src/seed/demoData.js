@@ -24,7 +24,17 @@ const DEMO_FRIENDS = [
 ];
 
 // Fixed ids so links to demo events (e.g. Groups -> event) stay stable
-// across restarts and re-seeds
+// across restarts and re-seeds. Users too: a hosted demo restarts with a
+// fresh database after sleeping, and a saved login should still work.
+const DEMO_USER_IDS = {
+  me: new mongoose.Types.ObjectId('00000000000000000000a001'),
+  Alex: new mongoose.Types.ObjectId('00000000000000000000a002'),
+  Taylor: new mongoose.Types.ObjectId('00000000000000000000a003'),
+  Jordan: new mongoose.Types.ObjectId('00000000000000000000a004'),
+  Jamie: new mongoose.Types.ObjectId('00000000000000000000a005'),
+  Casey: new mongoose.Types.ObjectId('00000000000000000000a006')
+};
+
 const DEMO_EVENT_IDS = {
   festival: new mongoose.Types.ObjectId('000000000000000000000001'),
   hiking: new mongoose.Types.ObjectId('000000000000000000000002'),
@@ -210,12 +220,12 @@ const seedDemoData = async () => {
   // One hash for everyone: same password, and hashing is deliberately slow
   const passwordHash = await User.hashPassword(DEMO_PASSWORD);
   const [me, ...friends] = await User.create([
-    { email: DEMO_LOGIN.email, username: 'johndoe', name: 'John Doe', passwordHash },
+    { _id: DEMO_USER_IDS.me, email: DEMO_LOGIN.email, username: 'johndoe', name: 'John Doe', passwordHash },
     // Friends' only payment handle is Zelle at their example.com address:
     // example.com is reserved, so no one can pay a real stranger by
     // accident. Made-up Venmo/Cash App/PayPal names could be real people.
     ...DEMO_FRIENDS.map(({ name, username, email }) => ({
-      name, username, email, passwordHash, paymentHandles: { zelle: email }
+      _id: DEMO_USER_IDS[name], name, username, email, passwordHash, paymentHandles: { zelle: email }
     }))
   ]);
 

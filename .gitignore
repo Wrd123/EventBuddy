@@ -9,6 +9,9 @@ node_modules/
 # Production
 /build
 
+# MongoDB binary downloaded for a hosted demo (see render.yaml)
+.mongodb-binaries/
+
 # Environment variables
 .env
 .env.local
