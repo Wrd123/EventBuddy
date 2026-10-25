@@ -35,7 +35,8 @@ describe('GET /api/invites/:code', () => {
       location: 'Atlanta',
       organizerName: organizer.user.name,
       memberCount: 1,
-      isMember: false
+      isMember: false,
+      isRemoved: false
     });
   });
 

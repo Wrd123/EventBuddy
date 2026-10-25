@@ -1,12 +1,48 @@
 import React, { useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
+import { useSharing, endShareOnServer } from '../../context/SharingContext';
+import { untilText } from '../../utils/live';
 import Header, { getInitials } from '../common/Header';
 import { Button } from '../common';
 
+// Logging out ends any location share first, while the login token still
+// works. This phone stops tracking straight away either way. If the server
+// can't be told, logging out waits for a decision, since friends would
+// still see your last spot until the share runs out.
+const useLogOut = () => {
+  const { logout } = useAppContext();
+  // unstopped: the share the server may still have, kept app-wide so the
+  // warning is still here after leaving this screen
+  const { share, setShare, unstopped, setUnstopped } = useSharing();
+  const [busy, setBusy] = useState(false);
+
+  const logOut = async () => {
+    const pending = unstopped || share;
+    if (!pending) {
+      logout();
+      return;
+    }
+    // Remembered before tracking stops, so it's never lost in between
+    setUnstopped(pending);
+    setShare(null);
+    setBusy(true);
+    try {
+      await endShareOnServer(pending.eventId);
+      setUnstopped(null);
+      logout();
+    } catch {
+      setBusy(false);
+    }
+  };
+
+  return { logOut, logOutAnyway: logout, unstopped: busy ? null : unstopped, busy };
+};
+
 const Profile = () => {
   // Logging out sends you to /login via the login guard (MainLayout)
-  const { currentUser, logout } = useAppContext();
+  const { currentUser } = useAppContext();
+  const { logOut, logOutAnyway, unstopped, busy } = useLogOut();
 
   return (
     <div className="flex flex-col h-full">
@@ -30,13 +66,28 @@ const Profile = () => {
 
         {/* Logging out is rare on a phone, so it sits at the bottom, out of
             the way, rather than as a prominent primary button */}
-        <button
-          onClick={logout}
-          className="mt-auto w-full flex items-center justify-center py-3 text-red-400 font-medium"
-        >
-          <LogOut size={18} className="mr-2" />
-          Log out
-        </button>
+        <div className="mt-auto">
+          {unstopped ? (
+            <div className="card p-4" role="alert">
+              <p className="text-sm mb-3">
+                Couldn't stop sharing your location on the server. Friends can still see your last spot {untilText(unstopped.until)}.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={logOut} disabled={busy} className="flex-1">{busy ? 'Trying...' : 'Try again'}</Button>
+                <Button variant="secondary" onClick={logOutAnyway} className="flex-1">Log out anyway</Button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={logOut}
+              disabled={busy}
+              className="w-full flex items-center justify-center py-3 text-red-400 font-medium disabled:opacity-50"
+            >
+              <LogOut size={18} className="mr-2" />
+              {busy ? 'Logging out...' : 'Log out'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -382,6 +382,11 @@ const liveRoute = (event, method, action, body) => {
     return respond(200, { sharing: state.sharing });
   }
   if (action === 'share' && method === 'DELETE') {
+    // options.stopShareFails: that many stops fail, as if offline
+    if (fakeOptions.stopShareFails > 0) {
+      fakeOptions.stopShareFails -= 1;
+      return respond(503, { message: 'Service unavailable' });
+    }
     state.sharing = null;
     return respond(204);
   }
@@ -509,7 +514,8 @@ const route = (method, path, body, authed, params) => {
         location: event.location,
         organizerName: organizer?.name ?? '',
         memberCount: event.members.length,
-        isMember: isMember(event)
+        isMember: isMember(event),
+        isRemoved: (event.removed || []).some((r) => r.user === demoUser._id)
       }
     });
   }
@@ -521,6 +527,31 @@ const route = (method, path, body, authed, params) => {
     if (!event) return respond(404, { message: 'Event not found.' });
     event.inviteCode = `reset-${nextEventId++}`;
     return respond(200, { event });
+  }
+
+  // /events/:id/members/:userId: leave (your own id) or remove someone
+  const memberMatch = path.match(/^\/events\/([^/]+)\/members\/([^/]+)$/);
+  if (memberMatch && method === 'DELETE') {
+    const event = events.find((e) => e._id === memberMatch[1] && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    // options.memberRemovalError: the balance isn't settled
+    if (fakeOptions.memberRemovalError) return respond(409, { message: fakeOptions.memberRemovalError });
+    const member = event.members.find((m) => m.user === memberMatch[2]);
+    if (member.user !== demoUser._id) event.removed = [...(event.removed || []), { user: member.user, name: member.name }];
+    event.members = event.members.filter((m) => m !== member);
+    return respond(204);
+  }
+
+  // /events/:id/removed[/:userId]: the organizer's list of removed people
+  const removedMatch = path.match(/^\/events\/([^/]+)\/removed(?:\/([^/]+))?$/);
+  if (removedMatch) {
+    const event = events.find((e) => e._id === removedMatch[1] && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    if (method === 'DELETE') {
+      event.removed = (event.removed || []).filter((r) => r.user !== removedMatch[2]);
+      return respond(204);
+    }
+    return respond(200, { removed: event.removed || [] });
   }
 
   // /events/:id/payment-handles: members with at least one handle
@@ -569,6 +600,8 @@ const route = (method, path, body, authed, params) => {
 // options.chatSendError makes sending a message fail with that message;
 // options.chatSendsLost saves that many sends but loses their responses;
 // options.paymentOutcomes lists what each payment meets ('lost', or a status);
+// options.memberRemovalError makes leaving or removing fail with that message;
+// options.stopShareFails makes that many stop-sharing requests fail;
 // options.liveEvent adds an event happening today with live locations;
 // options.eventsFailures makes loading your events fail that many times
 // Lets requests still in flight (like a screen's background counts) finish

@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, settle } from '../../testUtils/fakeApi';
+import { installFakeApi, settle, removeEvent } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 import { eventDays } from './Map';
@@ -413,6 +413,80 @@ describe('Sharing across the app', () => {
     await waitFor(() => expect(geolocation.clearWatch).toHaveBeenCalledWith(3));
     expect(storedShare()).toBeNull();
     await screen.findByRole('button', { name: /^Picnic in the Park/ });
+  });
+
+  it("stops when you're no longer in the event", async () => {
+    await alreadySharing();
+    renderAt('/groups');
+    await waitFor(() => expect(report).toBeDefined());
+    removeEvent('5'); // you left on another phone, or the organizer removed you
+
+    act(() => report({ coords: HERE }));
+
+    await waitFor(() => expect(geolocation.clearWatch).toHaveBeenCalledWith(3));
+    expect(storedShare()).toBeNull();
+  });
+
+  it("says so when logging out can't stop sharing on the server, and lets you retry", async () => {
+    installFakeApi({ liveEvent: true, stopShareFails: 1 }).logIn();
+    await alreadySharing();
+    renderAt('/profile');
+    await waitFor(() => expect(report).toBeDefined());
+
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn't stop sharing your location on the server. Friends can still see your last spot until/);
+    // This phone stopped tracking anyway, and you're still logged in
+    await waitFor(() => expect(geolocation.clearWatch).toHaveBeenCalledWith(3));
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await screen.findByLabelText('Email');
+    expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(2);
+  });
+
+  it("still warns after you leave Profile and come back", async () => {
+    installFakeApi({ liveEvent: true, stopShareFails: 1 }).logIn();
+    await alreadySharing();
+    renderAt('/');
+    fireEvent.click(await screen.findByRole('button', { name: 'Open profile' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open profile' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn't stop sharing your location on the server/);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await screen.findByLabelText('Email');
+    expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(2);
+  });
+
+  it('lets you log out anyway when the server still has your share', async () => {
+    installFakeApi({ liveEvent: true, stopShareFails: 1 }).logIn();
+    await alreadySharing();
+    renderAt('/profile');
+
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log out anyway' }));
+
+    await screen.findByLabelText('Email');
+    expect(storedShare()).toBeNull();
+  });
+
+  it("won't start sharing here until sharing with your other event has stopped", async () => {
+    installFakeApi({ liveEvent: true, stopShareFails: 1 }).logIn();
+    localStorage.setItem('eventbuddy_place', JSON.stringify(ATLANTA));
+    localStorage.setItem('eventbuddy_share', JSON.stringify({ eventId: '1', until: HOUR_AHEAD() }));
+    renderAt('/map');
+    await pin('Friend: Alex');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share my location' }));
+    fireEvent.click(screen.getByRole('button', { name: '1 hour' }));
+
+    expect(await screen.findByText("Couldn't stop sharing with your other event first. Try again.")).toBeInTheDocument();
+    expect(requests('PUT', '/api/events/5/live/share')).toHaveLength(0);
+    expect(storedShare()).toMatchObject({ eventId: '1' });
   });
 
   it('stops sharing when you log out', async () => {

@@ -24,6 +24,17 @@ export const updateEvent = (eventId, eventData) =>
 export const deleteEvent = (eventId) =>
   apiRequest(eventPath(eventId), { method: 'DELETE' });
 
+// Leave an event (your own id), or, as organizer, remove someone. A 409
+// explains why not yet, e.g. a balance that isn't settled.
+export const removeMember = (eventId, userId) =>
+  apiRequest(`${eventPath(eventId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+
+// Organizer only: people they removed, [{ user, name }], and letting one back in
+export const getRemoved = async (eventId) => (await apiRequest(`${eventPath(eventId)}/removed`)).removed;
+
+export const letBackIn = (eventId, userId) =>
+  apiRequest(`${eventPath(eventId)}/removed/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+
 // Schedule items. Each call returns the whole updated event.
 const schedulePath = (eventId, itemId) =>
   `${eventPath(eventId)}/schedule${itemId ? `/${encodeURIComponent(itemId)}` : ''}`;

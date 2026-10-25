@@ -59,6 +59,19 @@ describe('withEventLock', () => {
     assert.deepEqual(order, ['first', 'second']);
   });
 
+  it('treats an id spelled in capitals as the same event', async () => {
+    const order = [];
+    let finishFirst;
+    const first = withEventLock('65abcdef0123456789abcdef', () => new Promise((resolve) => { finishFirst = resolve; }).then(() => order.push('first')));
+    const second = withEventLock('65ABCDEF0123456789ABCDEF', async () => order.push('second'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(order, []);
+
+    finishFirst();
+    await Promise.all([first, second]);
+    assert.deepEqual(order, ['first', 'second']);
+  });
+
   it("doesn't make other events wait", async () => {
     let finishSlow;
     const slow = withEventLock('e1', () => new Promise((resolve) => { finishSlow = resolve; }));

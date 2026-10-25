@@ -3,7 +3,7 @@ import * as authService from '../services/authService';
 import * as eventService from '../services/eventService';
 import { findDevicePlace, deviceHasLocation, NO_LOCATION_SUPPORT } from '../services/devicePlace';
 import { setUnauthorizedHandler } from '../services/api';
-import { SharingProvider, stopStoredShare } from './SharingContext';
+import { SharingProvider } from './SharingContext';
 import { usePolling } from '../hooks/usePolling';
 import { createFreshness } from '../utils/freshness';
 
@@ -217,10 +217,9 @@ export const AppProvider = ({ children }) => {
 
   const register = async (userData) => startSession(await authService.register(userData));
 
+  // Ending any location share comes first, in Profile (useLogOut), since
+  // it needs the login token this clears
   const logout = () => {
-    // Friends shouldn't keep seeing where you were; this needs the login
-    // token, so it goes before the session is cleared
-    stopStoredShare();
     clearSession();
     setLoggedOutByUser(true);
   };
@@ -258,6 +257,20 @@ export const AppProvider = ({ children }) => {
         : [...prev, updated]
     );
     return updated;
+  };
+
+  // Leaving takes the event off your list. Errors (like a balance that
+  // isn't settled) are thrown for the screen to show.
+  const leaveEvent = async (eventId) => {
+    await eventService.removeMember(eventId, currentUser._id);
+    changeEvents(prev => prev.filter(event => event._id !== eventId));
+  };
+
+  const removeMember = async (eventId, userId) => {
+    await eventService.removeMember(eventId, userId);
+    changeEvents(prev => prev.map(event => (
+      event._id === eventId ? { ...event, members: event.members.filter(m => m.user !== userId) } : event
+    )));
   };
 
   // Schedule actions. Errors are thrown for the screen to show next to the
@@ -302,6 +315,8 @@ export const AppProvider = ({ children }) => {
     createEvent: createNewEvent,
     updateEvent: updateEventData,
     deleteEvent: deleteEventData,
+    leaveEvent,
+    removeMember,
     addScheduleItem,
     updateScheduleItem,
     deleteScheduleItem,

@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, MessageCircle, Wallet, Map, MapPin, Plus, ExternalLink, Pencil } from 'lucide-react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
 import { Avatar, EventCover, PhotoBackdrop, ScreenLoader } from '../common';
 import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
+import MemberSheet from '../common/MemberSheet';
 import { useAppContext } from '../../context/AppContext';
-import { useEvent } from '../../hooks/useEvent';
+import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
+import { usePolling } from '../../hooks/usePolling';
+import { createFreshness } from '../../utils/freshness';
 import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay, daysUntil } from '../../utils/dates';
 import { formatTimeRange, sortSchedule } from '../../utils/schedule';
 import { computeBalances } from '../../utils/ledger';
@@ -16,23 +19,32 @@ import * as eventService from '../../services/eventService';
 
 // What's waiting behind the Chat and Expenses buttons: unread messages and
 // your balance in cents (null until known, or if there are no expenses).
-// Loaded once; each screen has the live version.
+// Checked as often as the event itself, so a friend paying you back shows
+// here without leaving the page. A check that fails keeps what's shown.
 const useEventSummary = (eventId) => {
-  const [summary, setSummary] = useState({ unread: 0, ledger: null });
+  const [summary, setSummary] = useState({ eventId, unread: 0, ledger: null });
+  const [freshness] = useState(createFreshness);
+
+  const load = useCallback(async () => {
+    const read = freshness.start();
+    const [chats, ledger] = await Promise.allSettled([chatService.getChats(), eventService.getLedger(eventId)]);
+    if (!freshness.accept(read)) return;
+    setSummary(prev => {
+      const same = prev.eventId === eventId;
+      return {
+        eventId,
+        unread: chats.status === 'fulfilled' ? chats.value.find(c => c.eventId === eventId)?.unread ?? 0 : (same ? prev.unread : 0),
+        ledger: ledger.status === 'fulfilled' ? ledger.value : (same ? prev.ledger : null)
+      };
+    });
+  }, [eventId, freshness]);
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.allSettled([chatService.getChats(), eventService.getLedger(eventId)]).then(([chats, ledger]) => {
-      if (cancelled) return;
-      setSummary({
-        unread: chats.status === 'fulfilled' ? chats.value.find(c => c.eventId === eventId)?.unread ?? 0 : 0,
-        ledger: ledger.status === 'fulfilled' ? ledger.value : null
-      });
-    });
-    return () => { cancelled = true; };
-  }, [eventId]);
+    load();
+  }, [load]);
+  usePolling(load, EVENT_POLL_MS);
 
-  return summary;
+  return summary.eventId === eventId ? summary : { eventId, unread: 0, ledger: null };
 };
 
 // "You owe $12.50" style hint for the Expenses button, or '' if there's
@@ -52,6 +64,8 @@ const EventDetails = () => {
   // Create Event sends new organizers here with the invite sheet open
   const location = useLocation();
   const [showInvite, setShowInvite] = useState(Boolean(location.state?.showInvite));
+  // The person whose sheet is open (leave, or remove as organizer)
+  const [openMember, setOpenMember] = useState(null);
 
   if (status === 'loading') return <ScreenLoader />;
   if (status === 'not-found') {
@@ -104,7 +118,7 @@ const EventDetails = () => {
             Get tickets <ExternalLink size={16} className="ml-2" aria-hidden="true" />
           </a>
         )}
-        <EventContent event={event} onInvite={() => setShowInvite(true)} />
+        <EventContent event={event} onInvite={() => setShowInvite(true)} onMember={setOpenMember} />
       </div>
 
       {showInvite && (
@@ -113,6 +127,9 @@ const EventDetails = () => {
           isOrganizer={isOrganizer}
           onClose={() => setShowInvite(false)}
         />
+      )}
+      {openMember && (
+        <MemberSheet event={event} member={openMember} onClose={() => setOpenMember(null)} />
       )}
     </div>
   );
@@ -204,7 +221,7 @@ const ActionButton = ({ Icon, label, badge = 0, hint = '', onClick }) => (
   </button>
 );
 
-const EventContent = ({ event, onInvite }) => {
+const EventContent = ({ event, onInvite, onMember }) => {
   // Preview one day: today while the event is running, else its first day.
   // The Schedule screen shows every day.
   const day = defaultScheduleDay(event);
@@ -220,7 +237,12 @@ const EventContent = ({ event, onInvite }) => {
       <div className="flex gap-3.5 mb-7 overflow-x-auto no-scrollbar -mx-4 px-4">
         {event.members.map((member) => (
           // shrink-0 so a big group scrolls instead of squashing
-          <div key={member._id} className="flex flex-col items-center shrink-0 w-12">
+          <button
+            key={member._id}
+            onClick={() => onMember(member)}
+            aria-label={member.user === event.createdBy ? `${member.name}, organizer` : member.name}
+            className="flex flex-col items-center shrink-0 w-12 transition-transform active:scale-95"
+          >
             <Avatar
               initial={member.name.charAt(0)}
               color={member.color}
@@ -230,7 +252,7 @@ const EventContent = ({ event, onInvite }) => {
             {member.user === event.createdBy && (
               <span className="text-[10px] font-semibold text-accent-soft leading-none mt-0.5">Organizer</span>
             )}
-          </div>
+          </button>
         ))}
         <button onClick={onInvite} className="flex flex-col items-center shrink-0 w-12">
           <div className="w-12 h-12 rounded-full flex items-center justify-center text-fg border-[1.5px] border-dashed border-white/40 transition-transform active:scale-90">

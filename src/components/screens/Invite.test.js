@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, settle } from '../../testUtils/fakeApi';
+import { installFakeApi, settle, changeEvent } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -32,6 +32,17 @@ const fill = (fields) => {
 };
 
 describe('opening an invite link', () => {
+  it('explains instead of offering to join, when the organizer removed you', async () => {
+    fakeApi.logIn();
+    changeEvent('3', (event) => { event.removed = [{ user: 'u1', name: 'John Doe' }]; });
+    renderAt('/invite/game-code');
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      "You were removed from this event. Ask the organizer if you think that's a mistake."
+    );
+    expect(screen.queryByRole('button', { name: 'Join event' })).not.toBeInTheDocument();
+  });
+
   it('shows the event and joins it with one tap', async () => {
     fakeApi.logIn();
     renderAt('/invite/game-code');

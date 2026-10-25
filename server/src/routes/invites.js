@@ -10,9 +10,10 @@ const router = express.Router();
 router.use(requireAuth);
 
 const INVALID_LINK = "This invite link isn't valid anymore. Ask for a new one.";
+const REMOVED = "You can't join this event. Ask the organizer if you think that's a mistake.";
 
 const findByCode = async (code) => {
-  const event = await Event.findOne({ inviteCode: code });
+  const event = await Event.findOne({ inviteCode: code }).select('+removed');
   if (!event) throw new HttpError(404, INVALID_LINK);
   return event;
 };
@@ -33,7 +34,9 @@ router.get('/:code', async (req, res) => {
       location: event.location,
       organizerName: organizer?.name ?? '',
       memberCount: event.members.length,
-      isMember: event.members.some((m) => m.user.equals(req.user._id))
+      isMember: event.members.some((m) => m.user.equals(req.user._id)),
+      // The organizer took them out; the link won't let them back in
+      isRemoved: event.removed.some((r) => r.user.equals(req.user._id))
     }
   });
 });
@@ -41,16 +44,18 @@ router.get('/:code', async (req, res) => {
 router.post('/:code/join', async (req, res) => {
   const me = req.user;
 
-  // One atomic update that only matches if I'm not already a member, so
-  // opening the link twice (or two taps at once) can't add me twice
+  // One atomic update that only matches if I'm not already a member (and
+  // wasn't removed), so opening the link twice (or two taps at once) can't
+  // add me twice
   await Event.updateOne(
-    { inviteCode: req.params.code, 'members.user': { $ne: me._id } },
+    { inviteCode: req.params.code, 'members.user': { $ne: me._id }, 'removed.user': { $ne: me._id } },
     { $push: { members: { user: me._id, name: me.name, color: colorForUser(me._id) } } }
   );
 
   // Whether I just joined or was already in, return the event, which I can
   // now see. If the code is wrong, nothing matched above either.
   const event = await findByCode(req.params.code);
+  if (event.removed.some((r) => r.user.equals(me._id))) throw new HttpError(403, REMOVED);
   res.json({ event });
 });
 

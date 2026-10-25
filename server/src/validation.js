@@ -95,21 +95,27 @@ const validateCents = (cents, what) => {
 };
 
 // shares: [{ user, amountCents }]. They must cover exactly the total, so the
-// group's balances always add up to zero.
-const validateExpense = ({ description, amountCents, date, paidBy, splitType, shares }, event) => {
+// group's balances always add up to zero. existing: the expense being
+// edited, whose people may have left the event since; they can stay on it,
+// so an old expense can still be corrected.
+const validateExpense = ({ description, amountCents, date, paidBy, splitType, shares }, event, existing = null) => {
+  const onRecord = new Set(existing
+    ? [existing.paidBy.user, ...existing.shares.map((s) => s.user)].map((id) => id.toString())
+    : []);
+  const canBeOnIt = (userId) => isMember(event, userId) || onRecord.has(userId);
   if (!description) return 'Please describe the expense.';
   if (description.length > MAX_ACTIVITY_LENGTH) return `Description must be ${MAX_ACTIVITY_LENGTH} characters or fewer.`;
   const amountError = validateCents(amountCents, 'an amount');
   if (amountError) return amountError;
   if (!isRealDate(date)) return 'Please choose a date.';
-  if (!isMember(event, paidBy)) return 'The person who paid must be in the event.';
+  if (!canBeOnIt(paidBy)) return 'The person who paid must be in the event.';
   if (!['equal', 'exact'].includes(splitType)) return 'Please choose how to split it.';
   if (!Array.isArray(shares) || shares.length === 0) return 'Please choose who to split it with.';
 
   const seen = new Set();
   let total = 0;
   for (const share of shares) {
-    if (!share || !isMember(event, share.user)) return 'Everyone in the split must be in the event.';
+    if (!share || !canBeOnIt(share.user)) return 'Everyone in the split must be in the event.';
     if (seen.has(share.user)) return 'Each person can only appear once in the split.';
     seen.add(share.user);
     if (!Number.isInteger(share.amountCents) || share.amountCents < 0) return 'Split amounts must be $0 or more.';

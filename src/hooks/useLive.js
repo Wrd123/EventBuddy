@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as liveService from '../services/liveService';
 import { usePolling } from './usePolling';
-import { useSharing } from '../context/SharingContext';
+import { useSharing, endShareOnServer } from '../context/SharingContext';
+import { ApiError } from '../services/api';
 
 // Friends' positions arrive about this often while the map is open
 export const LIVE_POLL_MS = 10000;
@@ -45,17 +46,25 @@ export const useLive = (eventId) => {
   }, [eventId, load]);
   usePolling(load, LIVE_POLL_MS);
 
-  // One event at a time: starting here ends sharing with any other event
+  // One event at a time: starting here ends sharing with any other event.
+  // If that can't be confirmed, nothing changes: otherwise friends at the
+  // other event would still see you there while this phone stopped sending.
   const startSharing = useCallback(async (until) => {
     const previous = shareRef.current;
-    if (previous && previous.eventId !== eventId) await liveService.stopSharing(previous.eventId).catch(() => {});
+    if (previous && previous.eventId !== eventId) {
+      try {
+        await endShareOnServer(previous.eventId);
+      } catch (err) {
+        throw new ApiError(err.status, "Couldn't stop sharing with your other event first. Try again.");
+      }
+    }
     const sharing = await liveService.startSharing(eventId, until);
     setState(prev => ({ ...prev, sharing }));
     setShare({ eventId, until: new Date(sharing.until).toISOString() });
   }, [eventId, setShare]);
 
   const stopSharing = useCallback(async () => {
-    await liveService.stopSharing(eventId);
+    await endShareOnServer(eventId);
     setState(prev => ({ ...prev, sharing: null }));
     if (shareRef.current?.eventId === eventId) setShare(null);
   }, [eventId, setShare]);

@@ -92,6 +92,19 @@ const eventSchema = new mongoose.Schema(
       ),
       default: null
     },
+    // People the organizer removed, so an old invite link doesn't let them
+    // straight back in. Only the organizer sees this list (select: false
+    // keeps it out of every ordinary event read).
+    removed: {
+      type: [new mongoose.Schema(
+        {
+          user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+          name: { type: String, required: true }
+        },
+        { _id: false }
+      )],
+      select: false
+    },
     // Optional trip budget in whole cents, set by the organizer
     budgetCents: {
       type: Number,
@@ -113,6 +126,7 @@ eventSchema.set('toJSON', {
     // Only the map uses these, through /api/map and /api/events/:id/live
     delete ret.geo;
     delete ret.meetup;
+    delete ret.removed;
     return ret;
   }
 });

@@ -84,9 +84,15 @@ const Invite = () => {
       </div>
 
       <div className="p-4 border-t border-line">
-        <Button onClick={handleJoin} fullWidth size="lg" disabled={isJoining}>
-          {isJoining ? 'Joining...' : 'Join event'}
-        </Button>
+        {invite.isRemoved ? (
+          <p className="text-sm text-muted text-center" role="status">
+            You were removed from this event. Ask the organizer if you think that's a mistake.
+          </p>
+        ) : (
+          <Button onClick={handleJoin} fullWidth size="lg" disabled={isJoining}>
+            {isJoining ? 'Joining...' : 'Join event'}
+          </Button>
+        )}
       </div>
     </div>
   );

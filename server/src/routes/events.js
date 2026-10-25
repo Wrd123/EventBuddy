@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const express = require('express');
 const Event = require('../models/Event');
 const User = require('../models/User');
@@ -17,6 +18,8 @@ const messageRoutes = require('./messages');
 const liveRoutes = require('./live');
 const LocationShare = require('../models/LocationShare');
 const { MAX_CENTS } = require('../models/Expense');
+const { withEventLock } = require('../eventLock');
+const { netCents, formatCents } = require('../ledger');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -137,6 +140,77 @@ router.post('/:id/invite/reset', async (req, res) => {
   event.inviteCode = newInviteCode();
   await event.save();
   res.json({ event });
+});
+
+// Why someone can't go yet: anything but an even balance, so nobody is left
+// with a debt that can no longer be settled in the app. '' when they can.
+const unsettledReason = async (event, userId, leaving) => {
+  const [expenseList, paymentList] = await Promise.all([
+    Expense.find({ event: event._id }),
+    Payment.find({ event: event._id })
+  ]);
+  const net = netCents(expenseList, paymentList).get(userId.toString()) || 0;
+  if (net === 0) return '';
+  const amount = formatCents(Math.abs(net));
+  const name = event.members.find((m) => m.user.equals(userId)).name;
+  if (leaving) {
+    return net < 0
+      ? `You still owe ${amount} in this event. Settle up first.`
+      : `You're still owed ${amount} in this event. Settle up first.`;
+  }
+  return net < 0
+    ? `${name} still owes ${amount} in this event. Settle up first.`
+    : `${name} is still owed ${amount} in this event. Settle up first.`;
+};
+
+// Leave an event (your own id), or, for the organizer, remove someone. They
+// lose access to everything at once: every event route checks membership.
+// Their shared location and read marker go too; their messages stay, with
+// their name, so the conversation still reads right.
+router.delete('/:id/members/:userId', (req, res) => withEventLock(req.params.id, async () => {
+  // Loaded under the ledger lock, like every money change, so no expense or
+  // payment involving them can land between checking their balance and
+  // taking them out
+  const event = await findVisibleEvent(req.params.id, req.user);
+  const leaving = req.user._id.equals(req.params.userId);
+  if (!leaving && !event.createdBy.equals(req.user._id)) {
+    throw new HttpError(403, 'Only the organizer can remove people.');
+  }
+  const member = event.members.find((m) => m.user.equals(req.params.userId));
+  if (!member) throw new HttpError(404, "They're not in this event.");
+  if (event.createdBy.equals(member.user)) {
+    throw new HttpError(409, "You're the organizer. Delete the event instead.");
+  }
+
+  const reason = await unsettledReason(event, member.user, leaving);
+  if (reason) throw new HttpError(409, reason);
+
+  const update = { $pull: { members: { user: member.user } } };
+  // Removed people can't use an old invite link to come straight back
+  if (!leaving) update.$addToSet = { removed: { user: member.user, name: member.name } };
+  const { matchedCount } = await Event.updateOne({ _id: event._id, 'members.user': member.user }, update);
+  if (matchedCount === 0) throw new HttpError(404, "They're not in this event.");
+
+  await Promise.all([
+    LocationShare.deleteMany({ event: event._id, user: member.user }),
+    ChatRead.deleteMany({ event: event._id, user: member.user })
+  ]);
+  res.status(204).end();
+}));
+
+// People the organizer removed: [{ user, name }]
+router.get('/:id/removed', async (req, res) => {
+  const event = await findOwnEvent(req.params.id, req.user);
+  const { removed } = await Event.findById(event._id).select('+removed');
+  res.json({ removed });
+});
+
+// Let a removed person back in: their invite link works again
+router.delete('/:id/removed/:userId', async (req, res) => {
+  const event = await findOwnEvent(req.params.id, req.user);
+  if (!mongoose.isValidObjectId(req.params.userId)) throw new HttpError(404, 'Not found.');
+  await Event.updateOne({ _id: event._id }, { $pull: { removed: { user: req.params.userId } } });
+  res.status(204).end();
 });
 
 router.delete('/:id', async (req, res) => {
