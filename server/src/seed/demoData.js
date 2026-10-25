@@ -139,15 +139,22 @@ const demoChat = (users) => {
 
 // A picnic happening today, so live locations can be tried right away:
 // three friends are already sharing where they are in the park and Taylor
-// has set a meetup point. Dated by the server's clock when seeded.
+// has set a meetup point.
 const PARK = { lat: 33.7851, lng: -84.3738 };
+
+// "Today" is the calendar day in Atlanta, where the picnic is. A hosted
+// server's clock is usually UTC, which by a US evening is already tomorrow.
+const PARK_TIME_ZONE = 'America/New_York';
+
+// 'YYYY-MM-DD' for the given moment in a time zone (en-CA formats dates
+// that way)
+const dayIn = (timeZone, now = Date.now()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 
 const demoPicnic = (users) => {
   const now = Date.now();
   const minutesAgo = (minutes) => new Date(now - minutes * 60 * 1000);
-  const pad = (n) => String(n).padStart(2, '0');
-  const today = new Date(now);
-  const todayISO = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const todayISO = dayIn(PARK_TIME_ZONE, now);
   const color = (name) => DEMO_FRIENDS.find((f) => f.name === name)?.color || ORGANIZER_COLOR;
   const member = (name) => ({ user: users[name]._id, name: users[name].name, color: color(name) });
   const until = new Date(now + 6 * 60 * 60 * 1000);
@@ -246,4 +253,4 @@ const seedDemoData = async () => {
   return me;
 };
 
-module.exports = { seedDemoData, DEMO_LOGIN, DEMO_FRIENDS, DEMO_EVENT_IDS };
+module.exports = { seedDemoData, dayIn, DEMO_LOGIN, DEMO_FRIENDS, DEMO_EVENT_IDS };

@@ -4,6 +4,8 @@ A phone app for planning trips, festivals and nights out with friends: one place
 
 Built end to end by me: React front end, Express and MongoDB API, and a native iPhone app (Capacitor) that keeps sharing your location with your friends while the phone is locked.
 
+**[Try the live demo](https://eventbuddy-exic.onrender.com)** and tap **Try the demo** to look around as John. It runs on a free server that sleeps when idle, so the first visit can take up to a minute to wake it.
+
 ## What it does
 
 - **Plan together.** Single or multi-day events, a shared schedule with who's going to what, and invite links that let friends join in one tap.
@@ -12,7 +14,7 @@ Built end to end by me: React front end, Express and MongoDB API, and a native i
 - **Find each other.** During an event, friends can share their location for an hour, a few hours or until midnight. The map shows where everyone is, how recently they updated, and a meetup point anyone can set. In the iPhone app, sharing keeps working with the screen locked.
 - **Discover things to do.** Concerts, games and shows near you (Ticketmaster), each one a tap away from becoming a plan with friends.
 
-## Try it
+## Run it locally
 
 You need Node.js 22 (`nvm use` picks it up from `.nvmrc`).
 
@@ -72,7 +74,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet |
 | iPhone | Capacitor 7, background geolocation, native HTTP |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
-| Testing | Jest and Testing Library (231 tests), Node's test runner with Supertest and an in-memory MongoDB (242 tests) |
+| Testing | Jest and Testing Library (231 tests), Node's test runner with Supertest and an in-memory MongoDB (244 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look

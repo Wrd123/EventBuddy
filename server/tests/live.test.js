@@ -4,7 +4,7 @@ const { describe, it } = require('node:test');
 const Event = require('../src/models/Event');
 const LocationShare = require('../src/models/LocationShare');
 const { isHappening } = require('../src/routes/live');
-const { seedDemoData, DEMO_EVENT_IDS } = require('../src/seed/demoData');
+const { seedDemoData, dayIn, DEMO_EVENT_IDS } = require('../src/seed/demoData');
 
 useTestDatabase();
 
@@ -243,5 +243,21 @@ describe('demo picnic', () => {
     assert.deepEqual(view.people.map((p) => p.name), ['Alex', 'Taylor', 'Jordan']);
     assert.equal(view.meetup.note, 'By the lake, near the dock');
     assert.equal(view.sharing, null);
+  });
+
+  it("is dated by Atlanta's calendar, not the server's UTC clock", async () => {
+    await seedDemoData();
+    const picnic = await Event.findById(DEMO_EVENT_IDS.picnic);
+    assert.equal(picnic.startDate, dayIn('America/New_York'));
+    assert.equal(picnic.endDate, picnic.startDate);
+  });
+});
+
+describe('dayIn', () => {
+  it("gives a time zone's own calendar day", () => {
+    // 9 pm on Oct 24 in Atlanta is already Oct 25 in UTC
+    const evening = Date.parse('2026-10-25T01:07:00Z');
+    assert.equal(dayIn('America/New_York', evening), '2026-10-24');
+    assert.equal(dayIn('UTC', evening), '2026-10-25');
   });
 });
