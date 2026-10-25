@@ -258,8 +258,12 @@ describe('Map during an event', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop sharing' }));
     expect(await screen.findByRole('button', { name: 'Share my location' })).toBeInTheDocument();
     expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(1);
-    expect(geolocation.clearWatch).toHaveBeenCalledWith(7);
-    expect(screen.queryByRole('button', { name: 'You: You' })).not.toBeInTheDocument();
+    // Tracking stops in an effect that runs just after the button changes
+    // back, so wait for it rather than expect it on the same render
+    await waitFor(() => {
+      expect(geolocation.clearWatch).toHaveBeenCalledWith(7);
+      expect(screen.queryByRole('button', { name: 'You: You' })).not.toBeInTheDocument();
+    });
   });
 
   it('only sends a new position after moving a little', async () => {
@@ -498,7 +502,7 @@ describe('Sharing across the app', () => {
 
     await screen.findByLabelText('Email');
     expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(1);
-    expect(geolocation.clearWatch).toHaveBeenCalledWith(3);
+    await waitFor(() => expect(geolocation.clearWatch).toHaveBeenCalledWith(3));
     expect(storedShare()).toBeNull();
   });
 });
