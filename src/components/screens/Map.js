@@ -150,7 +150,9 @@ const Map = () => {
         />
         {placingMeetup && (
           <div className="eb-crosshair" aria-hidden="true">
-            <Flag size={36} fill="currentColor" />
+            <div className="eb-pin eb-pin-meetup">
+              <Flag size={16} strokeWidth={2.5} />
+            </div>
           </div>
         )}
 

@@ -112,8 +112,15 @@ const MapCanvas = forwardRef(({ pins, selectedId, onSelect, fitKey, fitIds, fall
       maxClusterRadius: 45
     }).addTo(map);
     mapRef.current = map;
+    // The panel under the map changes height (the meetup form, say), and
+    // Leaflet only notices window resizes. Without this, its center drifts
+    // from the middle of the screen, so a meetup point would be saved away
+    // from the flag. pan: false keeps the map still while its edge moves.
+    const resized = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    resized.observe(containerRef.current);
     const placed = markers.current;
     return () => {
+      resized.disconnect();
       map.remove();
       placed.clear();
       mapRef.current = null;

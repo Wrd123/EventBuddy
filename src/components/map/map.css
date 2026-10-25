@@ -135,14 +135,16 @@
   display: none;
 }
 
-/* The crosshair shown while choosing where the meetup point goes */
+/* The meetup pin, held in the middle of the map while choosing where it
+   goes. Same size and centering as the saved pin, so saving leaves it
+   exactly where it was. */
 .eb-crosshair {
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -100%);
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 1100;
-  color: #f59e0b;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
 }
