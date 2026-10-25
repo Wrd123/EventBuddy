@@ -13,6 +13,7 @@ const { MAX_MESSAGE_LENGTH } = require('../models/Message');
 const { HttpError } = require('../errors');
 const { text } = require('../validation');
 const { findVisibleEvent } = require('../eventAccess');
+const { readClientId, createOnce } = require('../idempotency');
 const { isTest } = require('../config');
 
 const PAGE_SIZE = 50;
@@ -67,13 +68,15 @@ router.post('/', sendLimiter, async (req, res) => {
     throw new HttpError(400, `Messages can be up to ${MAX_MESSAGE_LENGTH} characters.`);
   }
 
+  // A retried send that was already saved gets the saved message back
+  const key = { event: event._id, 'sender.user': req.user._id, clientId: readClientId(req.body) };
   const member = event.members.find((m) => m.user.equals(req.user._id));
-  const message = await Message.create({
+  const { record: message, created } = await createOnce(Message, key, {
     event: event._id,
     sender: { user: req.user._id, name: member?.name || req.user.name },
     text: body
-  });
-  res.status(201).json({ message });
+  }, (saved) => saved.text === body);
+  res.status(created ? 201 : 200).json({ message });
 });
 
 // Marks the chat read up to a message. Only ever moves forward, so a slow

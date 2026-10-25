@@ -98,7 +98,7 @@ describe('Group chat', () => {
     expect(await screen.findByText('I have a charger')).toBeInTheDocument();
     expect(screen.getByLabelText('Message')).toHaveValue('');
     const [, options] = requests('POST', '/api/events/1/messages')[0];
-    expect(JSON.parse(options.body)).toEqual({ text: 'I have a charger' });
+    expect(JSON.parse(options.body)).toEqual({ text: 'I have a charger', clientId: expect.any(String) });
     await waitFor(() => expect(screen.queryByText('Sending...')).not.toBeInTheDocument());
   });
 
@@ -177,6 +177,55 @@ describe('Group chat when sending fails', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(screen.queryByText('Never mind')).not.toBeInTheDocument();
+  });
+});
+
+describe('Group chat when a response is lost', () => {
+  // The server saves the message, but the phone never hears back
+  beforeEach(() => installFakeApi({ chatSendsLost: 1 }).logIn());
+
+  const sentIds = () => requests('POST', '/api/events/1/messages').map(([, opts]) => JSON.parse(opts.body).clientId);
+
+  it('retries with the same id, so the message is saved once', async () => {
+    renderAt('/events/1/chat');
+    await screen.findByText('I can grab snacks too.');
+
+    sendMessage('On my way');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not sent');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getAllByText('On my way')).toHaveLength(1);
+    const [first, retry] = sentIds();
+    expect(first).toBeTruthy();
+    expect(retry).toBe(first);
+  });
+
+  it('drops the failed copy once polling shows it was saved', async () => {
+    renderAt('/events/1/chat');
+    await screen.findByText('I can grab snacks too.');
+
+    sendMessage('On my way');
+    await screen.findByRole('alert');
+    checkForNewMessages();
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getAllByText('On my way')).toHaveLength(1);
+    expect(sentIds()).toHaveLength(1);
+  });
+
+  it('gives each new send its own id, so the same text can be sent twice', async () => {
+    installFakeApi().logIn();
+    renderAt('/events/1/chat');
+    await screen.findByText('I can grab snacks too.');
+
+    sendMessage('Ha!');
+    await waitFor(() => expect(screen.queryByText('Sending...')).not.toBeInTheDocument());
+    sendMessage('Ha!');
+
+    await waitFor(() => expect(screen.getAllByText('Ha!')).toHaveLength(2));
+    const [first, second] = sentIds();
+    expect(first).not.toBe(second);
   });
 });
 

@@ -1,35 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as chatService from '../services/chatService';
 import { mergeMessages } from '../utils/chat';
+import { newClientId } from '../utils/clientId';
+import { usePolling, isVisible } from './usePolling';
 
 // How often an open chat checks for new messages. Polling keeps the server
 // simple; a few seconds' delay is fine for planning with friends.
 export const POLL_MS = 4000;
 
-const isVisible = () => document.visibilityState !== 'hidden';
-
-// Runs fn now and every intervalMs while the app is on screen, and again as
-// soon as it comes back to the foreground. A phone in a pocket doesn't poll.
-export const usePolling = (fn, intervalMs) => {
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
-
-  useEffect(() => {
-    const tick = () => isVisible() && fnRef.current();
-    const timer = setInterval(tick, intervalMs);
-    document.addEventListener('visibilitychange', tick);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', tick);
-    };
-  }, [intervalMs]);
-};
-
-let nextTempId = 1;
-
 // An event's group chat: its messages (oldest first), live while open.
 // status: 'loading' | 'ready' | 'error'. pending: messages you've sent that
-// the server hasn't confirmed, each { tempId, text, failed }.
+// the server hasn't confirmed, each { tempId, text, failed }. The tempId is
+// also the send's clientId, so a retry can't post the message twice.
 export const useChat = (eventId) => {
   const [state, setState] = useState({ status: 'loading', messages: [], hasMore: false, error: '' });
   const [pending, setPending] = useState([]);
@@ -52,6 +34,12 @@ export const useChat = (eventId) => {
   // entirely: React schedules a render for any setState(fn), even one that
   // ends up returning the same state.
   const addMessages = useCallback((incoming) => {
+    // A message that's arrived (from polling, or the send that was thought
+    // to have failed) is no longer pending, so it never shows twice
+    const arrived = new Set(incoming.map(m => m.clientId).filter(Boolean));
+    if (arrived.size > 0) {
+      setPending(prev => (prev.some(p => arrived.has(p.tempId)) ? prev.filter(p => !arrived.has(p.tempId)) : prev));
+    }
     if (mergeMessages(messagesRef.current, incoming) === messagesRef.current) return;
     setState(prev => {
       const messages = mergeMessages(prev.messages, incoming);
@@ -90,7 +78,7 @@ export const useChat = (eventId) => {
 
   const deliver = useCallback(async (tempId, text) => {
     try {
-      const message = await chatService.sendMessage(eventId, text);
+      const message = await chatService.sendMessage(eventId, text, tempId);
       addMessages([message]);
       setPending(prev => prev.filter(p => p.tempId !== tempId));
     } catch (err) {
@@ -100,7 +88,7 @@ export const useChat = (eventId) => {
 
   // Shows the message straight away; it settles once the server has it
   const send = useCallback((text) => {
-    const tempId = `temp-${nextTempId++}`;
+    const tempId = newClientId();
     setPending(prev => [...prev, { tempId, text, failed: false }]);
     deliver(tempId, text);
   }, [deliver]);

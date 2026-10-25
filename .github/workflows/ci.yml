@@ -31,6 +31,9 @@ jobs:
       - name: Run tests
         run: npm test -- --watchAll=false
 
+      - name: Run script tests
+        run: npm run test:scripts
+
       # CI=true makes lint warnings fail the build
       - name: Build
         run: npm run build

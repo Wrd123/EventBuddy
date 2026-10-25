@@ -41,12 +41,21 @@ beforeEach(() => {
     const url = new URL(input);
     calls.push({ url, headers: options.headers || {} });
     if (url.hostname === 'app.ticketmaster.com') return ticketmasterReply(url);
-    if (url.hostname === 'nominatim.openstreetmap.org') return nominatimReply(url);
+    if (url.hostname === 'nominatim.openstreetmap.org') return nominatimReply(url, options);
     throw new Error(`Unexpected fetch to ${url}`);
   });
 });
 
-afterEach(() => mock.restoreAll());
+const originalTiming = { interval: config.nominatimIntervalMs, deadline: config.lookupDeadlineMs };
+afterEach(() => {
+  mock.restoreAll();
+  config.nominatimIntervalMs = originalTiming.interval;
+  config.lookupDeadlineMs = originalTiming.deadline;
+});
+
+// A request that never answers, until it's given up on
+const hang = (url, options) =>
+  new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('aborted'))));
 
 const tmCalls = () => calls.filter((c) => c.url.hostname === 'app.ticketmaster.com');
 
@@ -296,6 +305,51 @@ describe('GET /api/discover/place', () => {
       await api().get('/api/discover/place').query({ lat: 33.749, lng: -84.388 }).set('Authorization', auth).expect(200);
     }
     assert.equal(calls.length, 1);
+  });
+});
+
+describe('place lookups under load', () => {
+  const nominatimCalls = () => calls.filter((c) => c.url.hostname === 'nominatim.openstreetmap.org');
+  const outcome = (promise) => promise.then(() => 'ok', (err) => err.status);
+
+  it('gives up on a hung request in time, and the next lookup still runs', async () => {
+    config.lookupDeadlineMs = 200;
+    nominatimReply = hang;
+    const started = Date.now();
+    await assert.rejects(places.search('Atlanta, GA'), { status: 502 });
+    assert.ok(Date.now() - started < 1000);
+
+    nominatimReply = () => json(200, [{ lat: '36.16', lon: '-86.78', address: { city: 'Nashville', country_code: 'us' } }]);
+    assert.equal((await places.search('Nashville, TN')).label, 'Nashville');
+  });
+
+  it('sends the same lookup once when it is asked for twice at once', async () => {
+    const [a, b] = await Promise.all([places.search('Atlanta, GA'), places.search('atlanta, ga')]);
+    assert.deepEqual(a, b);
+    assert.equal(nominatimCalls().length, 1);
+  });
+
+  it("doesn't keep sharing a lookup that failed", async () => {
+    nominatimReply = () => json(503, {});
+    await Promise.all([outcome(places.search('Atlanta, GA')), outcome(places.search('Atlanta, GA'))]);
+    assert.equal(nominatimCalls().length, 1);
+
+    nominatimReply = () => json(200, [{ lat: '33.749', lon: '-84.388', address: { city: 'Atlanta', country_code: 'us' } }]);
+    assert.equal((await places.search('Atlanta, GA')).label, 'Atlanta');
+  });
+
+  it('turns lookups away quickly when the line is too long to answer in time', async () => {
+    config.nominatimIntervalMs = 150;
+    config.lookupDeadlineMs = 400;
+    const started = Date.now();
+    const results = await Promise.all(
+      ['Austin, TX', 'Boston, MA', 'Denver, CO', 'Miami, FL', 'Reno, NV', 'Tulsa, OK'].map((q) => outcome(places.search(q)))
+    );
+
+    assert.ok(results.includes('ok'));
+    assert.ok(results.includes(503));
+    // Nobody waited much past the deadline for an answer
+    assert.ok(Date.now() - started < 800);
   });
 });
 

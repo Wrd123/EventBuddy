@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 const Event = require('../src/models/Event');
 const places = require('../src/discover/places');
+const config = require('../src/config');
 const { seedDemoData } = require('../src/seed/demoData');
 
 useTestDatabase();
@@ -11,27 +12,36 @@ useTestDatabase();
 let lookups;
 let knownPlaces;
 let lookupFails;
+let lookupHangs;
 
 beforeEach(() => {
   lookups = [];
   lookupFails = false;
+  lookupHangs = false;
   knownPlaces = {
     'indio, ca': { lat: '33.72061', lon: '-116.21561' },
     'atlanta, ga': { lat: '33.749', lon: '-84.388' },
     'nashville, tn': { lat: '36.1627', lon: '-86.7816' }
   };
   places.clearCache();
-  mock.method(globalThis, 'fetch', async (input) => {
+  mock.method(globalThis, 'fetch', async (input, options = {}) => {
     const url = new URL(input);
     const q = url.searchParams.get('q');
     lookups.push(q);
+    if (lookupHangs) {
+      return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('aborted'))));
+    }
     if (lookupFails) return { ok: false, status: 503, json: async () => ({}) };
     const match = knownPlaces[q.toLowerCase()];
     return { ok: true, status: 200, json: async () => (match ? [match] : []) };
   });
 });
 
-afterEach(() => mock.restoreAll());
+const originalDeadline = config.lookupDeadlineMs;
+afterEach(() => {
+  mock.restoreAll();
+  config.lookupDeadlineMs = originalDeadline;
+});
 
 const createEvent = async (auth, fields) =>
   (await api()
@@ -108,6 +118,22 @@ describe('GET /api/map/events', () => {
 
     lookupFails = false;
     assert.equal((await mapEvents(auth))[0].lat, 33.7206);
+  });
+
+  it('answers within its lookup budget when the lookup service hangs', async () => {
+    const { auth } = await registerUser();
+    for (const location of ['Indio, CA', 'Atlanta, GA', 'Nashville, TN']) await createEvent(auth, { location });
+    config.lookupDeadlineMs = 300;
+    lookupHangs = true;
+
+    const started = Date.now();
+    const pins = await mapEvents(auth);
+    assert.ok(Date.now() - started < 1500);
+    assert.ok(pins.every((p) => p.lat === null));
+
+    // Once the service is back, the next visit places them
+    lookupHangs = false;
+    assert.ok((await mapEvents(auth)).every((p) => p.lat !== null));
   });
 
   it('looks up at most five events per visit', async () => {

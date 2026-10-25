@@ -56,11 +56,13 @@ This builds the web app, copies it into the native project and opens it in Xcode
 
 The free API sleeps after 15 idle minutes and takes up to a minute to start. Meanwhile, the web app shows a "Waking up the demo" screen and opens as soon as the API answers.
 
-The iPhone app can use the hosted API too:
+The iPhone app can use the hosted demo too. Give it both addresses of the same deployment: the API it talks to, and the web app that invite links open (an invite joins through that web app's API, so the two have to match). The build stops if either is missing or isn't `https`:
 
 ```bash
-EVENTBUDDY_API_URL=https://eventbuddy-api.onrender.com/api npm run build:ios
+EVENTBUDDY_API_URL=https://eventbuddy-api.onrender.com/api EVENTBUDDY_PUBLIC_URL=https://eventbuddy.onrender.com npm run build:ios
 ```
+
+Without them, `npm run build:ios` builds against the API on your Mac, and its invite links only work there.
 
 ## How it's built
 

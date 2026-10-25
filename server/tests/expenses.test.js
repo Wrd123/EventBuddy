@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { describe, it } = require('node:test');
 const Expense = require('../src/models/Expense');
 const Payment = require('../src/models/Payment');
+const { withEventLock } = require('../src/eventLock');
 const { seedDemoData, DEMO_EVENT_IDS } = require('../src/seed/demoData');
 
 useTestDatabase();
@@ -134,7 +135,8 @@ describe('GET /api/events/:id/expenses', () => {
     await api()
       .post(paymentsPath(eventId))
       .set('Authorization', member.auth)
-      .send({ from: member.user._id, to: organizer.user._id, amountCents: 5000, date: '2099-06-03' });
+      .send({ from: member.user._id, to: organizer.user._id, amountCents: 5000, date: '2099-06-03' })
+      .expect(201);
 
     const res = await api().get(ledgerPath(eventId)).set('Authorization', member.auth).expect(200);
 
@@ -213,8 +215,19 @@ describe('changing an expense', () => {
 describe('payments', () => {
   const pay = (auth, eventId, body) => api().post(paymentsPath(eventId)).set('Authorization', auth).send(body);
 
+  // The setup plus the $100 dinner, so the member owes the organizer $50
+  const setupWithDebt = async () => {
+    const context = await setup();
+    const { organizer, member, eventId } = context;
+    await addExpense(organizer.auth, eventId, dinner(organizer, member)).expect(201);
+    return context;
+  };
+  const settle = (context, overrides = {}) => ({
+    from: context.member.user._id, to: context.organizer.user._id, amountCents: 5000, date: '2099-06-03', ...overrides
+  });
+
   it('records a payment you made', async () => {
-    const { organizer, member, eventId } = await setup();
+    const { organizer, member, eventId } = await setupWithDebt();
     const res = await pay(member.auth, eventId, {
       from: member.user._id, to: organizer.user._id, amountCents: 5000, date: '2099-06-03'
     }).expect(201);
@@ -224,7 +237,7 @@ describe('payments', () => {
   });
 
   it('records a payment you received', async () => {
-    const { organizer, member, eventId } = await setup();
+    const { organizer, member, eventId } = await setupWithDebt();
     await pay(organizer.auth, eventId, {
       from: member.user._id, to: organizer.user._id, amountCents: 5000, date: '2099-06-03'
     }).expect(201);
@@ -251,7 +264,7 @@ describe('payments', () => {
   });
 
   it('lets whoever recorded it delete it, but not other members', async () => {
-    const { organizer, member, eventId } = await setup();
+    const { organizer, member, eventId } = await setupWithDebt();
     const { body } = await pay(member.auth, eventId, {
       from: member.user._id, to: organizer.user._id, amountCents: 5000, date: '2099-06-03'
     });
@@ -261,6 +274,106 @@ describe('payments', () => {
 
     await api().delete(paymentsPath(eventId, body.payment._id)).set('Authorization', third.auth).expect(403);
     await api().delete(paymentsPath(eventId, body.payment._id)).set('Authorization', member.auth).expect(204);
+  });
+
+  it("won't take anyone past even, so a debt can't be marked paid twice", async () => {
+    const context = await setupWithDebt();
+    const { organizer, member, eventId } = context;
+    await pay(member.auth, eventId, settle(context, { clientId: 'payer-tap' })).expect(201);
+
+    // The organizer's screen hadn't caught up and still offered "Mark paid"
+    const res = await pay(organizer.auth, eventId, settle(context, { clientId: 'recipient-tap' })).expect(409);
+    assert.equal(res.body.message, "That's already settled. Balances have been updated.");
+    assert.equal(await Payment.countDocuments(), 1);
+  });
+
+  it('records only one when both people mark it paid at the same moment', async () => {
+    const context = await setupWithDebt();
+    const { organizer, member, eventId } = context;
+    const results = await Promise.all([
+      pay(member.auth, eventId, settle(context, { clientId: 'payer-tap' })),
+      pay(organizer.auth, eventId, settle(context, { clientId: 'recipient-tap' }))
+    ]);
+
+    assert.deepEqual(results.map((r) => r.status).sort(), [201, 409]);
+    assert.equal(await Payment.countDocuments(), 1);
+  });
+
+  it('returns the saved payment when a retry repeats its clientId, even once settled', async () => {
+    const context = await setupWithDebt();
+    const { member, eventId } = context;
+    const first = await pay(member.auth, eventId, settle(context, { clientId: 'retry-me' })).expect(201);
+    const again = await pay(member.auth, eventId, settle(context, { clientId: 'retry-me' })).expect(200);
+
+    assert.equal(again.body.payment._id, first.body.payment._id);
+    assert.equal(await Payment.countDocuments(), 1);
+  });
+
+  it('records one payment when a retry races the original', async () => {
+    const context = await setupWithDebt();
+    const { member, eventId } = context;
+    const results = await Promise.all([
+      pay(member.auth, eventId, settle(context, { clientId: 'twice' })),
+      pay(member.auth, eventId, settle(context, { clientId: 'twice' }))
+    ]);
+
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 201]);
+    assert.equal(results[0].body.payment._id, results[1].body.payment._id);
+    assert.equal(await Payment.countDocuments(), 1);
+  });
+
+  it('rejects a clientId reused for a different payment', async () => {
+    const context = await setupWithDebt();
+    const { member, eventId } = context;
+    await pay(member.auth, eventId, settle(context, { amountCents: 2000, clientId: 'reused' })).expect(201);
+
+    const res = await pay(member.auth, eventId, settle(context, { amountCents: 3000, clientId: 'reused' })).expect(409);
+    assert.equal(res.body.message, 'That request was already used for something else.');
+  });
+
+  it('rejects a clientId that is blank, too long or not a plain id', async () => {
+    const context = await setupWithDebt();
+    const { member, eventId } = context;
+    for (const clientId of ['', 'x'.repeat(65), 'has spaces', 42]) {
+      await pay(member.auth, eventId, settle(context, { clientId })).expect(400);
+    }
+    assert.equal(await Payment.countDocuments(), 0);
+  });
+
+  it('still lets the same two people settle a new debt later', async () => {
+    const context = await setupWithDebt();
+    const { organizer, member, eventId } = context;
+    await pay(member.auth, eventId, settle(context, { clientId: 'first-dinner' })).expect(201);
+    await addExpense(organizer.auth, eventId, dinner(organizer, member, { description: 'Second dinner' })).expect(201);
+
+    await pay(member.auth, eventId, settle(context, { clientId: 'second-dinner' })).expect(201);
+    assert.equal(await Payment.countDocuments(), 2);
+  });
+
+  it('checks a payment against the ledger as it is once any change ahead of it has finished', async () => {
+    const context = await setupWithDebt();
+    const { member, eventId } = context;
+    // Another ledger change is underway: hold the event's lock while it runs
+    let finishChange;
+    const change = withEventLock(eventId, () => new Promise((resolve) => { finishChange = resolve; }));
+    const payment = pay(member.auth, eventId, settle(context)).then((res) => res);
+
+    // Meanwhile the dinner is halved, so the member only owes $25
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await Expense.updateOne({ event: eventId }, {
+      amountCents: 5000,
+      shares: [
+        { user: context.organizer.user._id, name: context.organizer.user.name, amountCents: 2500 },
+        { user: member.user._id, name: member.user.name, amountCents: 2500 }
+      ]
+    });
+    finishChange();
+    await change;
+
+    // Without the lock, the $50 payment would already have been checked
+    // against the old $50 debt and saved, leaving the member $25 past even
+    assert.equal((await payment).status, 409);
+    assert.equal(await Payment.countDocuments(), 0);
   });
 });
 

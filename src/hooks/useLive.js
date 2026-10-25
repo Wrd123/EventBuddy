@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as liveService from '../services/liveService';
-import { usePolling } from './useChat';
+import { usePolling } from './usePolling';
 import { useSharing } from '../context/SharingContext';
 
 // Friends' positions arrive about this often while the map is open

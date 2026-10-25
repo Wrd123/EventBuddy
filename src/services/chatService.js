@@ -17,8 +17,9 @@ export const getMessages = (eventId, { after, before } = {}) => {
   return apiRequest(`${messagesPath(eventId)}${query ? `?${query}` : ''}`);
 };
 
-export const sendMessage = async (eventId, text) =>
-  (await apiRequest(messagesPath(eventId), { method: 'POST', body: { text } })).message;
+// clientId: the same for every try of one send, so a retry is saved once
+export const sendMessage = async (eventId, text, clientId) =>
+  (await apiRequest(messagesPath(eventId), { method: 'POST', body: { text, clientId } })).message;
 
 // Everything up to and including this message counts as read
 export const markChatRead = (eventId, lastRead) =>

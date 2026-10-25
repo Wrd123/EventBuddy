@@ -10,6 +10,9 @@ const Payment = require('../models/Payment');
 const { HttpError } = require('../errors');
 const { validateExpense, validatePayment, text } = require('../validation');
 const { findVisibleEvent } = require('../eventAccess');
+const { withEventLock } = require('../eventLock');
+const { readClientId, findExisting, createOnce } = require('../idempotency');
+const { netCents, settlesWithinBalances } = require('../ledger');
 
 // A member as stored on money records: { user, name }
 const person = (event, userId) => {
@@ -68,7 +71,9 @@ expenses.post('/', async (req, res) => {
   const error = validateExpense(fields, event);
   if (error) throw new HttpError(400, error);
 
-  const expense = await Expense.create({ ...toStored(fields, event), event: event._id, createdBy: req.user._id });
+  const expense = await withEventLock(event._id, () =>
+    Expense.create({ ...toStored(fields, event), event: event._id, createdBy: req.user._id })
+  );
   res.status(201).json({ expense });
 });
 
@@ -83,7 +88,7 @@ expenses.patch('/:expenseId', async (req, res) => {
   if (error) throw new HttpError(400, error);
 
   expense.set(toStored(fields, event));
-  await expense.save();
+  await withEventLock(event._id, () => expense.save());
   res.json({ expense });
 });
 
@@ -92,7 +97,7 @@ expenses.delete('/:expenseId', async (req, res) => {
   const expense = await findExpense(event, req.params.expenseId);
   if (!canChange(expense, event, req.user)) throw new HttpError(403, CHANGE_FORBIDDEN);
 
-  await expense.deleteOne();
+  await withEventLock(event._id, () => expense.deleteOne());
   res.status(204).end();
 });
 
@@ -110,15 +115,36 @@ payments.post('/', async (req, res) => {
   const error = validatePayment(fields, event, req.user);
   if (error) throw new HttpError(400, error);
 
-  const payment = await Payment.create({
-    event: event._id,
-    from: person(event, fields.from),
-    to: person(event, fields.to),
-    amountCents: fields.amountCents,
-    date: fields.date,
-    createdBy: req.user._id
+  const key = { event: event._id, createdBy: req.user._id, clientId: readClientId(req.body) };
+  const isSame = (payment) =>
+    payment.from.user.equals(fields.from) && payment.to.user.equals(fields.to) && payment.amountCents === fields.amountCents;
+
+  const { record: payment, created } = await withEventLock(event._id, async () => {
+    // A retry of a payment that was already saved gets it back, even though
+    // the balances now say it's settled. Checked inside the lock, so a retry
+    // racing its original waits for it and then finds it.
+    if (key.clientId !== undefined) {
+      const saved = await findExisting(Payment, key, isSame);
+      if (saved) return { record: saved, created: false };
+    }
+
+    const [expenseList, paymentList] = await Promise.all([
+      Expense.find({ event: event._id }),
+      Payment.find({ event: event._id })
+    ]);
+    if (!settlesWithinBalances(netCents(expenseList, paymentList), fields)) {
+      throw new HttpError(409, "That's already settled. Balances have been updated.");
+    }
+    return createOnce(Payment, key, {
+      event: event._id,
+      from: person(event, fields.from),
+      to: person(event, fields.to),
+      amountCents: fields.amountCents,
+      date: fields.date,
+      createdBy: req.user._id
+    }, isSame);
   });
-  res.status(201).json({ payment });
+  res.status(created ? 201 : 200).json({ payment });
 });
 
 payments.delete('/:paymentId', async (req, res) => {
@@ -127,7 +153,7 @@ payments.delete('/:paymentId', async (req, res) => {
   if (!payment) throw new HttpError(404, 'Payment not found.');
   if (!canChange(payment, event, req.user)) throw new HttpError(403, CHANGE_FORBIDDEN);
 
-  await payment.deleteOne();
+  await withEventLock(event._id, () => payment.deleteOne());
   res.status(204).end();
 });
 

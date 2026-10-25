@@ -117,8 +117,12 @@ const CATEGORY_TYPES = { music: ['concert', 'music-festival'], sports: ['sports'
 
 // Round-trip through JSON like a real response, so the app never holds the
 // fake's own objects (which it changes in place)
-const respond = (status, body) =>
-  Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(JSON.parse(JSON.stringify(body))) });
+// The body is copied now, as the server would send it, so a response held
+// back (holdNext) still has the data from when it was asked for
+const respond = (status, body) => {
+  const sent = JSON.stringify(body);
+  return Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(sent === undefined ? undefined : JSON.parse(sent)) });
+};
 
 // Event 1's money: Alex paid a $300 Airbnb, split with John
 const demoLedger = () => ({
@@ -181,6 +185,14 @@ const moneyRoute = (event, method, kind, id, body) => {
   }
 
   if (method === 'POST') {
+    // A retry with the same clientId gets the saved payment, like the real API
+    const saved = body.clientId && ledger.payments.find((p) => p.clientId === body.clientId);
+    if (saved) return respond(200, { payment: saved });
+    // options.paymentOutcomes: what each "Mark paid" meets, in order.
+    // 'lost' saves it but the response never arrives; a status fails it.
+    const outcome = fakeOptions.paymentOutcomes?.shift();
+    if (outcome === 409) return respond(409, { message: "That's already settled. Balances have been updated." });
+    if (typeof outcome === 'number') return respond(outcome, { message: 'Something went wrong. Please try again.' });
     const payment = {
       ...body,
       _id: `p${nextItemId++}`,
@@ -189,6 +201,7 @@ const moneyRoute = (event, method, kind, id, body) => {
       createdBy: demoUser._id
     };
     ledger.payments.unshift(payment);
+    if (outcome === 'lost') return Promise.reject(new TypeError('Network request failed'));
     return respond(201, { payment });
   }
   ledger.payments = ledger.payments.filter((p) => p._id !== id);
@@ -245,6 +258,32 @@ const messagesFor = (eventId) => {
   return chats[eventId];
 };
 
+// Someone else changing an event on the server while the app is open
+export const changeEvent = (eventId, change) => {
+  const event = events.find((e) => e._id === eventId);
+  change(event);
+  return event;
+};
+
+// Someone else deleting an event, or removing you from it
+export const removeEvent = (eventId) => {
+  events = events.filter((e) => e._id !== eventId);
+};
+
+// Holds the response to the next matching request: the server answers
+// straight away, but the answer only reaches the app on release(). For
+// testing a slow read that lands after something newer.
+let holds = [];
+export const holdNext = (method, path) => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  holds.push({ method, path, gate });
+  return () => act(async () => {
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+};
+
 // A message from someone else arriving while the app is open
 export const receiveMessage = (eventId, { user = 'u2', name = 'Alex', text }) => {
   const message = chatMessage(`c${nextMessageId++}`, user, name, text, 0);
@@ -261,9 +300,16 @@ const chatRoute = (event, method, action, body, params) => {
     return respond(204);
   }
   if (method === 'POST') {
+    const saved = body.clientId && messages.find((m) => m.clientId === body.clientId);
+    if (saved) return respond(200, { message: saved });
     if (fakeOptions.chatSendError) return respond(503, { message: fakeOptions.chatSendError });
-    const message = chatMessage(`c${nextMessageId++}`, demoUser._id, demoUser.name, body.text.trim(), 0);
+    const message = { ...chatMessage(`c${nextMessageId++}`, demoUser._id, demoUser.name, body.text.trim(), 0), clientId: body.clientId };
     messages.push(message);
+    // options.chatSendsLost: that many sends are saved but their response is lost
+    if (fakeOptions.chatSendsLost > 0) {
+      fakeOptions.chatSendsLost -= 1;
+      return Promise.reject(new TypeError('Network request failed'));
+    }
     return respond(201, { message });
   }
   if (params.has('after')) {
@@ -521,6 +567,8 @@ const route = (method, path, body, authed, params) => {
 // options.noLocalEvents / options.discoverError change Discover's results;
 // options.chats replaces the starting chats ({ eventId: [messages] });
 // options.chatSendError makes sending a message fail with that message;
+// options.chatSendsLost saves that many sends but loses their responses;
+// options.paymentOutcomes lists what each payment meets ('lost', or a status);
 // options.liveEvent adds an event happening today with live locations;
 // options.eventsFailures makes loading your events fail that many times
 // Lets requests still in flight (like a screen's background counts) finish
@@ -535,15 +583,20 @@ export const installFakeApi = (options = {}) => {
   chatReads = options.chats ? {} : { '1': 'c003' };
   ledgers = demoLedger();
   handles = { ...demoHandles(), ...options.handles };
+  holds = [];
   global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) => {
     const [path, search = ''] = url.replace(/^\/api/, '').split('?');
-    return route(
+    const response = route(
       method,
       path,
       body ? JSON.parse(body) : undefined,
       headers.Authorization === `Bearer ${TOKEN}`,
       new URLSearchParams(search)
     );
+    const held = holds.findIndex((h) => h.method === method && h.path === path);
+    if (held === -1) return response;
+    const [{ gate }] = holds.splice(held, 1);
+    return gate.then(() => response);
   });
 
   return {

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import * as chatService from '../services/chatService';
-import { usePolling } from './useChat';
+import { usePolling } from './usePolling';
 
 // The Groups list refreshes less often than an open chat
 export const CHATS_POLL_MS = 15000;

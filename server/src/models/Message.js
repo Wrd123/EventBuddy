@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { personSchema } = require('./Expense');
+const { clientIdIndex } = require('../idempotency');
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -10,13 +11,16 @@ const messageSchema = new mongoose.Schema(
   {
     event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
     sender: { type: personSchema, required: true },
-    text: { type: String, required: true, trim: true, maxlength: MAX_MESSAGE_LENGTH }
+    text: { type: String, required: true, trim: true, maxlength: MAX_MESSAGE_LENGTH },
+    // The app's own id for this send, so a retry can't post it twice
+    clientId: { type: String }
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
 // Chats page by _id (ObjectIds increase over time), newest first
 messageSchema.index({ event: 1, _id: -1 });
+clientIdIndex(messageSchema, { event: 1, 'sender.user': 1 });
 
 messageSchema.set('toJSON', {
   transform: (doc, ret) => {

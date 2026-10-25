@@ -60,5 +60,9 @@ module.exports = {
   // Nominatim allows one request per second; tests set this to 0
   nominatimIntervalMs: process.env.NOMINATIM_MIN_INTERVAL_MS === undefined
     ? 1100
-    : Number(process.env.NOMINATIM_MIN_INTERVAL_MS)
+    : Number(process.env.NOMINATIM_MIN_INTERVAL_MS),
+  // How long a place lookup may take in all, waiting in line included. Well
+  // under the app's 15 second request timeout, so people get an answer
+  // ("busy, try again") instead of a request that just times out.
+  lookupDeadlineMs: Number(process.env.LOOKUP_DEADLINE_MS) || 10000
 };

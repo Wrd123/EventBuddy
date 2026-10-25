@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, changeEvent, removeEvent, holdNext } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -103,5 +103,46 @@ describe('Schedule', () => {
     await waitFor(() => expect(screen.queryByText('Tame Impala')).not.toBeInTheDocument());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(activities()).toEqual(['Arctic Monkeys']);
+  });
+});
+
+describe('Schedule while friends change things', () => {
+  // What the screen's check every 15 seconds does, done now
+  const checkForChanges = () => fireEvent(document, new Event('visibilitychange'));
+
+  it('shows an item a friend added without a refresh', async () => {
+    await openSchedule();
+    changeEvent('1', (event) => {
+      event.schedule.push({
+        _id: 's9', date: '2027-04-15', startTime: '18:00', endTime: '19:00', activity: 'Sound Check', location: 'Tent', attendees: []
+      });
+    });
+
+    checkForChanges();
+
+    expect(await screen.findByText('Sound Check')).toBeInTheDocument();
+  });
+
+  it('says so when the event was deleted', async () => {
+    await openSchedule();
+    removeEvent('1');
+
+    checkForChanges();
+
+    expect(await screen.findByText('Event not found')).toBeInTheDocument();
+  });
+
+  it("doesn't let a slow check undo an item you just added", async () => {
+    await openSchedule();
+    const release = holdNext('GET', '/events/1');
+    checkForChanges(); // answered before the add, but held up
+
+    fireEvent.click(screen.getByRole('button', { name: /Add to/ }));
+    fillForm({ "What's happening": 'Sound Check', Starts: '18:00' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to schedule' }));
+    await screen.findByText('Sound Check');
+    await release();
+
+    expect(screen.getByText('Sound Check')).toBeInTheDocument();
   });
 });

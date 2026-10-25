@@ -1,37 +1,46 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import * as eventService from '../services/eventService';
+import { usePolling } from './usePolling';
+
+// An open event is checked this often for changes friends made
+export const EVENT_POLL_MS = 15000;
 
 // Look up an event by the id in the URL.
 // status: 'loading' | 'ready' | 'not-found' | 'error' (with an error message)
 //
-// Uses the already-loaded events list when it has the event (instant), and
-// otherwise fetches it, e.g. on a refresh or a link straight to /events/:id
-// before the list has loaded.
+// Shows the already-loaded copy straight away when there is one, then asks
+// the server for a fresh one on opening and every so often while the screen
+// is up, so a friend's new schedule item or a deleted event shows without
+// a refresh. The fresh copy goes into the shared events list (fetchEvent),
+// so every screen sees the same event.
 export const useEvent = (eventId) => {
-  const { events } = useAppContext();
+  const { events, fetchEvent } = useAppContext();
   const cached = events.find(event => event._id === eventId);
-  const [fetched, setFetched] = useState({ eventId: null, event: null, status: 'loading', error: '' });
+  const [checked, setChecked] = useState({ eventId: null, status: 'loading', error: '' });
+
+  const check = useCallback(async () => {
+    // null: overtaken by another read (on launch, the events list loads at
+    // the same time). Ask again rather than leave a link to a deleted event
+    // spinning until the next check.
+    for (let tries = 0; tries < 3; tries += 1) {
+      const result = await fetchEvent(eventId);
+      if (result) {
+        setChecked({ eventId, ...result });
+        return;
+      }
+    }
+  }, [eventId, fetchEvent]);
 
   useEffect(() => {
-    if (cached) return;
+    check();
+  }, [check]);
+  usePolling(check, EVENT_POLL_MS);
 
-    // Ignore a response that arrives after the id changed or the screen closed
-    let cancelled = false;
-    eventService.getEventById(eventId)
-      .then(event => !cancelled && setFetched({ eventId, event, status: 'ready', error: '' }))
-      .catch(err => {
-        if (cancelled) return;
-        // 404: no such event (or not yours). Anything else: offline, server down...
-        const status = err.status === 404 ? 'not-found' : 'error';
-        setFetched({ eventId, event: null, status, error: err.message });
-      });
-
-    return () => { cancelled = true; };
-  }, [eventId, cached]);
-
-  if (cached) return { event: cached, status: 'ready', error: '' };
   // A result for a previous id doesn't count
-  if (fetched.eventId !== eventId) return { event: null, status: 'loading', error: '' };
-  return fetched;
+  const latest = checked.eventId === eventId ? checked : null;
+  if (latest?.status === 'not-found') return { event: null, status: 'not-found', error: latest.error };
+  // Offline with a copy in hand: keep showing it
+  if (cached) return { event: cached, status: 'ready', error: '' };
+  if (latest?.status === 'error') return { event: null, status: 'error', error: latest.error };
+  return { event: null, status: 'loading', error: '' };
 };

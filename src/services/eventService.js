@@ -88,7 +88,7 @@ export const updateExpense = async (eventId, expenseId, expense) =>
 export const deleteExpense = (eventId, expenseId) =>
   apiRequest(expensePath(eventId, expenseId), { method: 'DELETE' });
 
-// payment: { from, to, amountCents, date }
+// payment: { clientId, from, to, amountCents, date }. Retries reuse the clientId.
 export const recordPayment = async (eventId, payment) =>
   (await apiRequest(paymentPath(eventId), { method: 'POST', body: payment })).payment;
 

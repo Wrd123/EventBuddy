@@ -1,40 +1,52 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Copy, Pencil, Plus, X } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import Header from '../common/Header';
 import { Button, ScreenLoader } from '../common';
 import NotFound from './NotFound';
 import ExpenseForm from './ExpenseForm';
-import { useEvent } from '../../hooks/useEvent';
+import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
+import { usePolling } from '../../hooks/usePolling';
 import { useAppContext } from '../../context/AppContext';
 import * as eventService from '../../services/eventService';
 import { computeBalances, settleUp } from '../../utils/ledger';
 import { formatCents, parseDollars, centsToInput } from '../../utils/money';
 import { formatDay, todayISO } from '../../utils/dates';
 import { payOptions } from '../../utils/payLinks';
+import { newClientId, mightHaveSaved } from '../../utils/clientId';
+import { createFreshness } from '../../utils/freshness';
 
 // The event's expenses and payments, reloaded after every change so the
-// balances are always computed from what the server has. Also members'
-// payment handles, as { userId: { venmo, cashapp, paypal, zelle } }.
+// balances are always computed from what the server has, and every so often
+// so friends' expenses and payments show up too. Also members' payment
+// handles, as { userId: { venmo, cashapp, paypal, zelle } }.
 const useLedger = (eventId) => {
   const [ledger, setLedger] = useState({ status: 'loading', expenses: [], payments: [], handles: {}, error: '' });
+  // Every change here is followed by a reload, so a reload that started
+  // earlier and lands later is the only stale case (see utils/freshness.js)
+  const [freshness] = useState(createFreshness);
 
   const reload = useCallback(async () => {
+    const read = freshness.start();
     try {
       const [{ expenses, payments }, handleList] = await Promise.all([
         eventService.getLedger(eventId),
         eventService.getPaymentHandles(eventId)
       ]);
+      if (!freshness.accept(read)) return;
       const handles = Object.fromEntries(handleList.map(h => [h.user, h]));
       setLedger({ status: 'ready', expenses, payments, handles, error: '' });
     } catch (err) {
-      setLedger(prev => ({ ...prev, status: 'error', error: err.message }));
+      if (!freshness.accept(read)) return;
+      // A failed background check keeps the ledger on screen
+      setLedger(prev => (prev.status === 'ready' ? prev : { ...prev, status: 'error', error: err.message }));
     }
-  }, [eventId]);
+  }, [eventId, freshness]);
 
   useEffect(() => {
     reload();
   }, [reload]);
+  usePolling(reload, EVENT_POLL_MS);
 
   return { ...ledger, reload };
 };
@@ -230,10 +242,16 @@ const hasAnyHandle = (handles) =>
 const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) => {
   // Someone owes me, but I haven't said how to pay me
   const needsMyHandles = settlements.some(s => s.to.user === me) && !hasAnyHandle(myHandles);
+  const [notice, setNotice] = useState('');
+  const settledElsewhere = async (message) => {
+    setNotice(message);
+    await onRecorded();
+  };
 
   return (
     <section className="card p-4">
       <h3 className="font-medium mb-2">Settle up</h3>
+      {notice && <p className="text-sm text-muted mb-2" role="status">{notice}</p>}
       {settlements.length === 0 ? (
         <p className="text-sm text-muted">Everyone is settled up.</p>
       ) : (
@@ -246,6 +264,8 @@ const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) =>
               me={me}
               recipientHandles={handles[s.to.user]}
               onRecorded={onRecorded}
+              onSettledElsewhere={settledElsewhere}
+              onMarkPaid={() => setNotice('')}
             />
           ))}
         </ul>
@@ -260,7 +280,7 @@ const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) =>
   );
 };
 
-const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded }) => {
+const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded, onSettledElsewhere, onMarkPaid }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   // Set once a pay link is opened, to nudge recording the payment
@@ -269,14 +289,32 @@ const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded }) 
   const involvesMe = from.user === me || to.user === me;
   const iOwe = from.user === me;
 
+  // The last try that might have been saved without us hearing back. Tapping
+  // again resends it as is, with the same clientId, so the server saves it
+  // at most once. Anything else (a new amount, or the last try clearly
+  // worked or clearly failed) is a new payment with a new id.
+  const uncertain = useRef(null);
+
   const markPaid = async () => {
     setError('');
+    onMarkPaid();
     setIsSaving(true);
+    const last = uncertain.current;
+    const isRetry = last && last.from === from.user && last.to === to.user && last.amountCents === amountCents;
+    const attempt = isRetry ? last : { clientId: newClientId(), from: from.user, to: to.user, amountCents, date: todayISO() };
     try {
-      await eventService.recordPayment(event._id, { from: from.user, to: to.user, amountCents, date: todayISO() });
+      await eventService.recordPayment(event._id, attempt);
+      uncertain.current = null;
       await onRecorded();
     } catch (err) {
-      setError(err.message);
+      uncertain.current = mightHaveSaved(err) ? attempt : null;
+      // Someone else already recorded it: show where things stand now. The
+      // section says so, since this row may be gone once it reloads.
+      if (err.status === 409) await onSettledElsewhere(err.message);
+      else setError(err.message);
+    } finally {
+      // The row is keyed by who pays whom, so it can stay on screen with a
+      // new amount and needs its button back
       setIsSaving(false);
     }
   };

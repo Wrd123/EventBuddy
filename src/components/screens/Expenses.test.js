@@ -54,6 +54,59 @@ describe('Expenses', () => {
     expect(within(section('Payments')).getByText(/John Doe paid Alex/)).toHaveTextContent('John Doe paid Alex $150.00');
   });
 
+  it('explains when the payment was already recorded, and shows where things stand', async () => {
+    installFakeApi({ paymentOutcomes: [409] }).logIn();
+    await openExpenses();
+
+    fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+
+    expect(await within(section('Settle up')).findByRole('status'))
+      .toHaveTextContent("That's already settled. Balances have been updated.");
+    // It reloaded the ledger rather than leaving a stale "Mark paid" up
+    expect(global.fetch.mock.calls.filter(([url, opts = {}]) =>
+      url === '/api/events/1/expenses' && (opts.method || 'GET') === 'GET')).toHaveLength(2);
+
+    // Still owed here, so the next tap goes ahead and the old notice goes
+    fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+    expect(await screen.findByText('Everyone is settled up.')).toBeInTheDocument();
+    expect(within(section('Settle up')).queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('resends the same payment after a lost response, so it counts once', async () => {
+    installFakeApi({ paymentOutcomes: ['lost'] }).logIn();
+    await openExpenses();
+    const markPaid = () => fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+
+    markPaid();
+    await within(section('Settle up')).findByText(/Can't reach EventBuddy/);
+    markPaid();
+
+    expect(await screen.findByText('Everyone is settled up.')).toBeInTheDocument();
+    const sent = global.fetch.mock.calls
+      .filter(([url, opts = {}]) => url === '/api/events/1/payments' && opts.method === 'POST')
+      .map(([, opts]) => JSON.parse(opts.body));
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    expect(within(section('Payments')).getAllByText(/John Doe paid Alex/)).toHaveLength(1);
+  });
+
+  it('starts a new payment after one the server turned down', async () => {
+    installFakeApi({ paymentOutcomes: [400] }).logIn();
+    await openExpenses();
+    const markPaid = () => fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+
+    markPaid();
+    await within(section('Settle up')).findByText('Something went wrong. Please try again.');
+    // The button is usable again
+    markPaid();
+
+    expect(await screen.findByText('Everyone is settled up.')).toBeInTheDocument();
+    const ids = global.fetch.mock.calls
+      .filter(([url, opts = {}]) => url === '/api/events/1/payments' && opts.method === 'POST')
+      .map(([, opts]) => JSON.parse(opts.body).clientId);
+    expect(ids[1]).not.toBe(ids[0]);
+  });
+
   it('adds an expense split equally and updates balances', async () => {
     await openExpenses();
 

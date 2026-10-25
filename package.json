@@ -21,10 +21,11 @@
         "start": "react-scripts start",
         "server": "npm --prefix server run dev",
         "build": "react-scripts build",
-        "build:ios": "REACT_APP_API_URL=${EVENTBUDDY_API_URL:-http://localhost:4000/api} react-scripts build && cap sync ios",
+        "build:ios": "node scripts/native-env.js && cap sync ios",
         "ios": "npm run build:ios && cap open ios",
         "test": "react-scripts test",
         "test:server": "npm --prefix server test",
+        "test:scripts": "node --test scripts/*.test.js",
         "eject": "react-scripts eject"
     },
     "eslintConfig": {

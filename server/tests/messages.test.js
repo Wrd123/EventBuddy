@@ -79,6 +79,61 @@ describe('POST /api/events/:id/messages', () => {
   });
 });
 
+describe('sending with a clientId', () => {
+  const sendWithId = (auth, event, text, clientId) =>
+    api().post(messagesPath(event)).set('Authorization', auth).send({ text, clientId });
+
+  it('saves a retried send once and returns the saved message', async () => {
+    const { friend, event } = await setup();
+    const first = await sendWithId(friend.auth, event, 'On my way', 'send-1').expect(201);
+    // The response was lost, so the app sends it again with the same id
+    const again = await sendWithId(friend.auth, event, 'On my way', 'send-1').expect(200);
+
+    assert.equal(again.body.message._id, first.body.message._id);
+    assert.equal(await Message.countDocuments(), 1);
+  });
+
+  it('saves one message when a retry races the original', async () => {
+    const { friend, event } = await setup();
+    const results = await Promise.all([
+      sendWithId(friend.auth, event, 'On my way', 'send-1'),
+      sendWithId(friend.auth, event, 'On my way', 'send-1')
+    ]);
+
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 201]);
+    assert.equal(await Message.countDocuments(), 1);
+  });
+
+  it('still posts the same text twice when it is sent twice on purpose', async () => {
+    const { friend, event } = await setup();
+    await sendWithId(friend.auth, event, 'Ha!', 'send-1').expect(201);
+    await sendWithId(friend.auth, event, 'Ha!', 'send-2').expect(201);
+    assert.equal(await Message.countDocuments(), 2);
+  });
+
+  it("keeps people's ids apart", async () => {
+    const { organizer, friend, event } = await setup();
+    await sendWithId(organizer.auth, event, 'Hi', 'send-1').expect(201);
+    await sendWithId(friend.auth, event, 'Hi', 'send-1').expect(201);
+    assert.equal(await Message.countDocuments(), 2);
+  });
+
+  it('rejects an id reused for different text', async () => {
+    const { friend, event } = await setup();
+    await sendWithId(friend.auth, event, 'On my way', 'send-1').expect(201);
+    const res = await sendWithId(friend.auth, event, 'Running late', 'send-1').expect(409);
+    assert.equal(res.body.message, 'That request was already used for something else.');
+  });
+
+  it('rejects a clientId that is blank, too long or not a plain id', async () => {
+    const { friend, event } = await setup();
+    for (const clientId of ['', 'x'.repeat(65), 'has spaces', { $gt: '' }]) {
+      await sendWithId(friend.auth, event, 'Hi', clientId).expect(400);
+    }
+    assert.equal(await Message.countDocuments(), 0);
+  });
+});
+
 describe('GET /api/events/:id/messages', () => {
   it('lists messages oldest first', async () => {
     const { organizer, friend, event } = await setup();

@@ -4,6 +4,12 @@ import * as eventService from '../services/eventService';
 import { findDevicePlace, deviceHasLocation, NO_LOCATION_SUPPORT } from '../services/devicePlace';
 import { setUnauthorizedHandler } from '../services/api';
 import { SharingProvider, stopStoredShare } from './SharingContext';
+import { usePolling } from '../hooks/usePolling';
+import { createFreshness } from '../utils/freshness';
+
+// While the app is open, your events are checked this often for changes
+// friends made (a new schedule item, someone joining, an event deleted)
+export const EVENTS_POLL_MS = 30000;
 
 // Create context
 const AppContext = createContext();
@@ -48,11 +54,23 @@ export const AppProvider = ({ children }) => {
   // True after the user taps Log out (vs. a session that expired), so the
   // login guard doesn't send the next login back to the page they left
   const [loggedOutByUser, setLoggedOutByUser] = useState(false);
-  
+
+  // Events are read again and again to stay fresh. This keeps a slow read
+  // from undoing something newer (see utils/freshness.js).
+  const [freshness] = useState(createFreshness);
+  // Every change made here goes through this, so reads that started
+  // before it can't undo it
+  const changeEvents = useCallback((update) => {
+    freshness.changed();
+    setEvents(update);
+  }, [freshness]);
+
   // Drop the session locally (no navigation; the router's guards react to it).
   // Stable identity, since the effects below depend on it.
   const clearSession = useCallback(() => {
     authService.logout();
+    // Reads still on their way belong to the old session
+    freshness.changed();
     setCurrentUser(null);
     setIsAuthenticated(false);
     setEvents([]);
@@ -61,7 +79,7 @@ export const AppProvider = ({ children }) => {
     writeStoredPlace(null);
     setDeviceError('');
     locatedThisLaunch.current = false;
-  }, []);
+  }, [freshness]);
 
   const savePlace = useCallback((next) => {
     setPlace(next);
@@ -101,21 +119,66 @@ export const AppProvider = ({ children }) => {
     initAuth();
   }, [clearSession]);
   
+  // Reads your events and applies them if they're still current.
+  // -> true when applied (false: something newer won, so they were dropped)
+  const readEvents = useCallback(async () => {
+    const read = freshness.start();
+    const list = await eventService.getUserEvents();
+    if (!freshness.accept(read)) return false;
+    setEvents(list);
+    setEventsStatus('ready');
+    return true;
+  }, [freshness]);
+
   // Your events, loaded after login. eventsStatus lets Home tell "still
   // loading" and "couldn't load" apart from "no events yet".
   const loadEvents = useCallback(async () => {
     setEventsStatus('loading');
     try {
-      setEvents(await eventService.getUserEvents());
-      setEventsStatus('ready');
+      // A first load overtaken by a change is read again, so the screen
+      // doesn't wait on the next poll. If every try is overtaken, it stays
+      // loading and the next background refresh finishes it.
+      for (let tries = 0; tries < 3 && !(await readEvents()); tries += 1);
     } catch (error) {
       setEventsStatus('error');
     }
-  }, []);
+  }, [readEvents]);
 
   useEffect(() => {
     if (isAuthenticated) loadEvents();
   }, [isAuthenticated, loadEvents]);
+
+  // Background refreshes stay quiet: no loading state, and a failure just
+  // waits for the next one
+  const authenticatedRef = useRef(isAuthenticated);
+  authenticatedRef.current = isAuthenticated;
+  usePolling(() => {
+    if (authenticatedRef.current) readEvents().catch(() => {});
+  }, EVENTS_POLL_MS);
+
+  // One event, fresh from the server, for a screen showing it.
+  // -> { status: 'ready' | 'not-found' | 'error', error } or null when the
+  // answer was overtaken by something newer
+  const fetchEvent = useCallback(async (eventId) => {
+    const read = freshness.start();
+    try {
+      const event = await eventService.getEventById(eventId);
+      if (!freshness.accept(read)) return null;
+      setEvents(prev =>
+        prev.some(e => e._id === event._id) ? prev.map(e => (e._id === event._id ? event : e)) : [...prev, event]
+      );
+      return { status: 'ready', error: '' };
+    } catch (err) {
+      if (!freshness.accept(read)) return null;
+      // 404: deleted, or you're not in it anymore, so it leaves your list.
+      // Anything else (offline, server waking up) keeps what we have.
+      if (err.status === 404) {
+        setEvents(prev => prev.filter(e => e._id !== eventId));
+        return { status: 'not-found', error: err.message };
+      }
+      return { status: 'error', error: err.message };
+    }
+  }, [freshness]);
 
   // Home and Discover look for events around the phone, without asking
   // anyone to choose a place. Once per launch (or login) ask the phone where
@@ -140,6 +203,8 @@ export const AppProvider = ({ children }) => {
 
   // Authentication. Errors are thrown for the screen to show.
   const startSession = (response) => {
+    // Nothing read before this login belongs to it
+    freshness.changed();
     setCurrentUser(response.user);
     setIsAuthenticated(true);
     setLoggedOutByUser(false);
@@ -169,25 +234,25 @@ export const AppProvider = ({ children }) => {
   // Event changes; the caller decides where to go next
   const createNewEvent = async (eventData) => {
     const response = await eventService.createEvent(eventData);
-    setEvents(prev => [...prev, response.event]);
+    changeEvents(prev => [...prev, response.event]);
     return response;
   };
 
   const updateEventData = async (eventId, eventData) => {
     const response = await eventService.updateEvent(eventId, eventData);
-    setEvents(prev => prev.map(event => (event._id === eventId ? response.event : event)));
+    changeEvents(prev => prev.map(event => (event._id === eventId ? response.event : event)));
     return response;
   };
 
   const deleteEventData = async (eventId) => {
     await eventService.deleteEvent(eventId);
-    setEvents(prev => prev.filter(event => event._id !== eventId));
+    changeEvents(prev => prev.filter(event => event._id !== eventId));
   };
 
   // Replace an event in the list with a fresh copy from the server, or add it
   // if the list doesn't have it yet (e.g. it was opened from a link)
   const storeEvent = (updated) => {
-    setEvents(prev =>
+    changeEvents(prev =>
       prev.some(event => event._id === updated._id)
         ? prev.map(event => (event._id === updated._id ? updated : event))
         : [...prev, updated]
@@ -225,6 +290,7 @@ export const AppProvider = ({ children }) => {
     events,
     eventsStatus,
     reloadEvents: loadEvents,
+    fetchEvent,
     place,
     savePlace,
     locationError,

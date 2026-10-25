@@ -120,7 +120,8 @@ const searchNearby = async ({ lat, lng, radiusMiles, category, from, to }) => {
 
   let response;
   try {
-    response = await fetch(`${EVENTS_URL}?${params}`);
+    // A hung request gives up well inside the app's own 15 second timeout
+    response = await fetch(`${EVENTS_URL}?${params}`, { signal: AbortSignal.timeout(config.lookupDeadlineMs) });
   } catch {
     throw new HttpError(502, "Couldn't reach Ticketmaster. Try again in a moment.");
   }
@@ -133,7 +134,13 @@ const searchNearby = async ({ lat, lng, radiusMiles, category, from, to }) => {
     throw new HttpError(502, "Couldn't load local events right now.");
   }
 
-  const data = await response.json();
+  // The time limit covers reading the answer too
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new HttpError(502, "Couldn't reach Ticketmaster. Try again in a moment.");
+  }
   const events = (data._embedded?.events || [])
     .map(normalize)
     // Skip entries without a usable date (rare placeholder listings)
