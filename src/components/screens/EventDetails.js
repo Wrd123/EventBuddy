@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, MessageSquare, DollarSign, Map, Plus, ExternalLink, Pencil } from 'lucide-react';
+import { Calendar, MessageSquare, DollarSign, Map, MapPin, Plus, ExternalLink, Pencil } from 'lucide-react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
-import { Avatar, EventArt, ScreenLoader } from '../common';
+import { Avatar, EventCover, ScreenLoader } from '../common';
 import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
 import { useAppContext } from '../../context/AppContext';
@@ -65,15 +65,16 @@ const EventDetails = () => {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* The cover carries the event's name, so the header only has actions */}
+      {/* The photo runs under the header, which only has actions */}
       <Header
         type="screen"
         showBack
         showProfile={false}
+        overPhoto
         action={isOrganizer && (
           <Link
             to={`/events/${eventId}/edit`}
-            className="flex items-center rounded-full border border-line bg-surface px-3 py-1.5 text-sm font-semibold text-fg/90"
+            className="flex items-center rounded-full bg-black/45 backdrop-blur px-3 py-1.5 text-sm font-semibold text-white"
           >
             <Pencil size={14} className="mr-1.5 text-violet-soft" aria-hidden="true" />
             Edit
@@ -82,7 +83,7 @@ const EventDetails = () => {
       />
 
       <div className="flex-1 overflow-y-auto pb-16">
-        <EventCover event={event} />
+        <EventHero event={event} />
         {event.description && (
           <p className="px-4 pt-4 text-fg/90 whitespace-pre-wrap break-words">{event.description}</p>
         )}
@@ -116,15 +117,25 @@ const EventDetails = () => {
   );
 };
 
-const EventCover = ({ event }) => (
-  <div className="relative mx-4 h-52 rounded-card overflow-hidden border border-violet/40 shadow-glow-sm">
-    <EventArt type={event.type} seed={event._id} className="absolute inset-0 w-full h-full" />
-    <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-night/90 via-night/30 to-transparent" />
-    <div className="absolute bottom-3 left-4 right-4">
-      <h1 className="text-white text-2xl font-extrabold tracking-tight">{event.name}</h1>
-      <p className="text-white/90">{[formatDateRange(event.startDate, event.endDate), event.location].filter(Boolean).join(' • ')}</p>
+// Edge-to-edge photo that fades into the page, with the name and dates
+// underneath it rather than printed over it
+const EventHero = ({ event }) => (
+  <>
+    <div className="relative h-64">
+      <EventCover event={event} width={430} className="absolute inset-0 w-full h-full" />
+      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-night to-transparent" />
     </div>
-  </div>
+    <div className="px-4 -mt-2">
+      <h1 className="text-3xl font-extrabold tracking-tight break-words">{event.name}</h1>
+      <p className="font-semibold text-violet-soft">{formatDateRange(event.startDate, event.endDate)}</p>
+      {event.location && (
+        <p className="flex items-center text-muted">
+          <MapPin size={15} className="mr-1.5 shrink-0" aria-hidden="true" />
+          {event.location}
+        </p>
+      )}
+    </div>
+  </>
 );
 
 const EventActions = ({ eventId, unread, balance }) => {

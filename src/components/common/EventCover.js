@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
 import EventArt from './EventArt';
+import { coverPhotoFor, coverPhotoUrl } from '../../utils/coverPhotos';
 
-// An event's cover: its Ticketmaster artwork when there is some, otherwise
-// (or if the picture fails to load) EventBuddy's illustrated cover. The
-// picture is cropped to fill whatever box className gives it. Decorative,
-// since the event's name is always shown beside it.
-const EventCover = ({ imageUrl, type, seed, className = '' }) => {
-  // Remembers which URL failed, so a new imageUrl gets its own chance
-  const [failedUrl, setFailedUrl] = useState(null);
+// An event's cover photo: its Ticketmaster artwork when it has some,
+// otherwise its turn in its type's photos (see coverPhotos.js). If the
+// photo can't load, say offline, EventBuddy's illustrated cover stands in.
+// width is the photo's rendered width in CSS pixels, so small thumbnails
+// don't download big photos. The picture is cropped to fill whatever box
+// className gives it, and is decorative since the name is always beside it.
+const EventCover = ({ event, width = 400, className = '' }) => {
+  const src = event.imageUrl || coverPhotoUrl(coverPhotoFor(event), width);
+  // Remembers which URL failed, so a new one gets its own chance
+  const [failedSrc, setFailedSrc] = useState(null);
 
-  if (!imageUrl || failedUrl === imageUrl) {
-    return <EventArt type={type} seed={seed} className={className} />;
+  if (failedSrc === src) {
+    return <EventArt type={event.type} seed={event._id} className={className} />;
   }
   return (
     <img
-      src={imageUrl}
+      src={src}
       alt=""
       loading="lazy"
       decoding="async"
-      onError={() => setFailedUrl(imageUrl)}
+      onError={() => setFailedSrc(src)}
       className={`${className} object-cover bg-raised`}
     />
   );

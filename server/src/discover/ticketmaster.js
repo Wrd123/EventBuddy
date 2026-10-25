@@ -26,7 +26,7 @@ const eventType = (event) => {
 };
 
 // Ticketmaster's artwork for an event -> the one URL to use as its cover, or
-// '' to show EventBuddy's illustrated cover instead.
+// '' to show one of EventBuddy's stock photos for its type instead.
 //
 // images: about ten sizes of the same picture, e.g.
 //   { ratio: '16_9', url: 'https://s1.ticketm.net/...jpg', width: 1024, height: 576, fallback: false }
@@ -34,12 +34,12 @@ const eventType = (event) => {
 // photo for the category (a crowd, a stadium), not this event's own artwork.
 //
 // The same URL fills every cover: the event sheet (full phone width, about
-// 390 x 144 points), Home's suggestion cards (144 x 128) and Discover's list
+// 390 x 144 points), Home's suggestion cards (160 x 128) and Discover's list
 // thumbnails (80 x 80). Phones draw 2-3 pixels per point, and each cover crops
 // the picture to fill its box.
 //
 // Order of choice: the event's own artwork, then Ticketmaster's generic
-// artwork, then (by returning '') the illustrated cover. Within that, a
+// artwork, then (by returning '') a stock photo. Within that, a
 // picture sharp enough for the event sheet, the widest shape, then the
 // smallest file that's still sharp (or the largest, if none are).
 const COVER_WIDTH = 1024; // about 390 points x 2.6 pixels per point
@@ -95,12 +95,14 @@ const normalize = (event) => {
 // "2026-10-23T18:04:00Z": Ticketmaster rejects milliseconds
 const nowForApi = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-const searchNearby = async ({ lat, lng, radiusMiles, category }) => {
+// from/to (optional, "YYYY-MM-DD"): only events starting on those days, in
+// the venue's own time zone. Otherwise everything from now on.
+const searchNearby = async ({ lat, lng, radiusMiles, category, from, to }) => {
   if (!config.ticketmasterApiKey) {
     throw new HttpError(503, "Local events aren't set up yet. Add a Ticketmaster API key on the server.");
   }
 
-  const key = `${lat},${lng},${radiusMiles},${category}`;
+  const key = `${lat},${lng},${radiusMiles},${category},${from || ''},${to || ''}`;
   const cached = cache.get(key);
   if (cached) return cached;
 
@@ -109,10 +111,11 @@ const searchNearby = async ({ lat, lng, radiusMiles, category }) => {
     geoPoint: encodeGeohash(lat, lng),
     radius: String(radiusMiles),
     unit: 'miles',
-    startDateTime: nowForApi(),
     sort: 'date,asc',
     size: '40'
   });
+  if (from) params.set('localStartDateTime', `${from}T00:00:00,${to}T23:59:59`);
+  else params.set('startDateTime', nowForApi());
   if (SEGMENTS[category]) params.set('segmentName', SEGMENTS[category]);
 
   let response;

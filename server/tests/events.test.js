@@ -216,6 +216,49 @@ describe('PATCH /api/events/:id', () => {
   });
 });
 
+describe('cover photos', () => {
+  const coverOf = async (auth, overrides) => (await createEvent(auth, overrides).expect(201)).body.event.coverIndex;
+
+  it("gives each of an organizer's events of a type the next photo, starting over after 10", async () => {
+    const { auth } = await registerUser();
+    const covers = [];
+    for (let i = 0; i < 11; i++) covers.push(await coverOf(auth, { type: 'concert' }));
+    assert.deepEqual(covers, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+  });
+
+  it('counts each type and each organizer separately', async () => {
+    const me = await registerUser();
+    const friend = await registerUser();
+    await coverOf(me.auth, { type: 'concert' });
+    await coverOf(me.auth, { type: 'concert' });
+
+    assert.equal(await coverOf(me.auth, { type: 'sports' }), 0);
+    assert.equal(await coverOf(friend.auth, { type: 'concert' }), 0);
+    assert.equal(await coverOf(me.auth, { type: 'concert' }), 2);
+  });
+
+  it("can't be chosen in the request", async () => {
+    const { auth } = await registerUser();
+    const { body } = await createEvent(auth, { coverIndex: 7 }).expect(201);
+    assert.equal(body.event.coverIndex, 0);
+
+    const res = await api().patch(`/api/events/${body.event._id}`).set('Authorization', auth).send({ coverIndex: 7 }).expect(200);
+    assert.equal(res.body.event.coverIndex, 0);
+  });
+
+  it('takes the next photo of the new type when the type changes', async () => {
+    const { auth } = await registerUser();
+    await coverOf(auth, { type: 'sports' });
+    const { body } = await createEvent(auth, { type: 'concert' }).expect(201);
+
+    const res = await api().patch(`/api/events/${body.event._id}`).set('Authorization', auth).send({ type: 'sports' }).expect(200);
+    assert.equal(res.body.event.coverIndex, 1);
+    // Other edits leave it alone
+    const renamed = await api().patch(`/api/events/${body.event._id}`).set('Authorization', auth).send({ name: 'Game night' }).expect(200);
+    assert.equal(renamed.body.event.coverIndex, 1);
+  });
+});
+
 describe('DELETE /api/events/:id', () => {
   it('lets the organizer delete the event', async () => {
     const { auth } = await registerUser();

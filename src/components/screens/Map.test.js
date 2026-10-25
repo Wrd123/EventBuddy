@@ -5,6 +5,7 @@ import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
+import { eventDays } from './Map';
 
 // Leaflet can't draw in jsdom, so the map is replaced by its pins as buttons.
 // Its center (where a new meetup point goes) is always MAP_CENTER.
@@ -108,13 +109,23 @@ describe('Map', () => {
     expect(screen.getByText('1 upcoming event of yours')).toBeInTheDocument();
   });
 
-  it('starts on an event when opened from it', async () => {
+  it('opened from an event, helps plan it before it starts', async () => {
     renderAt('/events/1');
-
     fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+    await settle();
 
-    expect(await pin('Your event: Summer Music Festival')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Open event' })).toBeInTheDocument();
+    expect(await screen.findByText(/Location sharing opens Thu, Apr 15/)).toBeInTheDocument();
+    expect(await pin('Your event: Summer Music Festival')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Get directions' }))
+      .toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=Indio%2C%20CA');
+    // What else is on near the festival during it, not near you today
+    const searches = global.fetch.mock.calls.map(([url]) => url).filter(url => url.startsWith('/api/discover/events'));
+    expect(searches.at(-1)).toMatch(/from=2027-04-15&to=2027-04-18/);
+    expect(await screen.findByText('3 other events nearby during the event, at 2 venues')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Summer Music Festival' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Summer Music Festival' })).toBeInTheDocument();
+    await settle();
   });
 });
 
@@ -144,7 +155,9 @@ const bodyOf = ([, options]) => JSON.parse(options.body);
 
 // A phone that reports one position as soon as it's watched
 const mockWatchPosition = (impl) => {
-  const geolocation = { watchPosition: jest.fn(impl), clearWatch: jest.fn() };
+  // getCurrentPosition never answers, like a location prompt left open, so
+  // only the sharing under test moves
+  const geolocation = { watchPosition: jest.fn(impl), clearWatch: jest.fn(), getCurrentPosition: jest.fn() };
   Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
   return geolocation;
 };
@@ -161,8 +174,49 @@ describe('Map during an event', () => {
     expect(screen.getByRole('button', { name: 'Meetup: By the lake' })).toBeInTheDocument();
     const bar = screen.getByRole('region', { name: 'Live at Picnic in the Park' });
     expect(bar).toHaveTextContent('1 friend is sharing their location.');
+    // From the Map tab, it says whose friends these are
+    expect(within(screen.getByRole('group', { name: 'Show on map' })).getByRole('button', { name: 'Friends at Picnic in the Park' }))
+      .toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it("opened from an event that hasn't started, shows nobody, even with another event on now", async () => {
+    renderAt('/events/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+    await settle();
+
+    expect(await pin('Your event: Summer Music Festival')).toBeInTheDocument();
+    expect(await screen.findByText(/Location sharing opens/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Friend:/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Meetup:/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Your event: Picnic in the Park' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Friends/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /^Live at/ })).not.toBeInTheDocument();
+    await settle();
+  });
+
+  it('opened from the event that is on, shows its friends', async () => {
+    renderAt('/events/5');
+    fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+
+    expect(await pin('Friend: Alex')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Live at Picnic in the Park' })).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Show on map' })).getByRole('button', { name: 'Friends' }))
       .toHaveAttribute('aria-pressed', 'true');
+    await settle();
+  });
+
+  it('plans a meetup point before the event starts', async () => {
+    renderAt('/events/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Plan meetup' }));
+    fireEvent.change(screen.getByLabelText('Meetup note'), { target: { value: 'North gate' } });
+    fireEvent.change(screen.getByLabelText('Meetup time'), { target: { value: '10:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save meetup' }));
+
+    expect(await pin('Meetup: North gate')).toBeInTheDocument();
+    expect(bodyOf(requests('PUT', '/api/events/1/live/meetup')[0])).toEqual({ ...MAP_CENTER, note: 'North gate', time: '10:00' });
+    await settle();
   });
 
   it("shows when a friend last updated, with directions to them", async () => {
@@ -275,7 +329,7 @@ describe('Map during an event', () => {
     renderAt('/map');
     await pin('Friend: Alex');
 
-    fireEvent.click(within(screen.getByRole('group', { name: 'Show on map' })).getByRole('button', { name: 'Friends' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Show on map' })).getByRole('button', { name: 'Friends at Picnic in the Park' }));
 
     expect(screen.queryByRole('button', { name: 'Friend: Alex' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Meetup:/ })).not.toBeInTheDocument();
@@ -290,7 +344,7 @@ describe('Map with no event happening', () => {
     await pin('Your event: Summer Music Festival');
 
     expect(screen.queryByRole('region', { name: /^Live at/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Friends' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Friends/ })).not.toBeInTheDocument();
     expect(requests('GET', '/api/events/1/live')).toHaveLength(0);
   });
 });
@@ -372,5 +426,25 @@ describe('Sharing across the app', () => {
     expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(1);
     expect(geolocation.clearWatch).toHaveBeenCalledWith(3);
     expect(storedShare()).toBeNull();
+  });
+});
+
+describe('eventDays', () => {
+  const TODAY = '2026-10-25';
+
+  it("covers an event that hasn't started, from its first day to its last", () => {
+    expect(eventDays({ startDate: '2026-11-13', endDate: '2026-11-15' }, TODAY)).toEqual({ from: '2026-11-13', to: '2026-11-15' });
+  });
+
+  it('starts from today once the event is on', () => {
+    expect(eventDays({ startDate: '2026-10-24', endDate: '2026-10-26' }, TODAY)).toEqual({ from: TODAY, to: '2026-10-26' });
+  });
+
+  it('stops at 31 days, the longest search', () => {
+    expect(eventDays({ startDate: '2026-11-01', endDate: '2027-01-31' }, TODAY)).toEqual({ from: '2026-11-01', to: '2026-12-02' });
+  });
+
+  it('is nothing once the event is over', () => {
+    expect(eventDays({ startDate: '2026-08-08', endDate: '2026-08-08' }, TODAY)).toBeNull();
   });
 });

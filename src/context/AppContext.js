@@ -1,6 +1,7 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import * as authService from '../services/authService';
 import * as eventService from '../services/eventService';
+import { findDevicePlace, deviceHasLocation, NO_LOCATION_SUPPORT } from '../services/devicePlace';
 import { setUnauthorizedHandler } from '../services/api';
 import { SharingProvider, stopStoredShare } from './SharingContext';
 
@@ -36,6 +37,13 @@ export const AppProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [events, setEvents] = useState([]);
   const [place, setPlace] = useState(readStoredPlace);
+  // Why the phone's location isn't available, or '' (see the effect below).
+  // Without location support at all, there's nothing to ask.
+  const [deviceError, setDeviceError] = useState('');
+  const locationError = deviceHasLocation() ? deviceError : NO_LOCATION_SUPPORT;
+  const locatedThisLaunch = useRef(false);
+  const placeRef = useRef(place);
+  placeRef.current = place;
   const [eventsStatus, setEventsStatus] = useState('loading');
   // True after the user taps Log out (vs. a session that expired), so the
   // login guard doesn't send the next login back to the page they left
@@ -51,6 +59,8 @@ export const AppProvider = ({ children }) => {
     // Someone else may use this device next
     setPlace(null);
     writeStoredPlace(null);
+    setDeviceError('');
+    locatedThisLaunch.current = false;
   }, []);
 
   const savePlace = useCallback((next) => {
@@ -106,6 +116,27 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (isAuthenticated) loadEvents();
   }, [isAuthenticated, loadEvents]);
+
+  // Home and Discover look for events around the phone, without asking
+  // anyone to choose a place. Once per launch (or login) ask the phone where
+  // it is, so suggestions follow people when they travel. A city they typed
+  // stays until they pick their location again. If the phone can't say
+  // (permission denied, no signal), the last place stays; with none, the
+  // screens explain why and offer a city search.
+  useEffect(() => {
+    if (!isAuthenticated || locatedThisLaunch.current || placeRef.current?.source === 'search') return;
+    if (!deviceHasLocation()) return;
+    locatedThisLaunch.current = true;
+    findDevicePlace().then(
+      (found) => {
+        // Not if they logged out, or typed a city, while the phone was answering
+        if (!locatedThisLaunch.current || placeRef.current?.source === 'search') return;
+        savePlace(found);
+        setDeviceError('');
+      },
+      (err) => setDeviceError(err.message)
+    );
+  }, [isAuthenticated, savePlace]);
 
   // Authentication. Errors are thrown for the screen to show.
   const startSession = (response) => {
@@ -196,6 +227,7 @@ export const AppProvider = ({ children }) => {
     reloadEvents: loadEvents,
     place,
     savePlace,
+    locationError,
     login,
     loginDemo,
     register,

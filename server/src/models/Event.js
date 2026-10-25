@@ -41,6 +41,9 @@ const scheduleItemSchema = new mongoose.Schema({
 // as 12 URL-safe characters: far too many to guess or enumerate.
 const newInviteCode = () => crypto.randomBytes(9).toString('base64url');
 
+// Each event type has this many cover photos, used in turn
+const COVER_PHOTOS_PER_TYPE = 10;
+
 const eventSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 60 },
@@ -53,6 +56,10 @@ const eventSchema = new mongoose.Schema(
     endDate: { type: String, required: true, match: ISO_DATE },
     location: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true, maxlength: 500 },
+    // Which of its type's cover photos the event shows, 0-9 (the photos are
+    // listed in the app, src/utils/coverPhotos.js). Set by the server: see
+    // nextCoverIndex in routes/events.js.
+    coverIndex: { type: Number, default: 0, min: 0, max: COVER_PHOTOS_PER_TYPE - 1 },
     // Where to buy tickets, for events planned from Discover
     ticketUrl: { type: String, default: '', trim: true, maxlength: 500 },
     members: [memberSchema],
@@ -114,3 +121,4 @@ module.exports = mongoose.model('Event', eventSchema);
 module.exports.ISO_DATE = ISO_DATE;
 module.exports.TIME = TIME;
 module.exports.newInviteCode = newInviteCode;
+module.exports.COVER_PHOTOS_PER_TYPE = COVER_PHOTOS_PER_TYPE;

@@ -27,7 +27,7 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Allow this so friends at your event can still find you with your phone locked. Sharing stops when you end it or the time you chose runs out.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>EventBuddy shows your friends where you are during an event, only while you choose to share.</string>
+	<string>EventBuddy uses your location to find concerts, games and shows near you, and to show friends where you are during an event while you choose to share.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

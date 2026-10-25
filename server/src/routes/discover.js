@@ -14,6 +14,21 @@ const RADII = [10, 25, 50, 100];
 const CATEGORIES = ['all', ...Object.keys(ticketmaster.SEGMENTS)];
 
 const round = (n) => Math.round(n * 100) / 100;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+// Long enough for any trip, short enough to stay a "what's on then" search
+const MAX_RANGE_DAYS = 31;
+
+// Optional ?from&to ("YYYY-MM-DD", days at the venue): only events starting
+// in that range, e.g. during a trip. {} when not given, or throws a 400.
+const dayRange = ({ from, to }) => {
+  if (from === undefined && to === undefined) return {};
+  const days = (Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000);
+  if (!ISO_DAY.test(from || '') || !ISO_DAY.test(to || '') || !(days >= 0)) {
+    throw new HttpError(400, 'Choose a valid range of days.');
+  }
+  if (days > MAX_RANGE_DAYS) throw new HttpError(400, `Choose ${MAX_RANGE_DAYS} days or fewer.`);
+  return { from, to };
+};
 
 // { lat, lng } rounded, or throws a 400
 const coordinates = (query) => {
@@ -46,7 +61,7 @@ router.get('/events', async (req, res) => {
   const category = req.query.category || 'all';
   if (!CATEGORIES.includes(category)) throw new HttpError(400, 'Unknown category.');
 
-  const events = await ticketmaster.searchNearby({ lat, lng, radiusMiles, category });
+  const events = await ticketmaster.searchNearby({ lat, lng, radiusMiles, category, ...dayRange(req.query) });
   // Ticketmaster's terms expect credit where their data is shown
   res.json({ events, attribution: 'Ticketmaster' });
 });

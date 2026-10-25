@@ -22,7 +22,8 @@ export const Wordmark = () => (
 // Screen header on the night background. Top-level tabs show your avatar; inner screens show a back arrow instead, and can put an
 // action (like Edit) on the right. A screen whose content starts with its
 // own big title can leave title out. subtitle (inner screens) names what
-// the screen belongs to, like the event.
+// the screen belongs to, like the event. overPhoto floats the header over
+// a full-width photo, with the back arrow on a dark circle so it stays visible.
 const Header = ({
   title,
   subtitle = '',
@@ -30,7 +31,8 @@ const Header = ({
   showBack = false,
   showProfile = true,
   backTo = '/',
-  action = null
+  action = null,
+  overPhoto = false
 }) => {
   const { currentUser } = useAppContext();
   const navigate = useNavigate();
@@ -42,11 +44,17 @@ const Header = ({
   };
 
   return (
-    <header className="relative z-10 px-4 pt-4 pb-3 text-fg">
+    <header className={`${overPhoto ? 'absolute inset-x-0 top-0' : 'relative'} z-10 px-4 pt-4 pb-3 text-fg`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center min-w-0">
           {showBack && (
-            <button onClick={handleBack} className="mr-2 -ml-1 p-1 rounded-full text-muted hover:text-fg" aria-label="Back">
+            <button
+              onClick={handleBack}
+              className={overPhoto
+                ? 'mr-2 p-2 rounded-full bg-black/45 backdrop-blur text-white'
+                : 'mr-2 -ml-1 p-1 rounded-full text-muted hover:text-fg'}
+              aria-label="Back"
+            >
               <ArrowLeft size={22} />
             </button>
           )}

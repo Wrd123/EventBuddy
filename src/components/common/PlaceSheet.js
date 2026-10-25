@@ -1,23 +1,13 @@
-import React, { useState } from 'react';
-import { MapPin, Navigation, X } from 'lucide-react';
+import React from 'react';
+import { Navigation, X } from 'lucide-react';
 import Button from './Button';
+import CitySearch from './CitySearch';
 import { usePlace } from '../../hooks/usePlace';
 
 // Bottom sheet for choosing where to look for events: the phone's location
 // or a typed city / ZIP code. The parent must be position: relative.
 const PlaceSheet = ({ onClose }) => {
-  const { place, busy, error, locateDevice, searchPlace } = usePlace();
-  const [text, setText] = useState('');
-
-  const finish = (ok) => {
-    if (ok) onClose();
-  };
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (text.trim().length < 2) return;
-    finish(await searchPlace(text));
-  };
+  const { place, busy, error, locateDevice } = usePlace();
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-labelledby="place-title">
@@ -37,7 +27,7 @@ const PlaceSheet = ({ onClose }) => {
           <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-3 py-2 rounded-xl mb-3 text-sm" role="alert">{error}</div>
         )}
 
-        <Button onClick={async () => finish(await locateDevice())} fullWidth size="lg" disabled={busy} icon={<Navigation size={18} />}>
+        <Button onClick={async () => { if (await locateDevice()) onClose(); }} fullWidth size="lg" disabled={busy} icon={<Navigation size={18} />}>
           {busy ? 'Finding you...' : 'Use my current location'}
         </Button>
 
@@ -47,19 +37,7 @@ const PlaceSheet = ({ onClose }) => {
           <span className="flex-1 h-px bg-line" />
         </div>
 
-        <form onSubmit={handleSearch} className="flex space-x-2">
-          <div className="relative flex-1">
-            <MapPin size={18} className="absolute left-3 top-3 text-faint" aria-hidden="true" />
-            <input
-              aria-label="City or ZIP code"
-              className="field pl-9"
-              placeholder="City or ZIP code"
-              value={text}
-              onChange={e => setText(e.target.value)}
-            />
-          </div>
-          <Button type="submit" variant="secondary" disabled={busy || text.trim().length < 2}>Search</Button>
-        </form>
+        <CitySearch onFound={onClose} />
       </div>
     </div>
   );

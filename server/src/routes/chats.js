@@ -17,7 +17,7 @@ router.use(requireAuth);
 router.get('/', async (req, res) => {
   const me = req.user._id;
   const events = await Event.find(visibleTo(req.user))
-    .select('name type startDate endDate members')
+    .select('name type coverIndex startDate endDate members')
     .lean();
   if (events.length === 0) return res.json({ chats: [] });
   const ids = events.map((e) => e._id);
@@ -52,6 +52,7 @@ router.get('/', async (req, res) => {
       eventId: event._id,
       name: event.name,
       type: event.type,
+      coverIndex: event.coverIndex,
       startDate: event.startDate,
       endDate: event.endDate,
       memberCount: event.members.length,

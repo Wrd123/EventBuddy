@@ -38,6 +38,14 @@ const isHappening = (event, now = new Date()) => {
   return event.startDate <= utcDay(1) && event.endDate >= utcDay(-1);
 };
 
+// A meetup point is about today, so it lasts 12 hours. One planned before
+// the event starts lasts through the event's first day instead. That day
+// ends last in UTC-12, at noon UTC the next day.
+const meetupExpiry = (event, now) => {
+  const firstDayEnds = new Date(`${event.startDate}T12:00:00Z`).getTime() + DAY_MS;
+  return new Date(Math.max(now.getTime() + MEETUP_LIFETIME_MS, firstDayEnds));
+};
+
 const isCoordinate = (value, limit) => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit;
 
 // ~1 m: enough to find someone in a crowd
@@ -134,7 +142,8 @@ router.put('/position', positionLimiter, async (req, res) => {
   res.status(204).end();
 });
 
-// Body: { lat, lng, note?, time? ("HH:MM") }. Any member; replaces the last.
+// Body: { lat, lng, note?, time? ("HH:MM") }. Any member, before or during
+// the event; replaces the last.
 router.put('/meetup', async (req, res) => {
   const event = await findVisibleEvent(req.params.id, req.user);
   const { lat, lng } = req.body;
@@ -153,7 +162,7 @@ router.put('/meetup', async (req, res) => {
     time,
     setBy: { user: req.user._id, name: member?.name || req.user.name },
     setAt: now,
-    expiresAt: new Date(now.getTime() + MEETUP_LIFETIME_MS)
+    expiresAt: meetupExpiry(event, now)
   };
   await event.save();
   res.json({ meetup: currentMeetup(event) });

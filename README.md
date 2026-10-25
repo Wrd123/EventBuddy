@@ -15,8 +15,8 @@ Built end to end by me: React front end, Express and MongoDB API, and a native i
 - **Plan together.** Single or multi-day events, a shared schedule with who's going to what, and invite links that let friends join in one tap.
 - **Talk in one place.** Every event has its own group chat, with unread counts on the Groups tab and new messages arriving while it's open.
 - **Split costs.** Add expenses split equally or by exact amounts. EventBuddy works out balances and the fewest payments to settle up, then opens Venmo, Cash App or PayPal with the amount filled in.
-- **Find each other.** During an event, friends can share their location for an hour, a few hours or until midnight. The map shows where everyone is, how recently they updated, and a meetup point anyone can set. In the iPhone app, sharing keeps working with the screen locked.
-- **Discover things to do.** Concerts, games and shows near you (Ticketmaster), each one a tap away from becoming a plan with friends.
+- **Find each other.** During an event, friends can share their location for an hour, a few hours or until midnight. The map shows where everyone is, how recently they updated, and a meetup point anyone can set. In the iPhone app, sharing keeps working with the screen locked. Before the trip, an event's map helps plan it instead: directions, a meetup point for the first day, and what else is on nearby during those dates.
+- **Discover things to do.** Concerts, games and shows near you (Ticketmaster), found from your phone's location without setting anything up, each one a tap away from becoming a plan with friends.
 
 ## Run it locally
 
@@ -78,7 +78,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet |
 | iPhone | Capacitor 7, background geolocation, native HTTP |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
-| Testing | Jest and Testing Library (231 tests), Node's test runner with Supertest and an in-memory MongoDB (250 tests) |
+| Testing | Jest and Testing Library (244 tests), Node's test runner with Supertest and an in-memory MongoDB (259 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
@@ -86,10 +86,11 @@ flowchart LR
 - **Money is stored in whole cents.** Dollars in floating point drift (0.1 + 0.2 isn't 0.3), and an equal split of $100 between three people has to add up to exactly $100. Settling up uses a greedy match of the largest debtor with the largest creditor, which keeps the number of payments small.
 - **Chat pages by message id, not timestamp.** MongoDB ids increase over time, so "everything after this id" never skips or repeats a message, even when two arrive in the same second. The app polls every 4 seconds only while it's on screen.
 - **Read receipts are deliberately absent.** How far you've read is stored apart from the event's member list, which every member receives, so unread counts work without telling the group what you've read.
-- **Location sharing is built to forget.** It's opt-in per event, lasts at most 24 hours and only while the event is on. The server keeps only your latest position, and a MongoDB TTL index deletes it when sharing ends; reads also filter on the end time, since TTL cleanup runs about once a minute.
+- **Location sharing is built to forget.** It's opt-in per event, lasts at most 24 hours and only while the event is on. The server keeps only your latest position, and a MongoDB TTL index deletes it when sharing ends; reads also filter on the end time, since TTL cleanup runs about once a minute. A map opened from an event only ever shows that event's members, and only while it's on.
 - **Background location is one small seam.** A single tracker module uses the native background plugin in the app and the browser's geolocation on the web, and app-wide sharing state keeps it running on every screen, through a relaunch, and stops it on logout.
 - **Third-party APIs stay behind the server.** API keys never ship to the phone, results are cached (30 minutes for events, a day for places), OpenStreetMap's one-request-per-second rule is enforced with a queue, and user coordinates are rounded to about 1 km before they leave the phone for Discover.
 - **The map updates pins in place.** Friends' positions refresh every 10 seconds; markers are matched by id and moved rather than redrawn, so labels don't flicker. Debugging the first version turned up that Leaflet silently ignores a new view while a zoom animation is running, so automatic fits are instant.
+- **Cover photos without photo storage or choosing.** Each event type has 10 hand-picked free [Unsplash](https://unsplash.com) photos, served by Unsplash's image CDN at the size each screen draws them. Nobody picks one: each organizer's events of a type take the photos in turn (your first concert gets concert photo 1, your second photo 2), so a list of plans never repeats a picture until the 11th. The server assigns the number and the app owns the photo list, so there's nothing to upload, store or pay for. If a photo can't load, an illustrated cover drawn in SVG stands in.
 - **Demo mode instead of production infrastructure.** For a showcase, an in-memory database is cheaper and safer than a real one: no stored personal data and nothing to clean up.
 - **Every demo visitor gets a private world.** Tapping **Try the demo** creates a fresh copy of John, his friends, their events, chat and costs, so nothing one visitor adds shows up for the next. Every id in a world is derived from a random tag carried in the login token, so when the free server sleeps and wakes with an empty database, a saved login rebuilds the same world. Worlds expire after a day and at most 300 are kept, which bounds memory no matter how often someone taps the button. The picnic is placed on the visitor's own date, so it's happening "today" in any time zone.
 
@@ -135,3 +136,5 @@ EventBuddy/
 ## License
 
 [MIT](LICENSE)
+
+Event cover photos are from [Unsplash](https://unsplash.com) and used under the [Unsplash License](https://unsplash.com/license).

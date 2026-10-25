@@ -54,6 +54,10 @@ export const untilText = (until) =>
   `until ${new Date(until).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 
 // A link that opens directions in the phone's maps app (Google Maps on the
-// web and Android; iPhones offer to open it in Apple or Google Maps)
-export const directionsUrl = ({ lat, lng }) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+// web and Android; iPhones offer to open it in Apple or Google Maps). to is
+// a point { lat, lng }, or an address like "Piedmont Park, Atlanta, GA",
+// which finds a venue better than its pin, a city-level guess at times.
+export const directionsUrl = (to) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${
+    typeof to === 'string' ? encodeURIComponent(to) : `${to.lat},${to.lng}`
+  }`;

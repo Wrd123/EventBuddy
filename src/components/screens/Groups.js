@@ -3,7 +3,7 @@ import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../common/Header';
 import Footer from '../layout/Footer';
-import { Button, EventArt, ScreenLoader } from '../common';
+import { Button, EventCover, ScreenLoader } from '../common';
 import { useChats } from '../../hooks/useChats';
 import { useAppContext } from '../../context/AppContext';
 import { getEventStatus } from '../../utils/dates';
@@ -88,7 +88,7 @@ const ChatRow = ({ chat }) => {
         aria-label={label}
       >
         <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 mr-3">
-          <EventArt type={chat.type} seed={chat.eventId} className="w-full h-full" />
+          <EventCover event={{ _id: chat.eventId, type: chat.type, coverIndex: chat.coverIndex }} width={48} className="w-full h-full" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between">

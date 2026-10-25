@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, settle } from '../../testUtils/fakeApi';
@@ -19,7 +19,8 @@ const renderAt = (path) =>
 
 const ARCTIC_MONKEYS_ART = 'https://s1.ticketm.net/dam/a/123/arctic-monkeys_16_9.jpg';
 
-// EventArt's drawing, as opposed to icons like the row's chevron
+// EventArt's drawing (shown when a photo can't load), as opposed to icons
+// like the row's chevron
 const illustratedCover = (el) => el.querySelector('svg[viewBox="0 0 400 240"]');
 
 const rememberPlace =(place = ATLANTA) => localStorage.setItem('eventbuddy_place', JSON.stringify(place));
@@ -42,13 +43,35 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+// Tests that mock the phone's location mustn't leak it into the next test
+afterEach(() => {
+  delete navigator.geolocation;
+});
+
 describe('Discover without a location yet', () => {
   beforeEach(() => installFakeApi().logIn());
 
-  it('asks where to look, then shows events near a typed ZIP code', async () => {
+  it("finds the phone's location on its own, sending only rounded coordinates", async () => {
+    let answer;
+    mockGeolocation((success) => { answer = success; });
     renderAt('/discover');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Choose a location' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Finding events near you...');
+    await act(async () => answer({ coords: { latitude: 33.748992, longitude: -84.387985 } }));
+
+    expect(await screen.findByText('Near Atlanta, GA')).toBeInTheDocument();
+    expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalledTimes(1);
+    const urls = global.fetch.mock.calls.map(([url]) => url).filter(url => url.startsWith('/api/discover/'));
+    expect(urls.every(url => !url.includes('33.748992') && !url.includes('84.387985'))).toBe(true);
+    expect(urls[0]).toContain('lat=33.75&lng=-84.39');
+    expect(JSON.parse(localStorage.getItem('eventbuddy_place'))).toMatchObject({ label: 'Atlanta, GA', source: 'device' });
+  });
+
+  it('explains when location is turned off, and searches a typed ZIP code instead', async () => {
+    mockGeolocation((success, failure) => failure({ code: 1 }));
+    renderAt('/discover');
+
+    expect(await screen.findByText('Location is turned off for EventBuddy. Enter a city or ZIP code instead.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('City or ZIP code'), { target: { value: '30030' } });
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
@@ -58,36 +81,48 @@ describe('Discover without a location yet', () => {
   });
 
   it('explains a place it cannot find', async () => {
+    // No navigator.geolocation here, like a browser without location
     renderAt('/discover');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Choose a location' }));
+    expect(await screen.findByText("This device can't share its location. Enter a city or ZIP code instead.")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('City or ZIP code'), { target: { value: 'Nowheresville' } });
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Couldn\'t find "Nowheresville". Try a city name or ZIP code.');
   });
+});
 
-  it("uses the phone's location, sending only rounded coordinates", async () => {
+describe('Discover after a previous visit', () => {
+  beforeEach(() => installFakeApi().logIn());
+
+  it('keeps a typed city instead of asking the phone', async () => {
+    rememberPlace();
+    mockGeolocation(jest.fn());
+    renderAt('/discover');
+
+    expect(await screen.findByText('Near Atlanta, GA')).toBeInTheDocument();
+    expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+    await settle();
+  });
+
+  it("updates the phone's location when the app opens, since people travel", async () => {
+    rememberPlace({ label: 'Decatur, GA', lat: 33.77, lng: -84.3, source: 'device' });
     mockGeolocation((success) => success({ coords: { latitude: 33.748992, longitude: -84.387985 } }));
     renderAt('/discover');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Choose a location' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
-
     expect(await screen.findByText('Near Atlanta, GA')).toBeInTheDocument();
-    const urls = global.fetch.mock.calls.map(([url]) => url).filter(url => url.startsWith('/api/discover/'));
-    expect(urls.every(url => !url.includes('33.748992') && !url.includes('84.387985'))).toBe(true);
-    expect(urls[0]).toContain('lat=33.75&lng=-84.39');
+    await settle();
   });
 
-  it('explains when location access is turned off', async () => {
-    mockGeolocation((success, failure) => failure({ code: 1 }));
+  it('keeps the last place when the phone has no answer this time', async () => {
+    rememberPlace({ label: 'Decatur, GA', lat: 33.77, lng: -84.3, source: 'device' });
+    mockGeolocation((success, failure) => failure({ code: 2 }));
     renderAt('/discover');
+    // Let the phone's "no answer" arrive
+    await settle();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Choose a location' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Location is turned off for EventBuddy. Enter a city or ZIP code instead.');
+    expect(await screen.findByText('Near Decatur, GA')).toBeInTheDocument();
+    expect(screen.queryByLabelText('City or ZIP code')).not.toBeInTheDocument();
   });
 });
 
@@ -106,7 +141,7 @@ describe('Discover with a location', () => {
     expect(screen.getByText('Event data from Ticketmaster')).toBeInTheDocument();
   });
 
-  it("shows Ticketmaster artwork, or an illustrated cover when there isn't any", async () => {
+  it("shows Ticketmaster artwork, or a stock photo for the type when there isn't any", async () => {
     renderAt('/discover');
 
     const withArt = (await screen.findByText('Arctic Monkeys')).closest('button');
@@ -114,8 +149,8 @@ describe('Discover with a location', () => {
     expect(illustratedCover(withArt)).toBeNull();
 
     const withoutArt = screen.getByText('Hamilton').closest('button');
-    expect(withoutArt.querySelector('img')).toBeNull();
-    expect(illustratedCover(withoutArt)).not.toBeNull();
+    expect(withoutArt.querySelector('img').getAttribute('src')).toMatch(/^https:\/\/images\.unsplash\.com\/photo-/);
+    expect(illustratedCover(withoutArt)).toBeNull();
 
     fireEvent.click(withArt);
     expect(screen.getByRole('dialog', { name: 'Arctic Monkeys' }).querySelector('img')).toHaveAttribute('src', ARCTIC_MONKEYS_ART);

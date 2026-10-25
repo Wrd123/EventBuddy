@@ -6,8 +6,8 @@ import { usePlace } from '../../hooks/usePlace';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
 import Header from '../common/Header';
 import Footer from '../layout/Footer';
-import { AvatarStack, EventArt, EventCard, LocalEventSheet, PlaceSheet, SuggestedEventCard } from '../common';
-import { todayISO, getEventStatus, parseISODate } from '../../utils/dates';
+import { AvatarStack, EventCard, EventCover, LocalEventSheet, PlaceSheet, SuggestedEventCard } from '../common';
+import { todayISO, getEventStatus, formatDateRange } from '../../utils/dates';
 
 const byStartDate = (a, b) => a.startDate.localeCompare(b.startDate);
 
@@ -20,7 +20,7 @@ const Home = () => {
   const { events, eventsStatus, reloadEvents, currentUser } = useAppContext();
   const navigate = useNavigate();
   const openEvent = (event) => navigate(`/events/${event._id}`);
-  const { place } = usePlace();
+  const { place, locationError } = usePlace();
   const nearby = useNearbyEvents(place);
   const [choosingPlace, setChoosingPlace] = useState(false);
   const [openSuggestion, setOpenSuggestion] = useState(null);
@@ -72,6 +72,7 @@ const Home = () => {
 
         <Suggestions
           place={place}
+          locating={!place && !locationError}
           nearby={nearby}
           onChoosePlace={() => setChoosingPlace(true)}
           onOpen={setOpenSuggestion}
@@ -135,8 +136,10 @@ const PlaceBar = ({ place, onChange }) => (
   </button>
 );
 
-// Real events near you, a tap away from planning with friends
-const Suggestions = ({ place, nearby, onChoosePlace, onOpen }) => {
+// Real events near you, a tap away from planning with friends. While the
+// phone's location is on its way they show as loading; if it can't be had,
+// a card offers to choose a place instead.
+const Suggestions = ({ place, locating, nearby, onChoosePlace, onOpen }) => {
   // Errors and empty areas are explained on Discover; Home just stays quiet
   if (place && (nearby.status === 'error' || (nearby.status === 'ready' && nearby.events.length === 0))) return null;
 
@@ -150,7 +153,7 @@ const Suggestions = ({ place, nearby, onChoosePlace, onOpen }) => {
           </Link>
         )}
       </div>
-      {!place ? (
+      {!place && !locating ? (
         <button onClick={onChoosePlace} className="card w-full p-4 text-left">
           <span className="font-semibold block">Find concerts, games and shows near you</span>
           <span className="flex items-center text-sm text-violet-soft mt-0.5">
@@ -158,9 +161,9 @@ const Suggestions = ({ place, nearby, onChoosePlace, onOpen }) => {
             Choose a location
           </span>
         </button>
-      ) : nearby.status === 'loading' ? (
-        <div className="flex space-x-3" aria-label="Loading suggestions">
-          {[0, 1, 2].map(i => <div key={i} className="w-36 h-32 rounded-2xl bg-surface border border-line animate-pulse shrink-0" />)}
+      ) : !place || nearby.status === 'loading' ? (
+        <div className="flex space-x-3 overflow-hidden" aria-label="Loading suggestions">
+          {[0, 1, 2].map(i => <div key={i} className="w-40 h-32 rounded-2xl bg-surface border border-line animate-pulse shrink-0" />)}
         </div>
       ) : (
         <div className="flex overflow-x-auto no-scrollbar space-x-3 -mx-4 px-4 pb-1">
@@ -196,64 +199,41 @@ const Backdrop = () => (
   </div>
 );
 
-// Calendar-style badge: NOV / 13 / – 15
-const DateBadge = ({ startDate, endDate }) => {
-  const start = parseISODate(startDate);
-  const end = parseISODate(endDate);
-  const month = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(start).toUpperCase();
-  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
-
-  return (
-    <div className="bg-white/95 text-night rounded-xl px-3 py-1.5 text-center shadow-lg min-w-[3.5rem]">
-      <div className="text-xs font-bold text-violet-deep">{month}</div>
-      <div className="text-2xl font-extrabold leading-none">{start.getDate()}</div>
-      {startDate !== endDate && (
-        <div className="text-xs font-bold text-violet-deep">
-          – {sameMonth ? end.getDate() : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(end)}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// The soonest upcoming (or happening) event, as a large cover card
+// The soonest upcoming (or happening) event: a big photo with the details
+// underneath, so the name reads cleanly whatever the picture
 const NextUpCard = ({ event, status, onOpen }) => (
   <button
     onClick={onOpen}
-    className="relative block w-full h-60 rounded-card overflow-hidden border border-violet/40 text-left shadow-glow-sm mb-2"
+    className="card block w-full overflow-hidden text-left shadow-glow-sm mb-2"
     aria-label={`Open ${event.name}`}
   >
-    <EventArt type={event.type} seed={event._id} className="absolute inset-0 w-full h-full" />
-    <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-night/90 via-night/30 to-transparent" />
-
-    <div className="absolute top-3 left-3">
-      <DateBadge startDate={event.startDate} endDate={event.endDate} />
+    <div className="relative h-48">
+      <EventCover event={event} width={360} className="absolute inset-0 w-full h-full" />
+      <span
+        className={`absolute top-3 left-3 flex items-center text-sm font-semibold px-3 py-1 rounded-full text-white ${
+          status === 'ongoing' ? 'bg-emerald-500/90' : 'bg-violet/90 shadow-glow-sm'
+        }`}
+      >
+        <Zap size={14} className="mr-1" aria-hidden="true" />
+        {status === 'ongoing' ? 'Happening now' : 'Next up'}
+      </span>
     </div>
-    <span
-      className={`absolute top-3 right-3 flex items-center text-sm font-semibold px-3 py-1 rounded-full text-white ${
-        status === 'ongoing' ? 'bg-emerald-500/90' : 'bg-violet/90 shadow-glow-sm'
-      }`}
-    >
-      <Zap size={14} className="mr-1" aria-hidden="true" />
-      {status === 'ongoing' ? 'Happening now' : 'Next up'}
-    </span>
 
-    <div className="absolute bottom-3 left-4 right-4">
-      <div className="text-3xl font-extrabold tracking-tight text-white truncate">{event.name}</div>
+    <div className="p-4">
+      <div className="text-2xl font-extrabold tracking-tight truncate">{event.name}</div>
+      <div className="font-semibold text-violet-soft">{formatDateRange(event.startDate, event.endDate)}</div>
       {event.location && (
-        <div className="flex items-center text-white/90 mt-0.5 mb-2">
-          <MapPin size={16} className="mr-1.5 shrink-0" aria-hidden="true" />
+        <div className="flex items-center text-muted">
+          <MapPin size={15} className="mr-1.5 shrink-0" aria-hidden="true" />
           <span className="truncate">{event.location}</span>
         </div>
       )}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center bg-black/35 backdrop-blur rounded-full pl-1 pr-3 py-1">
+      <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center">
           <AvatarStack members={event.members} size="md" />
-          <span className="ml-2 text-sm text-white">{event.members.length} attending</span>
+          <span className="ml-2 text-sm text-muted">{event.members.length} attending</span>
         </div>
-        <span className="w-10 h-10 rounded-full border border-violet-soft/60 bg-night/40 flex items-center justify-center text-white">
-          <ChevronRight size={20} aria-hidden="true" />
-        </span>
+        <ChevronRight size={22} className="text-muted" aria-hidden="true" />
       </div>
     </div>
   </button>

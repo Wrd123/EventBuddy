@@ -110,6 +110,17 @@ describe('GET /api/discover/events', () => {
     assert.match(searchParams.get('startDateTime'), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   });
 
+  it('can look only at events starting on certain days, like during a trip', async () => {
+    await getEvents({ lat: 33.75, lng: -84.39, from: '2099-04-15', to: '2099-04-18' });
+    const { searchParams } = tmCalls()[0].url;
+    assert.equal(searchParams.get('localStartDateTime'), '2099-04-15T00:00:00,2099-04-18T23:59:59');
+    assert.equal(searchParams.has('startDateTime'), false);
+
+    // A different range is a different search, not a cached one
+    await getEvents({ lat: 33.75, lng: -84.39, from: '2099-04-16', to: '2099-04-18' });
+    assert.equal(tmCalls().length, 2);
+  });
+
   it("doesn't filter by segment for all categories", async () => {
     await getEvents({ lat: 33.749, lng: -84.388 }, undefined, 200);
     assert.equal(tmCalls()[0].url.searchParams.has('segmentName'), false);
@@ -172,7 +183,10 @@ describe('GET /api/discover/events', () => {
     ['a missing location', {}, 'Please share a valid location.'],
     ['an impossible latitude', { lat: 95, lng: 10 }, 'Please share a valid location.'],
     ['an unsupported radius', { lat: 33.7, lng: -84.4, radius: 7 }, 'Radius must be one of 10, 25, 50, 100 miles.'],
-    ['an unknown category', { lat: 33.7, lng: -84.4, category: 'food' }, 'Unknown category.']
+    ['an unknown category', { lat: 33.7, lng: -84.4, category: 'food' }, 'Unknown category.'],
+    ['half a range of days', { lat: 33.7, lng: -84.4, from: '2099-04-15' }, 'Choose a valid range of days.'],
+    ['a range that ends before it starts', { lat: 33.7, lng: -84.4, from: '2099-04-15', to: '2099-04-14' }, 'Choose a valid range of days.'],
+    ['a range over a month', { lat: 33.7, lng: -84.4, from: '2099-04-01', to: '2099-05-15' }, 'Choose 31 days or fewer.']
   ];
   for (const [label, query, message] of invalid) {
     it(`rejects ${label}`, async () => {

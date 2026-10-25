@@ -52,6 +52,7 @@ describe('GET /api/map/events', () => {
       _id: event._id,
       name: 'Coachella',
       type: 'music-festival',
+      coverIndex: 0,
       startDate: '2099-11-25',
       endDate: '2099-11-27',
       location: 'Indio, CA',

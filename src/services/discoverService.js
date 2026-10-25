@@ -22,9 +22,9 @@ export const findPlace = async (text) => {
 };
 
 // -> [{ _id, name, type, startDate, endDate, startTime, venue, location, distanceMiles, ticketUrl }]
-export const getNearbyEvents = async ({ lat, lng, radius = 25, category = 'all' }) => {
-  const { events } = await apiRequest(
-    `/discover/events?${query({ lat: roundCoordinate(lat), lng: roundCoordinate(lng), radius, category })}`
-  );
+// from/to (optional, "YYYY-MM-DD"): only events starting on those days
+export const getNearbyEvents = async ({ lat, lng, radius = 25, category = 'all', from, to }) => {
+  const params = { lat: roundCoordinate(lat), lng: roundCoordinate(lng), radius, category, ...(from && { from, to }) };
+  const { events } = await apiRequest(`/discover/events?${query(params)}`);
   return events;
 };

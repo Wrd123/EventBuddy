@@ -281,6 +281,7 @@ const chatList = () => {
       eventId: event._id,
       name: event.name,
       type: event.type || 'music-festival',
+      coverIndex: event.coverIndex ?? 0,
       startDate: event.startDate,
       endDate: event.endDate,
       memberCount: event.members.length,

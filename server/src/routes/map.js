@@ -16,10 +16,10 @@ router.use(requireAuth);
 
 const isCurrent = (event) => event.geo && event.geo.for === event.location;
 
-// -> { events: [{ _id, name, type, startDate, endDate, location, lat, lng }] }
+// -> { events: [{ _id, name, type, coverIndex, startDate, endDate, location, lat, lng }] }
 // lat/lng are null for events with no location, or one that couldn't be found
 router.get('/events', async (req, res) => {
-  const events = await Event.find(visibleTo(req.user)).select('name type startDate endDate location geo');
+  const events = await Event.find(visibleTo(req.user)).select('name type coverIndex startDate endDate location geo');
 
   const stale = events.filter((e) => e.location && !isCurrent(e)).slice(0, MAX_LOOKUPS_PER_REQUEST);
   for (const event of stale) {
@@ -38,6 +38,7 @@ router.get('/events', async (req, res) => {
       _id: e._id,
       name: e.name,
       type: e.type,
+      coverIndex: e.coverIndex,
       startDate: e.startDate,
       endDate: e.endDate,
       location: e.location,

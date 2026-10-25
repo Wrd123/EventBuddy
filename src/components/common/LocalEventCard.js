@@ -7,7 +7,7 @@ import { whenText, whereText } from './LocalEventSheet';
 const LocalEventCard = ({ event, onOpen }) => (
   <button onClick={onOpen} className="card w-full p-3 flex items-center text-left">
     <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 mr-3">
-      <EventCover imageUrl={event.imageUrl} type={event.type} seed={event._id} className="w-full h-full" />
+      <EventCover event={event} width={80} className="w-full h-full" />
     </div>
     <div className="flex-1 min-w-0">
       <div className="font-semibold line-clamp-2">{event.name}</div>

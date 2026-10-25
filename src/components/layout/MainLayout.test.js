@@ -37,6 +37,7 @@ describe('routing', () => {
     renderAt('/events/1');
 
     expect(await screenTitle('Summer Music Festival')).toBeInTheDocument();
+    await settle();
   });
 
   it('opens a sub-screen straight from its URL', async () => {
@@ -44,6 +45,7 @@ describe('routing', () => {
     renderAt('/events/1/schedule');
 
     expect(await screen.findByText('Arctic Monkeys')).toBeInTheDocument();
+    await settle();
   });
 
   it('shows Event not found for an unknown event id', async () => {
@@ -89,6 +91,7 @@ describe('routing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screenTitle('Hiking Trip')).toBeInTheDocument();
+    await settle();
   });
 
   it("shows the server's message for a wrong password", async () => {
@@ -117,6 +120,7 @@ describe('routing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screen.findByRole('heading', { name: /Hey John/ })).toBeInTheDocument();
+    await settle();
   });
 
   it('logs out when the server rejects a saved login', async () => {

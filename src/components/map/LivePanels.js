@@ -4,7 +4,7 @@ import { Button } from '../common';
 import { agoText, directionsUrl, shareDurations, untilText } from '../../utils/live';
 import { tracksInBackground } from '../../services/locationTracker';
 
-const DirectionsLink = ({ to }) => (
+export const DirectionsLink = ({ to }) => (
   <a
     href={directionsUrl(to)}
     target="_blank"

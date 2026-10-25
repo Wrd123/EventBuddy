@@ -55,7 +55,7 @@ const LocalEventSheet = ({ event, onClose }) => {
     <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-labelledby="local-event-title">
       <div className="bg-surface border-t border-line rounded-t-3xl overflow-hidden">
         <div className="relative h-36">
-          <EventCover imageUrl={event.imageUrl} type={event.type} seed={event._id} className="absolute inset-0 w-full h-full" />
+          <EventCover event={event} className="absolute inset-0 w-full h-full" />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/20 to-transparent" />
           <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full bg-night/60 text-white" aria-label="Close">
             <X size={18} />

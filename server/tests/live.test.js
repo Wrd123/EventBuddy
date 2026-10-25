@@ -203,6 +203,15 @@ describe('the meetup point', () => {
     assert.equal((await getLive(friend.auth, event)).meetup, null);
   });
 
+  it('can be planned before the event, and lasts through its first day', async () => {
+    const { friend, event } = await setup({ startDate: '2099-06-10', endDate: '2099-06-12' });
+    await setMeetup(friend.auth, event, { lat: 33.78, lng: -84.37, note: 'North gate', time: '10:00' });
+
+    assert.equal((await getLive(friend.auth, event)).meetup.note, 'North gate');
+    const stored = await Event.findById(event._id);
+    assert.equal(stored.meetup.expiresAt.toISOString(), '2099-06-11T12:00:00.000Z');
+  });
+
   it('stays out of ordinary event responses', async () => {
     const { friend, event } = await setup();
     await setMeetup(friend.auth, event, { lat: 33.78, lng: -84.37 });

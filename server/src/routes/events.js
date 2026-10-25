@@ -1,7 +1,7 @@
 const express = require('express');
 const Event = require('../models/Event');
 const User = require('../models/User');
-const { newInviteCode } = require('../models/Event');
+const { newInviteCode, COVER_PHOTOS_PER_TYPE } = require('../models/Event');
 const { ORGANIZER_COLOR } = require('../colors');
 const { requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
@@ -51,15 +51,27 @@ router.post('/', async (req, res) => {
 
   // The creator comes from the login token and starts as the only member;
   // everyone else joins through the invite link
-  const event = await Event.create({
+  const event = new Event({
     ...fields,
     createdBy: req.user._id,
     members: [{ user: req.user._id, name: req.user.name, color: ORGANIZER_COLOR }],
     schedule: []
   });
+  await event.validate();
+  event.coverIndex = await nextCoverIndex(event);
+  await event.save();
 
   res.status(201).json({ event });
 });
+
+// Each organizer's events of a type take that type's cover photos in turn:
+// their 1st concert gets photo 1, their 2nd photo 2, and the 11th starts
+// over. Counting the events they have now keeps this to one query; after a
+// delete, a photo can come around again sooner.
+const nextCoverIndex = async (event) => {
+  const earlier = await Event.countDocuments({ createdBy: event.createdBy, type: event.type, _id: { $ne: event._id } });
+  return earlier % COVER_PHOTOS_PER_TYPE;
+};
 
 const EDITABLE_FIELDS = ['name', 'type', 'startDate', 'endDate', 'location', 'description', 'ticketUrl'];
 
@@ -98,6 +110,9 @@ router.patch('/:id', async (req, res) => {
         : `${outside} schedule items are on days outside the new dates. Move or delete them first.`);
     }
   }
+
+  // A festival photo shouldn't stay on what's now a ballgame
+  if (event.isModified('type')) event.coverIndex = await nextCoverIndex(event);
 
   await event.save();
   res.json({ event });
