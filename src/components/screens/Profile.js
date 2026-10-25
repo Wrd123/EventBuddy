@@ -19,7 +19,7 @@ const Profile = () => {
 
       <div className="p-4 flex-1 flex flex-col overflow-y-auto">
         <div className="card p-6 flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full bg-violet text-white text-2xl font-semibold flex items-center justify-center mb-3">
+          <div className="w-20 h-20 rounded-full bg-accent text-night text-2xl font-semibold flex items-center justify-center mb-3">
             {getInitials(currentUser?.name) || '?'}
           </div>
           <div className="text-lg font-semibold">{currentUser?.name}</div>
@@ -86,7 +86,7 @@ const GetPaid = ({ handles = {} }) => {
       {FIELDS.map(({ key, label, prefix, placeholder }) => (
         <div key={key} className="mb-3">
           <label htmlFor={`handle-${key}`} className="block text-sm font-medium text-fg/80 mb-1">{label}</label>
-          <div className="flex items-center border border-line rounded-xl bg-raised overflow-hidden focus-within:border-violet">
+          <div className="flex items-center border border-line rounded-xl bg-raised overflow-hidden focus-within:border-accent">
             {prefix && <span className="pl-2 text-faint text-sm select-none">{prefix}</span>}
             <input
               id={`handle-${key}`}

@@ -284,7 +284,7 @@ const EventTypeSelector = ({ selectedType, onSelect }) => (
             type="button"
             aria-pressed={isSelected}
             className={`border p-2 rounded-xl flex items-center justify-center ${
-              isSelected ? 'border-violet bg-violet/10 text-violet-soft' : 'border-line text-fg/80'
+              isSelected ? 'border-accent bg-accent/10 text-accent-soft' : 'border-line text-fg/80'
             }`}
             onClick={() => onSelect(id)}
           >
@@ -305,7 +305,7 @@ const DateFields = ({ isMultiDay, startDate, endDate, earliest, onChange }) => (
     <label className="flex items-center mb-2 text-sm text-fg/80">
       <input
         type="checkbox"
-        className="mr-2 h-4 w-4 accent-violet"
+        className="mr-2 h-4 w-4 accent-accent"
         checked={isMultiDay}
         onChange={(e) => onChange('isMultiDay', e.target.checked)}
       />

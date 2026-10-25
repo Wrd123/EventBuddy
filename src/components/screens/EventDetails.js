@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, MessageSquare, DollarSign, Map, MapPin, Plus, ExternalLink, Pencil } from 'lucide-react';
+import { CalendarDays, MessageCircle, Wallet, Map, MapPin, Plus, ExternalLink, Pencil } from 'lucide-react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
-import { Avatar, EventCover, ScreenLoader } from '../common';
+import { Avatar, EventCover, PhotoBackdrop, ScreenLoader } from '../common';
 import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
 import { useAppContext } from '../../context/AppContext';
 import { useEvent } from '../../hooks/useEvent';
-import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay } from '../../utils/dates';
+import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay, daysUntil } from '../../utils/dates';
 import { formatTimeRange, sortSchedule } from '../../utils/schedule';
 import { computeBalances } from '../../utils/ledger';
 import { formatCents } from '../../utils/money';
@@ -65,6 +65,7 @@ const EventDetails = () => {
 
   return (
     <div className="flex flex-col h-full relative">
+      <PhotoBackdrop event={event} />
       {/* The photo runs under the header, which only has actions */}
       <Header
         type="screen"
@@ -74,18 +75,18 @@ const EventDetails = () => {
         action={isOrganizer && (
           <Link
             to={`/events/${eventId}/edit`}
-            className="flex items-center rounded-full bg-black/45 backdrop-blur px-3 py-1.5 text-sm font-semibold text-white"
+            className="glass flex items-center h-10 rounded-full px-4 text-sm font-semibold text-fg transition-transform active:scale-95"
           >
-            <Pencil size={14} className="mr-1.5 text-violet-soft" aria-hidden="true" />
+            <Pencil size={14} className="mr-1.5" aria-hidden="true" />
             Edit
           </Link>
         )}
       />
 
-      <div className="flex-1 overflow-y-auto pb-16">
+      <div className="relative flex-1 overflow-y-auto pb-16">
         <EventHero event={event} />
         {event.description && (
-          <p className="px-4 pt-4 text-fg/90 whitespace-pre-wrap break-words">{event.description}</p>
+          <p className="px-5 pt-4 text-fg/85 leading-relaxed whitespace-pre-wrap break-words">{event.description}</p>
         )}
         <EventActions
           eventId={eventId}
@@ -98,7 +99,7 @@ const EventDetails = () => {
             href={event.ticketUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mx-4 mt-3 flex items-center justify-center py-2.5 rounded-xl border border-violet/50 text-violet-soft font-semibold"
+            className="card mx-4 mt-3 flex items-center justify-center h-12 rounded-full text-fg font-semibold transition-transform active:scale-[0.98]"
           >
             Get tickets <ExternalLink size={16} className="ml-2" aria-hidden="true" />
           </a>
@@ -117,45 +118,60 @@ const EventDetails = () => {
   );
 };
 
-// Edge-to-edge photo that fades into the page, with the name and dates
-// underneath it rather than printed over it
-const EventHero = ({ event }) => (
-  <>
-    <div className="relative h-64">
-      <EventCover event={event} width={430} className="absolute inset-0 w-full h-full" />
-      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-night to-transparent" />
-    </div>
-    <div className="px-4 -mt-2">
-      <h1 className="text-3xl font-extrabold tracking-tight break-words">{event.name}</h1>
-      <p className="font-semibold text-violet-soft">{formatDateRange(event.startDate, event.endDate)}</p>
-      {event.location && (
-        <p className="flex items-center text-muted">
-          <MapPin size={15} className="mr-1.5 shrink-0" aria-hidden="true" />
-          {event.location}
-        </p>
-      )}
-    </div>
-  </>
-);
+// Where the event stands, for the pill over the photo
+const statusText = (event) => {
+  const status = getEventStatus(event);
+  if (status === 'ongoing') return 'Happening now';
+  if (status === 'past') return `Ended ${formatDay(event.endDate)}`;
+  const days = daysUntil(event.startDate);
+  return days === 1 ? 'Starts tomorrow' : `${days} days to go`;
+};
+
+// The photo edge to edge, fading into its own blurred glow, with the name
+// and dates set on the page below it rather than printed over it
+const EventHero = ({ event }) => {
+  const live = getEventStatus(event) === 'ongoing';
+  return (
+    <>
+      <div className="relative h-[340px] [mask-image:linear-gradient(to_bottom,#000_55%,transparent)]">
+        <EventCover event={event} width={430} className="absolute inset-0 w-full h-full" />
+      </div>
+      <div className="relative px-5 -mt-24 flex flex-col gap-1.5">
+        <span className="glass self-start flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold">
+          {live && <span className="w-2 h-2 rounded-full bg-go shadow-[0_0_10px_#4ade80]" aria-hidden="true" />}
+          {statusText(event)}
+        </span>
+        <h1 className="mt-1 text-[34px] leading-[1.04] font-bold tracking-[-0.035em] break-words">{event.name}</h1>
+        <p className="font-semibold text-accent-soft">{formatDateRange(event.startDate, event.endDate)}</p>
+        {event.location && (
+          <p className="flex items-center text-fg/75">
+            <MapPin size={15} className="mr-1.5 shrink-0" aria-hidden="true" />
+            {event.location}
+          </p>
+        )}
+      </div>
+    </>
+  );
+};
 
 const EventActions = ({ eventId, unread, balance }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="grid grid-cols-4 gap-2 px-4 pt-4">
+    <div className="grid grid-cols-4 gap-2.5 px-4 pt-5">
       <ActionButton
-        Icon={Calendar}
+        Icon={CalendarDays}
         label="Schedule"
         onClick={() => navigate(`/events/${eventId}/schedule`)}
       />
       <ActionButton
-        Icon={MessageSquare}
+        Icon={MessageCircle}
         label="Chat"
         badge={unread}
         onClick={() => navigate(`/events/${eventId}/chat`)}
       />
       <ActionButton
-        Icon={DollarSign}
+        Icon={Wallet}
         label="Expenses"
         hint={balance}
         onClick={() => navigate(`/events/${eventId}/expenses`)}
@@ -169,18 +185,19 @@ const EventActions = ({ eventId, unread, balance }) => {
   );
 };
 
-// badge: an unread count on the icon. hint: a short status under the label.
+// A glass tile. badge: an unread count on its corner. hint: a short status
+// under the label, like what you owe.
 const ActionButton = ({ Icon, label, badge = 0, hint = '', onClick }) => (
   <button
     onClick={onClick}
-    className="card relative flex flex-col items-center py-3 px-1 text-fg/90"
+    className="card relative flex flex-col items-center justify-center min-h-[84px] py-3 px-1 rounded-[22px] text-fg transition-transform duration-200 active:scale-95"
     aria-label={[label, badge > 0 && `${badge} unread`, hint].filter(Boolean).join(', ')}
   >
-    <Icon size={20} className="text-violet-soft" aria-hidden="true" />
-    <span className="text-xs mt-1.5 font-medium">{label}</span>
-    {hint && <span className="text-[11px] text-muted leading-tight mt-0.5">{hint}</span>}
+    <Icon size={22} strokeWidth={1.9} aria-hidden="true" />
+    <span className="text-xs mt-1.5 font-semibold">{label}</span>
+    {hint && <span className="text-[11px] text-accent-soft font-medium leading-tight mt-0.5">{hint}</span>}
     {badge > 0 && (
-      <span className="absolute top-1.5 right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-violet text-white text-[11px] font-bold flex items-center justify-center" aria-hidden="true">
+      <span className="absolute top-2 right-2 min-w-[1.25rem] h-5 px-1 rounded-full bg-fg text-night text-[11px] font-bold flex items-center justify-center" aria-hidden="true">
         {badge > 99 ? '99+' : badge}
       </span>
     )}
@@ -195,32 +212,35 @@ const EventContent = ({ event, onInvite }) => {
   const heading = getEventStatus(event) === 'ongoing' ? "Today's schedule" : `Schedule for ${formatDay(day)}`;
 
   return (
-    <div className="p-4">
-      <h3 className="text-xl font-bold mb-3">Who's going</h3>
-      <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar">
+    <div className="px-4 pt-7">
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-lg font-semibold tracking-[-0.01em]">Who's going</h3>
+        <span className="text-sm text-fg/60">{event.members.length} {event.members.length === 1 ? 'person' : 'people'}</span>
+      </div>
+      <div className="flex gap-3.5 mb-7 overflow-x-auto no-scrollbar -mx-4 px-4">
         {event.members.map((member) => (
           // shrink-0 so a big group scrolls instead of squashing
-          <div key={member._id} className="flex flex-col items-center shrink-0">
-            <Avatar 
-              initial={member.name.charAt(0)} 
-              color={member.color} 
-              size="md" 
+          <div key={member._id} className="flex flex-col items-center shrink-0 w-12">
+            <Avatar
+              initial={member.name.charAt(0)}
+              color={member.color}
+              size="lg"
             />
-            <span className="text-xs mt-1">{member.name}</span>
+            <span className="text-xs mt-1.5 text-fg/85 truncate max-w-full">{member.name.split(' ')[0]}</span>
             {member.user === event.createdBy && (
-              <span className="text-[10px] font-semibold text-violet-soft leading-none mt-0.5">Organizer</span>
+              <span className="text-[10px] font-semibold text-accent-soft leading-none mt-0.5">Organizer</span>
             )}
           </div>
         ))}
-        <button onClick={onInvite} className="flex flex-col items-center shrink-0">
-          <div className="w-8 h-8 bg-violet/15 rounded-full flex items-center justify-center text-violet-soft border border-dashed border-violet/40">
-            <Plus size={16} />
+        <button onClick={onInvite} className="flex flex-col items-center shrink-0 w-12">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center text-fg border-[1.5px] border-dashed border-white/40 transition-transform active:scale-90">
+            <Plus size={18} />
           </div>
-          <span className="text-xs mt-1">Invite</span>
+          <span className="text-xs mt-1.5 text-fg/85">Invite</span>
         </button>
       </div>
     
-      <h3 className="text-xl font-bold mb-3">{heading}</h3>
+      <h3 className="text-lg font-semibold tracking-[-0.01em] mb-3">{heading}</h3>
       {items.length > 0 ? (
         <div className="flex flex-col space-y-3">
           {items.map((item) => (
@@ -234,18 +254,16 @@ const EventContent = ({ event, onInvite }) => {
   );
 };
 
+// Time on the left, set apart by a hairline, like a lineup card
 const ScheduleItem = ({ item }) => (
-  <div className="card p-3">
-    <div className="flex justify-between items-start">
-      <div>
-        <div className="text-sm text-muted">{formatTimeRange(item.startTime, item.endTime)}</div>
-        <div className="font-semibold">{item.activity}</div>
-        <div className="text-sm text-muted">{item.location}</div>
-      </div>
-      <div className="chip shrink-0 ml-2">
-        {item.attendees.length} going
-      </div>
+  <div className="card flex items-center gap-3.5 px-4 py-3.5 rounded-[22px]">
+    <div className="w-[68px] shrink-0 text-[13px] font-semibold leading-snug text-fg/90">{formatTimeRange(item.startTime, item.endTime)}</div>
+    <span className="w-px self-stretch bg-white/15" aria-hidden="true" />
+    <div className="flex-1 min-w-0">
+      <div className="font-semibold truncate">{item.activity}</div>
+      {item.location && <div className="text-[13px] text-fg/65 truncate">{item.location}</div>}
     </div>
+    <div className="chip shrink-0">{item.attendees.length} going</div>
   </div>
 );
 

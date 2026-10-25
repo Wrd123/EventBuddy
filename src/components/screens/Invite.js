@@ -61,17 +61,17 @@ const Invite = () => {
 
           <div className="space-y-2 text-left text-fg/80 mb-2">
             <div className="flex items-center">
-              <Calendar size={18} className="mr-2 text-violet-soft shrink-0" />
+              <Calendar size={18} className="mr-2 text-accent-soft shrink-0" />
               {formatDateRange(invite.startDate, invite.endDate)}
             </div>
             {invite.location && (
               <div className="flex items-center">
-                <MapPin size={18} className="mr-2 text-violet-soft shrink-0" />
+                <MapPin size={18} className="mr-2 text-accent-soft shrink-0" />
                 {invite.location}
               </div>
             )}
             <div className="flex items-center">
-              <Users size={18} className="mr-2 text-violet-soft shrink-0" />
+              <Users size={18} className="mr-2 text-accent-soft shrink-0" />
               {invite.memberCount} {invite.memberCount === 1 ? 'person' : 'people'} going
               {others > 0 && invite.organizerName ? ` (${invite.organizerName} + ${others})` : ''}
             </div>

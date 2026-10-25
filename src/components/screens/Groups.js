@@ -2,7 +2,7 @@ import React from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../common/Header';
-import Footer from '../layout/Footer';
+import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
 import { Button, EventCover, ScreenLoader } from '../common';
 import { useChats } from '../../hooks/useChats';
 import { useAppContext } from '../../context/AppContext';
@@ -20,10 +20,10 @@ const Groups = () => {
   const past = chats.filter(chat => getEventStatus(chat) === 'past');
 
   return (
-    <div className="flex flex-col h-full">
-      <Header title="Groups" />
+    <div className="flex flex-col h-full relative">
+      <Header title="Chats" />
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className={`flex-1 overflow-y-auto px-4 ${TAB_BAR_CLEARANCE}`}>
         {status === 'error' ? (
           <div className="card p-5 text-center">
             <p className="font-semibold mb-1">Couldn't load your groups</p>
@@ -54,7 +54,7 @@ const NoGroups = () => {
   const navigate = useNavigate();
   return (
     <div className="card p-6 text-center mt-2">
-      <div className="w-14 h-14 rounded-full bg-violet/15 text-violet-soft flex items-center justify-center mx-auto mb-3">
+      <div className="w-14 h-14 rounded-full bg-accent/15 text-accent-soft flex items-center justify-center mx-auto mb-3">
         <MessageCircle size={26} />
       </div>
       <h2 className="text-xl font-bold mb-1">No groups yet</h2>
@@ -94,7 +94,7 @@ const ChatRow = ({ chat }) => {
           <div className="flex items-baseline justify-between">
             <span className={`truncate ${unread > 0 ? 'font-bold' : 'font-semibold'}`}>{chat.name}</span>
             {lastMessage && (
-              <span className={`text-xs shrink-0 ml-2 ${unread > 0 ? 'text-violet-soft font-semibold' : 'text-faint'}`}>
+              <span className={`text-xs shrink-0 ml-2 ${unread > 0 ? 'text-accent-soft font-semibold' : 'text-faint'}`}>
                 {shortTime(lastMessage.createdAt)}
               </span>
             )}
@@ -102,7 +102,7 @@ const ChatRow = ({ chat }) => {
           <div className="flex items-center justify-between mt-0.5">
             <span className={`text-sm truncate ${unread > 0 ? 'text-fg' : 'text-muted'}`}>{preview}</span>
             {unread > 0 && (
-              <span className="ml-2 shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-violet text-white text-xs font-bold flex items-center justify-center" aria-hidden="true">
+              <span className="ml-2 shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-accent text-night text-xs font-bold flex items-center justify-center" aria-hidden="true">
                 {unread > 99 ? '99+' : unread}
               </span>
             )}

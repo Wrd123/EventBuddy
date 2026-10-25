@@ -38,22 +38,22 @@ const SuggestedEventCard = ({ event, onOpen }) => {
   // Photo on top and the details underneath, so the text never fights the
   // picture for contrast
   return (
-    <div className="relative flex-shrink-0 w-40">
-      <button onClick={onOpen} className="block w-full text-left" aria-label={`See ${event.name}`}>
-        <span className="block h-32 rounded-2xl overflow-hidden border border-line">
+    <div className="relative flex-shrink-0 w-40 snap-start">
+      <button onClick={onOpen} className="block w-full text-left transition-transform duration-200 active:scale-[0.97]" aria-label={`See ${event.name}`}>
+        <span className="block h-32 rounded-[20px] overflow-hidden ring-1 ring-white/10">
           <EventCover event={event} width={160} className="w-full h-full" />
         </span>
         <span className="block mt-2 font-bold text-sm truncate">{event.name}</span>
-        <span className="block text-xs font-semibold text-violet-soft truncate">{whenText(event)}</span>
-        <span className="block text-xs text-muted truncate">{event.venue || event.location}</span>
+        <span className="block text-xs font-medium text-accent-soft truncate">{whenText(event)}</span>
+        <span className="block text-xs text-fg/60 truncate">{event.venue || event.location}</span>
       </button>
       <button
         onClick={toggle}
         aria-pressed={isSaved}
         aria-label={isSaved ? `Unsave ${event.name}` : `Save ${event.name}`}
-        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-white"
+        className="glass absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center text-white transition-transform active:scale-90"
       >
-        <Heart size={18} className={isSaved ? 'fill-violet-soft text-violet-soft' : ''} />
+        <Heart size={16} className={isSaved ? 'fill-accent text-accent' : ''} />
       </button>
     </div>
   );

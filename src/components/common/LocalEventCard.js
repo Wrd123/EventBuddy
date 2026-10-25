@@ -11,7 +11,7 @@ const LocalEventCard = ({ event, onOpen }) => (
     </div>
     <div className="flex-1 min-w-0">
       <div className="font-semibold line-clamp-2">{event.name}</div>
-      <div className="text-sm text-violet-soft mt-0.5">{whenText(event)}</div>
+      <div className="text-sm text-accent-soft mt-0.5">{whenText(event)}</div>
       <div className="text-sm text-muted truncate">{whereText(event)}</div>
     </div>
     <ChevronRight size={20} className="text-muted shrink-0 ml-1" aria-hidden="true" />

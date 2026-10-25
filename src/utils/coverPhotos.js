@@ -95,3 +95,7 @@ export const coverPhotoFor = ({ type, coverIndex = 0 } = {}) => {
 // width is in CSS pixels; asking for double keeps it sharp on Retina screens
 export const coverPhotoUrl = (photoId, width) =>
   `https://images.unsplash.com/photo-${photoId}?w=${width * 2}&q=70&auto=format&fit=crop`;
+
+// Any event's picture: its Ticketmaster artwork when it has some (one fixed
+// size), otherwise its turn in its type's photos at the width asked for
+export const eventPhotoUrl = (event, width) => event.imageUrl || coverPhotoUrl(coverPhotoFor(event), width);

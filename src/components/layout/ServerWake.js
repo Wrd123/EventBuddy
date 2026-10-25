@@ -60,7 +60,7 @@ const ServerWake = ({ children, enabled = ENABLED, showAfterMs = 1500, retryMs =
       </p>
       <div className="w-full max-w-[14rem] h-1.5 rounded-full bg-surface overflow-hidden mb-2" aria-hidden="true">
         <div
-          className="h-full rounded-full bg-violet transition-[width] duration-1000 ease-linear"
+          className="h-full rounded-full bg-accent transition-[width] duration-1000 ease-linear"
           style={{ width: `${Math.min(95, (seconds / 60) * 100)}%` }}
         />
       </div>

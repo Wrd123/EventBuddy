@@ -382,8 +382,8 @@ describe('Sharing across the app', () => {
     fireEvent.click(screen.getByRole('button', { name: '1 hour' }));
     await waitFor(() => expect(report).toBeDefined());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Groups' }));
-    await screen.findByRole('heading', { name: 'Groups' });
+    fireEvent.click(screen.getByRole('button', { name: 'Chats' }));
+    await screen.findByRole('heading', { name: 'Chats' });
     act(() => report({ coords: HERE }));
 
     await waitFor(() => expect(requests('PUT', '/api/events/5/live/position')).toHaveLength(1));

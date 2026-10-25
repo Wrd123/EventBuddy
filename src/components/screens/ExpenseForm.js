@@ -98,8 +98,8 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
   const remaining = amountCents !== null ? amountCents - exactTotal : null;
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-40" role="dialog" aria-modal="true" aria-labelledby="expense-form-title">
-      <form onSubmit={handleSubmit} className="bg-surface border-t border-line rounded-t-3xl p-4 max-h-full overflow-y-auto">
+    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="expense-form-title">
+      <form onSubmit={handleSubmit} className="sheet p-4 max-h-full overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 id="expense-form-title" className="text-lg font-semibold">{expense ? 'Edit expense' : 'Add expense'}</h2>
           <button type="button" onClick={onClose} className="text-faint" aria-label="Close">
@@ -140,7 +140,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
                 role="radio"
                 aria-checked={fields.splitType === value}
                 onClick={() => setFields(prev => ({ ...prev, splitType: value }))}
-                className={`border p-2 rounded-xl text-sm ${fields.splitType === value ? 'border-violet bg-violet/10 text-violet-soft' : 'border-line text-fg/80'}`}
+                className={`border p-2 rounded-xl text-sm ${fields.splitType === value ? 'border-accent bg-accent/10 text-accent-soft' : 'border-line text-fg/80'}`}
               >
                 {label}
               </button>
@@ -151,7 +151,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
             <div className="space-y-1">
               {members.map(m => (
                 <label key={m.user} className="flex items-center text-sm py-1">
-                  <input type="checkbox" className="mr-2 h-4 w-4 accent-violet" checked={included.has(m.user)} onChange={() => toggle(m.user)} />
+                  <input type="checkbox" className="mr-2 h-4 w-4 accent-accent" checked={included.has(m.user)} onChange={() => toggle(m.user)} />
                   {m.name}
                 </label>
               ))}
@@ -169,7 +169,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
                   <input
                     id={`exact-${m.user}`}
                     inputMode="decimal"
-                    className="w-28 px-2.5 py-1.5 rounded-xl bg-raised border border-line text-fg text-right placeholder-faint focus:border-violet outline-none"
+                    className="w-28 px-2.5 py-1.5 rounded-xl bg-raised border border-line text-fg text-right placeholder-faint focus:border-accent outline-none"
                     placeholder="0.00"
                     value={exact[m.user]}
                     onChange={e => setExact(prev => ({ ...prev, [m.user]: e.target.value }))}

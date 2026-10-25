@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import EventArt from './EventArt';
-import { coverPhotoFor, coverPhotoUrl } from '../../utils/coverPhotos';
+import { eventPhotoUrl } from '../../utils/coverPhotos';
 
 // An event's cover photo: its Ticketmaster artwork when it has some,
 // otherwise its turn in its type's photos (see coverPhotos.js). If the
@@ -9,7 +9,7 @@ import { coverPhotoFor, coverPhotoUrl } from '../../utils/coverPhotos';
 // don't download big photos. The picture is cropped to fill whatever box
 // className gives it, and is decorative since the name is always beside it.
 const EventCover = ({ event, width = 400, className = '' }) => {
-  const src = event.imageUrl || coverPhotoUrl(coverPhotoFor(event), width);
+  const src = eventPhotoUrl(event, width);
   // Remembers which URL failed, so a new one gets its own chance
   const [failedSrc, setFailedSrc] = useState(null);
 

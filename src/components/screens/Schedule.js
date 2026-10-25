@@ -90,8 +90,8 @@ const DaySelector = ({ days, activeDay, setActiveDay }) => {
           ref={activeDay === day ? activeRef : null}
           className={`flex-shrink-0 px-4 py-2 rounded-full ${
             activeDay === day
-              ? 'bg-violet text-white'
-              : 'bg-surface text-fg/80 border border-line'
+              ? 'bg-fg text-night'
+              : 'bg-white/[0.06] text-fg/80 border border-line'
           }`}
           onClick={() => setActiveDay(day)}
         >
@@ -138,7 +138,7 @@ const ScheduleItem = ({ event, item, onEdit }) => {
   };
 
   return (
-    <div className={`card p-3 ${isPopular ? 'border-l-4 border-violet' : ''}`}>
+    <div className={`card p-3.5 rounded-[22px] ${isPopular ? 'ring-1 ring-accent/60 shadow-glow-sm' : ''}`}>
       <div className="flex justify-between items-start">
         <div className="min-w-0">
           <div className="text-sm text-muted mb-1">{formatTimeRange(item.startTime, item.endTime)}</div>
@@ -158,7 +158,7 @@ const ScheduleItem = ({ event, item, onEdit }) => {
           disabled={isSaving}
           aria-pressed={going}
           className={`text-xs font-medium flex items-center px-3 py-1 rounded-full disabled:opacity-50 ${
-            going ? 'bg-violet text-white' : 'text-violet-soft border border-violet'
+            going ? 'bg-fg text-night' : 'text-accent-soft border border-accent/60'
           }`}
         >
           {going ? <Check size={14} className="mr-1" /> : <Plus size={14} className="mr-1" />}
@@ -266,8 +266,8 @@ const ScheduleItemForm = ({ event, days, item, defaultDay, onClose, onSaved }) =
   const inputClass = 'field';
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-40" role="dialog" aria-modal="true" aria-labelledby="schedule-form-title">
-      <form onSubmit={handleSubmit} className="bg-surface border-t border-line rounded-t-3xl p-4 max-h-full overflow-y-auto">
+    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="schedule-form-title">
+      <form onSubmit={handleSubmit} className="sheet p-4 max-h-full overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 id="schedule-form-title" className="text-lg font-semibold">
             {item ? 'Edit schedule item' : 'Add to schedule'}

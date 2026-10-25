@@ -52,8 +52,8 @@ const LocalEventSheet = ({ event, onClose }) => {
   };
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-labelledby="local-event-title">
-      <div className="bg-surface border-t border-line rounded-t-3xl overflow-hidden">
+    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="local-event-title">
+      <div className="sheet overflow-hidden">
         <div className="relative h-36">
           <EventCover event={event} className="absolute inset-0 w-full h-full" />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/20 to-transparent" />
@@ -66,11 +66,11 @@ const LocalEventSheet = ({ event, onClose }) => {
           <h2 id="local-event-title" className="text-2xl font-extrabold tracking-tight mb-3">{event.name}</h2>
           <div className="space-y-2 text-fg/90 mb-4">
             <div className="flex items-start">
-              <Calendar size={18} className="mr-2 mt-0.5 text-violet-soft shrink-0" aria-hidden="true" />
+              <Calendar size={18} className="mr-2 mt-0.5 text-accent-soft shrink-0" aria-hidden="true" />
               {whenText(event)}
             </div>
             <div className="flex items-start">
-              <MapPin size={18} className="mr-2 mt-0.5 text-violet-soft shrink-0" aria-hidden="true" />
+              <MapPin size={18} className="mr-2 mt-0.5 text-accent-soft shrink-0" aria-hidden="true" />
               {whereText(event)}
             </div>
           </div>

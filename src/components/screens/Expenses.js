@@ -91,7 +91,7 @@ const Expenses = () => {
         <section>
           <div className="flex justify-between items-center mb-3">
             <h3 className="font-medium">Expenses</h3>
-            <button onClick={() => setEditing('new')} className="text-violet-soft text-sm font-medium flex items-center">
+            <button onClick={() => setEditing('new')} className="text-accent-soft text-sm font-medium flex items-center">
               <Plus size={16} className="mr-1" />
               Add expense
             </button>
@@ -154,7 +154,7 @@ const Summary = ({ event, totalCents, myBalance, isOrganizer }) => {
             </span>
           </div>
           <div className="w-full bg-raised rounded-full h-2.5 mb-2" role="progressbar" aria-valuenow={Math.round(percentSpent)} aria-valuemin={0} aria-valuemax={100} aria-label="Budget used">
-            <div className={`h-2.5 rounded-full ${overBudget ? 'bg-red-500' : 'bg-violet'}`} style={{ width: `${percentSpent}%` }} />
+            <div className={`h-2.5 rounded-full ${overBudget ? 'bg-red-500' : 'bg-accent'}`} style={{ width: `${percentSpent}%` }} />
           </div>
         </>
       )}
@@ -205,7 +205,7 @@ const BudgetEditor = ({ event }) => {
 
   if (!isEditing) {
     return (
-      <button onClick={open} className="text-sm text-violet-soft font-medium">
+      <button onClick={open} className="text-sm text-accent-soft font-medium">
         {event.budgetCents !== null && event.budgetCents !== undefined ? 'Edit budget' : 'Set a budget'}
       </button>
     );
@@ -252,7 +252,7 @@ const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) =>
       )}
       {needsMyHandles && (
         <p className="text-sm text-muted mt-3">
-          <Link to="/profile" className="text-violet-soft font-medium">Add your Venmo, Cash App, PayPal or Zelle</Link>
+          <Link to="/profile" className="text-accent-soft font-medium">Add your Venmo, Cash App, PayPal or Zelle</Link>
           {' '}so friends can pay you back.
         </p>
       )}
@@ -294,7 +294,7 @@ const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded }) 
           <button
             onClick={markPaid}
             disabled={isSaving}
-            className="text-xs font-medium text-violet-soft border border-violet px-3 py-1 rounded-full disabled:opacity-50"
+            className="text-xs font-medium text-accent-soft border border-accent px-3 py-1 rounded-full disabled:opacity-50"
           >
             {isSaving ? 'Saving...' : 'Mark paid'}
           </button>
@@ -310,7 +310,7 @@ const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded }) 
         />
       )}
       {openedPayLink && (
-        <p className="text-xs text-violet-soft mt-1">Sent it? Tap Mark paid so everyone's balances update.</p>
+        <p className="text-xs text-accent-soft mt-1">Sent it? Tap Mark paid so everyone's balances update.</p>
       )}
       {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
     </li>
@@ -363,7 +363,7 @@ const PayWith = ({ recipient, handles, amountCents, note, onOpened }) => {
             rel="noopener noreferrer"
             onClick={onOpened}
             aria-label={`Pay ${recipient.name} ${formatCents(amountCents)} with ${option.label} (${option.handle})`}
-            className="text-xs font-medium bg-violet text-white px-3 py-1.5 rounded-full"
+            className="text-xs font-medium bg-fg text-night px-3 py-1.5 rounded-full"
           >
             {option.label}
           </a>
@@ -374,7 +374,7 @@ const PayWith = ({ recipient, handles, amountCents, note, onOpened }) => {
         <div className="mt-2 bg-raised rounded-xl p-2 text-xs text-fg/80">
           <div className="flex items-center justify-between">
             <span className="font-medium break-all">{zelle.handle}</span>
-            <button onClick={copyZelle} className="ml-2 flex items-center text-violet-soft font-medium shrink-0">
+            <button onClick={copyZelle} className="ml-2 flex items-center text-accent-soft font-medium shrink-0">
               <Copy size={14} className="mr-1" />
               {copied ? 'Copied' : 'Copy'}
             </button>
@@ -427,7 +427,7 @@ const ExpenseCard = ({ expense, me, onEdit }) => {
         </div>
       </div>
       <div className="flex justify-between items-center text-xs">
-        <span className="bg-violet/15 text-violet-soft px-2 py-1 rounded">
+        <span className="bg-accent/15 text-accent-soft px-2 py-1 rounded">
           {expense.splitType === 'equal' ? `Split equally (${expense.shares.length})` : 'Exact amounts'}
         </span>
         {myShare && <span className="text-muted">Your share {formatCents(myShare.amountCents)}</span>}

@@ -59,7 +59,7 @@ const ShowcaseFrame = ({ children }) => {
         <ul className="space-y-4 mb-10">
           {FEATURES.map(({ icon: Icon, text }) => (
             <li key={text} className="flex items-start text-fg/80">
-              <span className="w-9 h-9 rounded-xl bg-violet/15 text-violet-soft flex items-center justify-center shrink-0 mr-3">
+              <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent-soft flex items-center justify-center shrink-0 mr-3">
                 <Icon size={18} aria-hidden="true" />
               </span>
               <span className="pt-1.5">{text}</span>
@@ -79,7 +79,7 @@ const ShowcaseFrame = ({ children }) => {
           href={REPO_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center self-start rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg hover:border-violet/60"
+          className="inline-flex items-center self-start rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg hover:border-accent/60"
         >
           <Github size={16} className="mr-2" aria-hidden="true" />
           Code and write-up on GitHub

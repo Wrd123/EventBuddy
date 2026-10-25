@@ -10,7 +10,7 @@ const AvatarStack = ({ members, max = 3, size = 'sm' }) => {
       {members.slice(0, max).map((member) => (
         <div
           key={member._id || member.user}
-          className={`${dims} rounded-full ring-2 ring-surface flex items-center justify-center text-white font-semibold`}
+          className={`${dims} rounded-full ring-2 ring-night/90 flex items-center justify-center text-white font-semibold`}
           style={{ backgroundColor: member.color }}
           title={member.name}
         >
@@ -18,7 +18,7 @@ const AvatarStack = ({ members, max = 3, size = 'sm' }) => {
         </div>
       ))}
       {extra > 0 && (
-        <div className={`${dims} rounded-full ring-2 ring-surface bg-raised text-muted flex items-center justify-center font-semibold`}>
+        <div className={`${dims} rounded-full ring-2 ring-night/90 bg-raised text-muted flex items-center justify-center font-semibold`}>
           +{extra}
         </div>
       )}

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { ArrowLeft, Flag, MapPin } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Footer from '../layout/Footer';
+import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
 import MapCanvas from '../map/MapCanvas';
 import { DirectionsLink, FriendPanel, LiveBar, MeetupForm, MeetupPanel, ShareSheet } from '../map/LivePanels';
 import { Button, EventCover, LocalEventCard, LocalEventSheet, PlaceSheet } from '../common';
@@ -161,7 +161,7 @@ const Map = () => {
           {oneEvent && (
             <button
               onClick={() => navigate(`/events/${focusId}`)}
-              className="pointer-events-auto inline-flex items-center max-w-full rounded-full bg-surface/90 border border-line backdrop-blur px-3 py-1.5 text-sm font-semibold"
+              className="glass pointer-events-auto inline-flex items-center max-w-full h-10 rounded-full px-4 text-sm font-semibold transition-transform active:scale-95"
               aria-label={`Back to ${focusEvent?.name || 'the event'}`}
             >
               <ArrowLeft size={16} className="mr-1.5 shrink-0" aria-hidden="true" />
@@ -176,24 +176,25 @@ const Map = () => {
               </LayerChip>
             )}
             {!oneEvent && (
-              <LayerChip active={show.mine} dotClass="bg-violet" onClick={() => toggle('mine')}>Your events</LayerChip>
+              <LayerChip active={show.mine} dotClass="bg-accent" onClick={() => toggle('mine')}>Your events</LayerChip>
             )}
-            <LayerChip active={show.nearby} dotClass="bg-pink-500" onClick={() => toggle('nearby')}>Nearby</LayerChip>
+            <LayerChip active={show.nearby} dotClass="bg-[#a78bfa]" onClick={() => toggle('nearby')}>Nearby</LayerChip>
           </div>
           {!oneEvent && (
             <button
               onClick={() => setChoosingPlace(true)}
-              className="pointer-events-auto inline-flex items-center max-w-full rounded-full bg-surface/90 border border-line backdrop-blur px-3 py-1.5 text-sm"
+              className="glass pointer-events-auto inline-flex items-center max-w-full h-9 rounded-full px-3.5 text-sm"
               aria-label={place ? `Change location, now near ${place.label}` : 'Choose a location for nearby events'}
             >
-              <MapPin size={16} className="mr-1.5 text-violet-soft shrink-0" aria-hidden="true" />
+              <MapPin size={16} className="mr-1.5 text-accent-soft shrink-0" aria-hidden="true" />
               <span className="truncate">{place ? `Near ${place.label}` : 'Choose a location'}</span>
             </button>
           )}
         </div>
       </div>
 
-      <div className="bg-surface border-t border-line px-4 pt-3 pb-4 max-h-[50%] overflow-y-auto">
+      {/* A glass sheet over the bottom of the map; the tab bar floats over its foot */}
+      <div className={`glass relative z-10 -mt-6 rounded-t-[28px] border-b-0 px-4 pt-4 max-h-[55%] overflow-y-auto ${TAB_BAR_CLEARANCE}`}>
         {placingMeetup ? (
           <MeetupForm existing={live.meetup} onSave={saveMeetup} onCancel={() => setPlacingMeetup(false)} />
         ) : selectedPerson ? (
@@ -266,8 +267,8 @@ const LayerChip = ({ active, dotClass, onClick, children }) => (
   <button
     onClick={onClick}
     aria-pressed={active}
-    className={`flex items-center px-3 py-1.5 rounded-full text-sm font-semibold border backdrop-blur ${
-      active ? 'bg-surface/90 text-fg border-violet/60' : 'bg-surface/60 text-faint border-line'
+    className={`glass flex items-center h-9 px-3.5 rounded-full text-sm font-semibold transition-all active:scale-95 ${
+      active ? 'text-fg' : 'text-fg/45'
     }`}
   >
     <span className={`w-2.5 h-2.5 rounded-full mr-2 ${dotClass} ${active ? '' : 'opacity-40'}`} aria-hidden="true" />
@@ -285,7 +286,7 @@ const EventPanel = ({ event }) => {
         </div>
         <div className="min-w-0">
           <h2 className="font-bold truncate">{event.name}</h2>
-          <p className="text-sm text-violet-soft">{formatDateRange(event.startDate, event.endDate)}</p>
+          <p className="text-sm text-accent-soft">{formatDateRange(event.startDate, event.endDate)}</p>
           <p className="text-sm text-muted truncate">{event.location}</p>
         </div>
       </div>
@@ -312,10 +313,10 @@ const Summary = ({ mine, mappedCount, unmapped, place, nearby, venueCount, onCho
     {mine.status === 'error' ? (
       <div className="flex items-center justify-between">
         <span className="text-muted">Couldn't load your events.</span>
-        <button onClick={mine.reload} className="font-semibold text-violet-soft">Try again</button>
+        <button onClick={mine.reload} className="font-semibold text-accent-soft">Try again</button>
       </div>
     ) : (
-      <Line dotClass="bg-violet">
+      <Line dotClass="bg-accent">
         {mine.status === 'loading'
           ? 'Finding your events...'
           : `${mappedCount} upcoming ${mappedCount === 1 ? 'event' : 'events'} of yours`}
@@ -325,10 +326,10 @@ const Summary = ({ mine, mappedCount, unmapped, place, nearby, venueCount, onCho
     {!place ? (
       <div className="flex items-center justify-between">
         <span className="text-muted">See concerts, games and shows nearby.</span>
-        <button onClick={onChoosePlace} className="font-semibold text-violet-soft shrink-0 ml-2">Choose a location</button>
+        <button onClick={onChoosePlace} className="font-semibold text-accent-soft shrink-0 ml-2">Choose a location</button>
       </div>
     ) : (
-      <Line dotClass="bg-pink-500">
+      <Line dotClass="bg-[#a78bfa]">
         {nearby.status === 'error'
           ? nearby.error
           : nearby.status === 'ready'
@@ -378,7 +379,7 @@ const EventPlan = ({ event, status, meetup, nearby, venueCount, liveBar, onPlanM
       )}
       {status === 'past' && <Line dotClass="bg-faint">This event is over, so location sharing has ended.</Line>}
       {status !== 'past' && hasPosition(event) && (
-        <Line dotClass="bg-pink-500">
+        <Line dotClass="bg-[#a78bfa]">
           {nearby.status === 'error'
             ? nearby.error
             : nearby.status === 'ready'

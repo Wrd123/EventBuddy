@@ -25,7 +25,7 @@ describe('Login', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Try the demo' }));
 
-    expect(await screen.findByText('Hey John!')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Hey John/ })).toBeInTheDocument();
     const signIn = global.fetch.mock.calls.find(([url]) => url === '/api/auth/demo');
     // No password involved: the server makes a private copy of the demo,
     // with its picnic on this phone's date

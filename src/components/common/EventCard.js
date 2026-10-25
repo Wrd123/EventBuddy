@@ -1,36 +1,33 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import EventCover from './EventCover';
-import AvatarStack from './AvatarStack';
-import { formatDateRange } from '../../utils/dates';
+import { formatDateRangeShort } from '../../utils/dates';
 
-// status: 'upcoming' | 'ongoing' | 'past' (from getEventStatus)
+// A row for one of your events on a pane of glass: photo, name, when and
+// where. status: 'upcoming' | 'ongoing' | 'past' (from getEventStatus)
 const EventCard = ({ event, status, onSelect }) => (
   <button
     onClick={onSelect}
-    className={`card w-full p-3 flex items-center text-left ${status === 'past' ? 'opacity-75' : ''}`}
+    className={`card w-full p-2 pr-3 flex items-center gap-3.5 text-left rounded-[22px] transition-transform duration-200 active:scale-[0.98] ${
+      status === 'past' ? 'opacity-70' : ''
+    }`}
   >
     {/* The "Happening now" badge sits on the picture so the name keeps the full width */}
-    <div className="relative w-24 h-24 rounded-xl overflow-hidden shrink-0 mr-3">
-      <EventCover event={event} width={96} className="w-full h-full" />
+    <div className="relative w-[54px] h-[54px] rounded-2xl overflow-hidden shrink-0">
+      <EventCover event={event} width={54} className="w-full h-full" />
       {status === 'ongoing' && (
-        <span className="absolute left-1.5 bottom-1.5 bg-emerald-500/90 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full">
+        <span className="absolute inset-x-1 bottom-1 bg-go text-night text-[9px] font-bold text-center py-0.5 rounded-full">
           Happening now
         </span>
       )}
     </div>
     <div className="flex-1 min-w-0">
-      <div className="font-bold truncate">{event.name}</div>
-      <div className="text-sm font-semibold text-violet-soft truncate">{formatDateRange(event.startDate, event.endDate)}</div>
-      {event.location && <div className="text-sm text-muted truncate">{event.location}</div>}
-      <div className="flex items-center mt-1.5">
-        <div className="mr-2">
-          <AvatarStack members={event.members} />
-        </div>
-        <div className="text-xs text-muted">{event.members.length} attending</div>
+      <div className="font-semibold truncate">{event.name}</div>
+      <div className="text-[13px] text-fg/65 truncate">
+        {[formatDateRangeShort(event.startDate, event.endDate), event.location].filter(Boolean).join(', ')}
       </div>
     </div>
-    <ChevronRight size={20} className="text-muted shrink-0 ml-1" aria-hidden="true" />
+    <ChevronRight size={18} className="text-fg/40 shrink-0" aria-hidden="true" />
   </button>
 );
 

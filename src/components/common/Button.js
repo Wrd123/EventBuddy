@@ -13,10 +13,11 @@ const Button = ({
   ...rest
 }) => {
   const variantClasses = {
-    primary: 'bg-violet text-white shadow-glow-sm hover:bg-violet-deep',
-    secondary: 'bg-raised text-fg border border-line',
-    outline: 'bg-transparent text-violet-soft border border-violet/60',
-    text: 'text-violet-soft'
+    // Solid white pills: Afterglow's one loud control, readable on any photo
+    primary: 'bg-fg text-night hover:bg-white',
+    secondary: 'bg-white/[0.08] text-fg border border-line',
+    outline: 'bg-transparent text-accent-soft border border-accent/60',
+    text: 'text-accent-soft'
   };
 
   const sizeClasses = {
@@ -34,8 +35,9 @@ const Button = ({
         ${variantClasses[variant]}
         ${sizeClasses[size]}
         ${fullWidth ? 'w-full' : ''}
-        rounded-xl font-semibold flex items-center justify-center
-        disabled:opacity-50 disabled:cursor-not-allowed
+        rounded-full font-semibold flex items-center justify-center
+        transition-transform active:scale-[0.97]
+        disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
         ${className}
       `}
       {...rest}

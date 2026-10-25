@@ -9,9 +9,9 @@ export const DirectionsLink = ({ to }) => (
     href={directionsUrl(to)}
     target="_blank"
     rel="noopener noreferrer"
-    className="flex-1 inline-flex items-center justify-center rounded-xl border border-line bg-raised py-2.5 font-semibold text-fg"
+    className="flex-1 inline-flex items-center justify-center h-11 rounded-full border border-line bg-white/[0.08] font-semibold text-fg transition-transform active:scale-[0.97]"
   >
-    <Navigation size={16} className="mr-2 text-violet-soft" aria-hidden="true" />
+    <Navigation size={16} className="mr-2 text-accent-soft" aria-hidden="true" />
     Get directions
   </a>
 );
@@ -36,7 +36,7 @@ export const LiveBar = ({ event, live, trackingError, onShare, onSetMeetup }) =>
   };
 
   return (
-    <section className="rounded-2xl border border-violet/40 bg-violet/10 p-3 mb-3" aria-label={`Live at ${event.name}`}>
+    <section className="card rounded-[22px] p-3.5 mb-3" aria-label={`Live at ${event.name}`}>
       <div className="flex items-center text-sm font-semibold mb-1">
         <Radio size={16} className="mr-2 text-go shrink-0" aria-hidden="true" />
         <span className="truncate">Live at {event.name}</span>
@@ -53,11 +53,11 @@ export const LiveBar = ({ event, live, trackingError, onShare, onSetMeetup }) =>
       )}
       <div className="flex space-x-2">
         {live.sharing ? (
-          <Button variant="secondary" onClick={stop} disabled={busy} className="flex-1">Stop sharing</Button>
+          <Button variant="secondary" onClick={stop} disabled={busy} className="flex-1 h-11 px-3 whitespace-nowrap text-[15px]">Stop sharing</Button>
         ) : (
-          <Button onClick={onShare} className="flex-1">Share my location</Button>
+          <Button onClick={onShare} className="flex-1 h-11 px-3 whitespace-nowrap text-[15px]">Share my location</Button>
         )}
-        <Button variant="secondary" onClick={onSetMeetup} icon={<Flag size={16} />} className="flex-1">
+        <Button variant="secondary" onClick={onSetMeetup} icon={<Flag size={16} />} className="flex-1 h-11 px-3 whitespace-nowrap text-[15px]">
           {live.meetup ? 'Move meetup' : 'Set meetup'}
         </Button>
       </div>
@@ -83,8 +83,8 @@ export const ShareSheet = ({ event, onShare, onClose }) => {
   };
 
   return (
-    <div className="absolute inset-0 z-[1200] flex flex-col justify-end bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-labelledby="share-title">
-      <div className="bg-surface border-t border-line rounded-t-3xl p-4">
+    <div className="absolute inset-0 z-[1200] flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="share-title">
+      <div className="sheet p-4">
         <div className="flex items-center justify-between mb-1">
           <h2 id="share-title" className="text-lg font-bold">Share your location</h2>
           <button onClick={onClose} className="text-faint" aria-label="Close"><X size={20} /></button>

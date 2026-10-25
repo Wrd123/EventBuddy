@@ -10,8 +10,8 @@ const PlaceSheet = ({ onClose }) => {
   const { place, busy, error, locateDevice } = usePlace();
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-labelledby="place-title">
-      <div className="bg-surface border-t border-line rounded-t-3xl p-4">
+    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="place-title">
+      <div className="sheet p-4">
         <div className="flex items-center justify-between mb-1">
           <h2 id="place-title" className="text-lg font-bold">Where should we look?</h2>
           <button onClick={onClose} className="text-faint" aria-label="Close">

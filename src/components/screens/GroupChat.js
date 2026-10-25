@@ -112,7 +112,7 @@ const Conversation = ({ event, chat }) => {
       {items.map(item =>
         item.kind === 'day' ? (
           <div key={item.key} className="flex justify-center my-3">
-            <span className="text-xs text-muted bg-surface border border-line px-3 py-1 rounded-full">{item.label}</span>
+            <span className="glass text-xs text-muted px-3 py-1 rounded-full">{item.label}</span>
           </div>
         ) : (
           <MessageRow key={item.key} item={item} color={colorOf(item.message.sender.user)} />
@@ -133,7 +133,7 @@ const MessageRow = ({ item, color }) => {
   if (mine) {
     return (
       <div className={`flex flex-col items-end ${spacing}`}>
-        <div className={`bg-violet text-white px-3.5 py-2 rounded-2xl ${last ? 'rounded-br-md' : ''} max-w-[80%] whitespace-pre-wrap break-words`}>
+        <div className={`bg-fg text-night px-3.5 py-2 rounded-2xl ${last ? 'rounded-br-md' : ''} max-w-[80%] whitespace-pre-wrap break-words`}>
           {message.text}
         </div>
         {last && <span className="text-[11px] text-faint mt-1 mr-1">{time}</span>}
@@ -157,7 +157,7 @@ const MessageRow = ({ item, color }) => {
       </div>
       <div className="flex flex-col items-start max-w-[80%] min-w-0">
         {first && <span className="text-xs font-semibold mb-1 ml-1" style={{ color }}>{message.sender.name}</span>}
-        <div className={`bg-surface border border-line px-3.5 py-2 rounded-2xl ${last ? 'rounded-bl-md' : ''} whitespace-pre-wrap break-words max-w-full`}>
+        <div className={`bg-white/[0.09] border border-line px-3.5 py-2 rounded-2xl ${last ? 'rounded-bl-md' : ''} whitespace-pre-wrap break-words max-w-full`}>
           {message.text}
         </div>
         {last && <span className="text-[11px] text-faint mt-1 ml-1">{time}</span>}
@@ -168,13 +168,13 @@ const MessageRow = ({ item, color }) => {
 
 const PendingRow = ({ pending, onRetry, onDiscard }) => (
   <div className="flex flex-col items-end mt-3">
-    <div className={`bg-violet text-white px-3.5 py-2 rounded-2xl rounded-br-md max-w-[80%] whitespace-pre-wrap break-words ${pending.failed ? 'opacity-50' : 'opacity-70'}`}>
+    <div className={`bg-fg text-night px-3.5 py-2 rounded-2xl rounded-br-md max-w-[80%] whitespace-pre-wrap break-words ${pending.failed ? 'opacity-50' : 'opacity-70'}`}>
       {pending.text}
     </div>
     {pending.failed ? (
       <div className="text-xs mt-1 mr-1 flex items-center space-x-3" role="alert">
         <span className="text-red-300">Not sent</span>
-        <button onClick={onRetry} className="font-semibold text-violet-soft">Retry</button>
+        <button onClick={onRetry} className="font-semibold text-accent-soft">Retry</button>
         <button onClick={onDiscard} className="text-muted">Delete</button>
       </div>
     ) : (
@@ -195,7 +195,7 @@ const Composer = ({ eventName, onSend }) => {
   };
 
   return (
-    <form onSubmit={submit} className="px-3 py-3 border-t border-line bg-surface/80 flex items-center space-x-2">
+    <form onSubmit={submit} className="glass border-x-0 border-b-0 px-3 py-3 flex items-center space-x-2">
       <input
         aria-label="Message"
         className="field rounded-full flex-1"
@@ -209,7 +209,7 @@ const Composer = ({ eventName, onSend }) => {
       <button
         type="submit"
         disabled={!trimmed}
-        className="w-11 h-11 shrink-0 rounded-full bg-violet text-white flex items-center justify-center shadow-glow-sm disabled:opacity-40 disabled:shadow-none"
+        className="w-11 h-11 shrink-0 rounded-full bg-fg text-night flex items-center justify-center disabled:opacity-40"
         aria-label="Send"
       >
         <Send size={18} />

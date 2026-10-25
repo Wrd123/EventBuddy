@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MapPin, Navigation, Search } from 'lucide-react';
 import Header from '../common/Header';
-import Footer from '../layout/Footer';
+import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
 import { Button, CitySearch, LocalEventCard, LocalEventSheet, PlaceSheet } from '../common';
 import { usePlace } from '../../hooks/usePlace';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
@@ -35,17 +35,17 @@ const Discover = () => {
     <div className="flex flex-col h-full relative">
       <Header title="Discover" />
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className={`flex-1 overflow-y-auto px-4 ${TAB_BAR_CLEARANCE}`}>
         {!place ? (
           <FirstRun locationError={locationError} />
         ) : (
           <>
-            <div className="flex items-center justify-between rounded-2xl bg-surface/80 border border-line px-3 py-2.5 mb-3">
+            <div className="flex items-center justify-between card rounded-full px-4 py-2.5 mb-3">
               <span className="flex items-center font-semibold min-w-0">
-                <MapPin size={20} className="mr-2 text-violet-soft shrink-0" aria-hidden="true" />
+                <MapPin size={20} className="mr-2 text-accent-soft shrink-0" aria-hidden="true" />
                 <span className="truncate">Near {place.label}</span>
               </span>
-              <button onClick={() => setChoosingPlace(true)} className="text-sm font-semibold text-violet-soft shrink-0">
+              <button onClick={() => setChoosingPlace(true)} className="text-sm font-semibold text-accent-soft shrink-0">
                 Change
               </button>
             </div>
@@ -96,7 +96,7 @@ const Discover = () => {
 // own, see AppContext), or why it couldn't, with a city search instead
 const FirstRun = ({ locationError }) => (
   <div className="card p-6 text-center mt-2">
-    <div className="w-14 h-14 rounded-full bg-violet/15 text-violet-soft flex items-center justify-center mx-auto mb-3">
+    <div className="w-14 h-14 rounded-full bg-accent/15 text-accent-soft flex items-center justify-center mx-auto mb-3">
       <Navigation size={26} className={locationError ? '' : 'animate-pulse'} aria-hidden="true" />
     </div>
     <h2 className="text-xl font-bold mb-1">See what's happening near you</h2>
@@ -124,7 +124,7 @@ const Chip = ({ active, onClick, children }) => (
     onClick={onClick}
     aria-pressed={active}
     className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold border ${
-      active ? 'bg-violet text-white border-violet shadow-glow-sm' : 'bg-surface text-fg/80 border-line'
+      active ? 'bg-fg text-night border-fg' : 'bg-white/[0.06] text-fg/80 border-line'
     }`}
   >
     {children}

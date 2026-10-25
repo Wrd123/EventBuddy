@@ -53,7 +53,7 @@ const Login = () => {
         </div>
 
         {fromInvite && (
-          <div className="bg-violet/10 border border-violet/40 text-violet-soft px-4 py-3 rounded-xl mb-4 text-center">
+          <div className="bg-accent/10 border border-accent/40 text-accent-soft px-4 py-3 rounded-xl mb-4 text-center">
             Log in or sign up to see your invite.
           </div>
         )}
@@ -123,7 +123,7 @@ const Login = () => {
 
         <p className="mt-4 text-center text-muted">
           New to EventBuddy?{' '}
-          <Link to="/register" state={location.state} className="text-violet-soft font-medium">
+          <Link to="/register" state={location.state} className="text-accent-soft font-medium">
             Sign up
           </Link>
         </p>

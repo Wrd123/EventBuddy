@@ -65,7 +65,7 @@ describe('Editing an event', () => {
     // The first button has become the confirmation, so there's one again
     fireEvent.click(screen.getByRole('button', { name: 'Delete event' }));
 
-    expect(await screen.findByText('Hey John!')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Hey John/ })).toBeInTheDocument();
     expect(requests('DELETE', '/api/events/2')).toHaveLength(1);
     await waitFor(() => expect(screen.queryByText('Hiking Trip')).not.toBeInTheDocument());
   });

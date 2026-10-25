@@ -1,4 +1,7 @@
 import {
+  formatDateRangeShort,
+  daysUntil,
+  daysAwayLabel,
   toISODate,
   parseISODate,
   eachDay,
@@ -64,6 +67,39 @@ describe('formatDateRange', () => {
 
   it('returns an empty string when there is no date', () => {
     expect(formatDateRange('')).toBe('');
+  });
+});
+
+describe('formatDateRangeShort', () => {
+  const TODAY = '2026-10-25';
+
+  it("drops the year for this year's dates", () => {
+    expect(formatDateRangeShort('2026-10-28', '2026-10-28', TODAY)).toBe('Wed, Oct 28');
+    expect(formatDateRangeShort('2026-11-13', '2026-11-15', TODAY)).toBe('Nov 13 – 15');
+    expect(formatDateRangeShort('2026-11-30', '2026-12-02', TODAY)).toBe('Nov 30 – Dec 2');
+  });
+
+  it('keeps the year for other years', () => {
+    expect(formatDateRangeShort('2027-04-15', '2027-04-18', TODAY)).toBe('Apr 15 – 18, 2027');
+  });
+});
+
+describe('daysUntil and daysAwayLabel', () => {
+  const TODAY = '2026-10-25';
+
+  it('counts whole days, even across a daylight-saving change', () => {
+    expect(daysUntil('2026-10-25', TODAY)).toBe(0);
+    expect(daysUntil('2026-11-13', TODAY)).toBe(19);
+    // US clocks fall back on Nov 1, 2026
+    expect(daysUntil('2026-11-02', TODAY)).toBe(8);
+    expect(daysUntil('2027-04-15', TODAY)).toBe(172);
+    expect(daysUntil('2026-10-24', TODAY)).toBe(-1);
+  });
+
+  it('labels the timeline in plain words', () => {
+    expect(daysAwayLabel('2026-10-25', TODAY)).toBe('Today');
+    expect(daysAwayLabel('2026-10-26', TODAY)).toBe('Tomorrow');
+    expect(daysAwayLabel('2026-11-13', TODAY)).toBe('19 days');
   });
 });
 

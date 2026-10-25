@@ -8,30 +8,34 @@
 
 /* OpenStreetMap's light tiles turned into a night map: invert and turn the
    hue back (dark land, roads light), drain most of the color, then tint it
-   all indigo with sepia + a hue turn, like the rest of the app */
+   a deep plum with sepia + a hue turn, like the rest of the app */
 .eb-tiles-darkened {
-  filter: invert(1) hue-rotate(180deg) saturate(0.35) brightness(0.85) contrast(1.15) sepia(0.5) hue-rotate(210deg) saturate(1.5);
+  filter: invert(1) hue-rotate(180deg) saturate(0.3) brightness(0.78) contrast(1.15) sepia(0.45) hue-rotate(230deg) saturate(1.3);
 }
 
+/* Zoom buttons as a frosted glass pill */
 .leaflet-control-zoom.leaflet-bar {
   border: 1px solid theme('colors.line');
-  border-radius: 0.75rem;
+  border-radius: 9999px;
   overflow: hidden;
+  background: rgba(30, 24, 44, 0.45);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
 }
 .leaflet-control-zoom.leaflet-bar a {
-  width: 2.25rem;
-  height: 2.25rem;
-  line-height: 2.25rem;
-  background: theme('colors.surface');
+  width: 2.5rem;
+  height: 2.5rem;
+  line-height: 2.5rem;
+  background: transparent;
   color: theme('colors.fg');
   border-bottom-color: theme('colors.line');
 }
 .leaflet-control-zoom.leaflet-bar a:hover {
-  background: theme('colors.raised');
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .leaflet-control-attribution.leaflet-control {
-  background: rgba(12, 10, 31, 0.7);
+  background: rgba(18, 14, 28, 0.6);
   color: theme('colors.faint');
   font-size: 10px;
 }
@@ -54,24 +58,25 @@
   transition: transform 120ms ease-out;
 }
 
-/* Your events: violet with a glow, like the app's primary actions */
+/* Your events: the sunset accent, glowing */
 .eb-pin-mine {
-  background: theme('colors.violet.DEFAULT');
-  box-shadow: 0 0 14px rgba(139, 92, 246, 0.7);
+  background: theme('colors.accent.DEFAULT');
+  box-shadow: 0 0 16px rgba(255, 143, 94, 0.7);
 }
 .eb-pin-mine::after {
   content: '';
   width: 8px;
   height: 8px;
   border-radius: 9999px;
-  background: white;
+  background: theme('colors.night');
 }
 
-/* Ticketmaster venues: pink, smaller, with a count when several events
-   share the venue */
+/* Ticketmaster venues: lilac, smaller, with a count when several events
+   share the venue. Cool, so they never read as one of yours. */
 .eb-pin-nearby {
-  background: #ec4899;
-  box-shadow: 0 0 10px rgba(236, 72, 153, 0.5);
+  background: #a78bfa;
+  color: theme('colors.night');
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
 }
 
 .eb-pin-selected {
@@ -88,7 +93,7 @@
 /* Venue bubbles: several venues merged at this zoom */
 .eb-cluster {
   font-size: 13px;
-  box-shadow: 0 0 0 4px rgba(236, 72, 153, 0.25), 0 0 14px rgba(236, 72, 153, 0.5);
+  box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.25), 0 0 14px rgba(167, 139, 250, 0.5);
 }
 
 /* Friends: their initial in their member color, like their chat avatar */
@@ -121,7 +126,9 @@
 
 /* Name and "2 min ago" under a friend's pin */
 .leaflet-tooltip.eb-tip {
-  background: rgba(22, 19, 47, 0.92);
+  background: rgba(30, 24, 44, 0.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   color: theme('colors.fg');
   border: 1px solid theme('colors.line');
   border-radius: 9999px;

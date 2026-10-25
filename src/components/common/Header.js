@@ -12,18 +12,15 @@ export const getInitials = (name = '') =>
     .map(part => part[0].toUpperCase())
     .join('');
 
-// The two-tone wordmark from the design: "Event" in white, "Buddy" in violet
-export const Wordmark = () => (
-  <span>
-    Event<span className="text-violet-soft">Buddy</span>
-  </span>
-);
+// The wordmark: plain and white, letting the photos carry the color
+export const Wordmark = () => <span className="text-[19px] tracking-[-0.03em]">EventBuddy</span>;
 
 // Screen header on the night background. Top-level tabs show your avatar; inner screens show a back arrow instead, and can put an
 // action (like Edit) on the right. A screen whose content starts with its
 // own big title can leave title out. subtitle (inner screens) names what
 // the screen belongs to, like the event. overPhoto floats the header over
-// a full-width photo, with the back arrow on a dark circle so it stays visible.
+// a full-width photo. Its round buttons are frosted glass either way, so
+// they read on a photo or on the night background.
 const Header = ({
   title,
   subtitle = '',
@@ -50,17 +47,15 @@ const Header = ({
           {showBack && (
             <button
               onClick={handleBack}
-              className={overPhoto
-                ? 'mr-2 p-2 rounded-full bg-black/45 backdrop-blur text-white'
-                : 'mr-2 -ml-1 p-1 rounded-full text-muted hover:text-fg'}
+              className="glass mr-3 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-fg transition-transform active:scale-90"
               aria-label="Back"
             >
-              <ArrowLeft size={22} />
+              <ArrowLeft size={20} />
             </button>
           )}
           {title && (
             <div className="min-w-0">
-              <h1 className={`${type === 'default' ? 'text-2xl font-extrabold tracking-tight' : 'text-lg font-bold'} truncate`}>
+              <h1 className={`${type === 'default' ? 'text-[28px] font-bold tracking-[-0.03em]' : 'text-lg font-semibold tracking-[-0.01em]'} truncate`}>
                 {title === 'EventBuddy' ? <Wordmark /> : title}
               </h1>
               {subtitle && <p className="text-sm text-muted truncate -mt-0.5">{subtitle}</p>}
@@ -73,7 +68,7 @@ const Header = ({
         {showProfile && (
           <button
             onClick={() => navigate('/profile')}
-            className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-violet-soft to-violet-deep text-white text-sm font-bold flex items-center justify-center shadow-glow-sm"
+            className="glass w-10 h-10 shrink-0 rounded-full text-fg text-[13px] font-semibold flex items-center justify-center transition-transform active:scale-90"
             aria-label="Open profile"
           >
             {getInitials(currentUser?.name) || '?'}

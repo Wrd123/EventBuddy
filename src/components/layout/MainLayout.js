@@ -16,7 +16,7 @@ import Register from '../screens/Register';
 import Profile from '../screens/Profile';
 import NotFound from '../screens/NotFound';
 import Invite from '../screens/Invite';
-import { ScreenLoader } from '../common';
+import { AmbientGlow, ScreenLoader } from '../common';
 
 // The map brings in Leaflet, so it loads only when the Map tab is opened
 const Map = lazy(() => import('../screens/Map'));
@@ -25,6 +25,9 @@ const Map = lazy(() => import('../screens/Map'));
 // Each screen renders its own Footer when it needs one.
 const MainLayout = () => (
   <div className="w-full h-full max-w-md mx-auto bg-night overflow-hidden relative">
+    <AmbientGlow />
+    {/* Positioned, so every screen paints above the glow */}
+    <div className="relative h-full">
     <Routes>
       <Route element={<PublicOnly />}>
         <Route path="/login" element={<Login />} />
@@ -47,6 +50,7 @@ const MainLayout = () => (
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
+    </div>
   </div>
 );
 
@@ -79,13 +83,11 @@ const PublicOnly = () => {
 
 // Loading screen component
 const LoadingScreen = () => (
-  <div className="w-full h-full bg-night flex items-center justify-center">
-    <div className="text-center">
-      <div className="animate-pulse text-3xl text-violet-soft font-bold mb-4">
-        EventBuddy
-      </div>
-      <div className="w-12 h-12 border-4 border-violet border-t-transparent rounded-full animate-spin mx-auto"></div>
-      <p className="mt-4 text-muted">Loading...</p>
+  <div className="w-full h-full flex items-center justify-center">
+    <div className="flex flex-col items-center gap-5">
+      <div className="text-2xl font-bold tracking-[-0.03em] animate-pulse">EventBuddy</div>
+      <div className="w-8 h-8 border-[3px] border-fg/80 border-t-transparent rounded-full animate-spin" />
+      <p className="sr-only">Loading</p>
     </div>
   </div>
 );

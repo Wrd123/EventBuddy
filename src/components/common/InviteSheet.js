@@ -54,8 +54,8 @@ const InviteSheet = ({ event, isOrganizer, onClose }) => {
   };
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end bg-black bg-opacity-40" role="dialog" aria-modal="true" aria-labelledby="invite-title">
-      <div className="bg-surface border-t border-line rounded-t-3xl p-4">
+    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+      <div className="sheet p-4">
         <div className="flex items-center justify-between mb-2">
           <h2 id="invite-title" className="text-lg font-semibold">Invite friends</h2>
           <button onClick={onClose} className="text-faint" aria-label="Close">

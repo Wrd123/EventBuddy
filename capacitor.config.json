@@ -2,10 +2,10 @@
   "appId": "com.wrd123.eventbuddy",
   "appName": "EventBuddy",
   "webDir": "build",
-  "backgroundColor": "#0c0a1f",
+  "backgroundColor": "#120e1c",
   "ios": {
     "contentInset": "never",
-    "backgroundColor": "#0c0a1f"
+    "backgroundColor": "#120e1c"
   },
   "plugins": {
     "CapacitorHttp": {

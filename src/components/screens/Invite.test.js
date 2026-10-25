@@ -43,7 +43,8 @@ describe('opening an invite link', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Join event' }));
 
     expect(await screenTitle('Game Night')).toBeInTheDocument();
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    // You're now in Who's going (first names there)
+    expect(screen.getByText('John')).toBeInTheDocument();
     await settle();
   });
 
