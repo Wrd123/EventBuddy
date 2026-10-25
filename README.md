@@ -4,7 +4,7 @@ A phone app for planning trips, festivals and nights out with friends: one place
 
 Built end to end by me: React front end, Express and MongoDB API, and a native iPhone app (Capacitor) that keeps sharing your location with your friends while the phone is locked.
 
-**[Try the live demo](https://eventbuddy-exic.onrender.com)** and tap **Try the demo** to look around as John. It runs on a free server that sleeps when idle, so the first visit can take up to a minute to wake it.
+**[Try the live demo](https://eventbuddy-exic.onrender.com)** and tap **Try the demo** to look around as John, in your own copy of the demo, so change anything you like. It runs on a free server that sleeps when idle, so the first visit can take up to a minute to wake it.
 
 | Home | Event | Live map | Group chat | Split costs |
 |---|---|---|---|---|
@@ -46,7 +46,7 @@ This builds the web app, copies it into the native project and opens it in Xcode
 
 ### Hosting the demo for free
 
-[`render.yaml`](render.yaml) puts the demo on Render's free plan: the web app as a static site, and the API as a free web service in demo mode. There's no database to pay for or look after; the API's in-memory database starts fresh from the demo data each time it wakes.
+[`render.yaml`](render.yaml) puts the demo on Render's free plan: the web app as a static site, and the API as a free web service in demo mode. There's no database to pay for or look after: the API keeps everything in memory, and every visitor who taps **Try the demo** gets a private copy of the demo data.
 
 1. In Render, choose **New > Blueprint** and pick this repository.
 2. When it asks, enter the two addresses (and optionally a Ticketmaster key):
@@ -78,7 +78,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet |
 | iPhone | Capacitor 7, background geolocation, native HTTP |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
-| Testing | Jest and Testing Library (231 tests), Node's test runner with Supertest and an in-memory MongoDB (244 tests) |
+| Testing | Jest and Testing Library (231 tests), Node's test runner with Supertest and an in-memory MongoDB (250 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
@@ -90,7 +90,8 @@ flowchart LR
 - **Background location is one small seam.** A single tracker module uses the native background plugin in the app and the browser's geolocation on the web, and app-wide sharing state keeps it running on every screen, through a relaunch, and stops it on logout.
 - **Third-party APIs stay behind the server.** API keys never ship to the phone, results are cached (30 minutes for events, a day for places), OpenStreetMap's one-request-per-second rule is enforced with a queue, and user coordinates are rounded to about 1 km before they leave the phone for Discover.
 - **The map updates pins in place.** Friends' positions refresh every 10 seconds; markers are matched by id and moved rather than redrawn, so labels don't flicker. Debugging the first version turned up that Leaflet silently ignores a new view while a zoom animation is running, so automatic fits are instant.
-- **Demo mode instead of production infrastructure.** For a showcase, a fresh in-memory database seeded on every start is cheaper and safer than a real one: no stored personal data, nothing to clean up, and every visitor sees the same lively demo. Demo accounts keep fixed ids, so a saved login still works after the server sleeps and wakes with a new database.
+- **Demo mode instead of production infrastructure.** For a showcase, an in-memory database is cheaper and safer than a real one: no stored personal data and nothing to clean up.
+- **Every demo visitor gets a private world.** Tapping **Try the demo** creates a fresh copy of John, his friends, their events, chat and costs, so nothing one visitor adds shows up for the next. Every id in a world is derived from a random tag carried in the login token, so when the free server sleeps and wakes with an empty database, a saved login rebuilds the same world. Worlds expire after a day and at most 300 are kept, which bounds memory no matter how often someone taps the button. The picnic is placed on the visitor's own date, so it's happening "today" in any time zone.
 
 ## Project structure
 

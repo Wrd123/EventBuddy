@@ -1,16 +1,17 @@
 const { createApp } = require('./app');
 const { connectDatabase, disconnectDatabase } = require('./db');
 const { seedDemoData, DEMO_LOGIN } = require('./seed/demoData');
-const { port, demoMode } = require('./config');
+const { port, demoMode, isProduction } = require('./config');
 
 const start = async () => {
   const inMemory = await connectDatabase();
 
-  if (inMemory || demoMode) {
+  // The shared demo world, with its public password, is for development. A
+  // hosted demo gives each visitor a private world instead (POST /api/auth/demo).
+  const sharedDemo = (inMemory || demoMode) && !isProduction;
+  if (sharedDemo) {
     await seedDemoData();
-  }
-  if (inMemory) {
-    console.log('Using a temporary in-memory database (set MONGODB_URI to use Atlas).');
+    if (inMemory) console.log('Using a temporary in-memory database (set MONGODB_URI to use Atlas).');
     console.log(`Demo login: ${DEMO_LOGIN.email} / ${DEMO_LOGIN.password}`);
     console.log('Demo friends (same password): alex@, taylor@, jordan@, jamie@, casey@example.com');
   }

@@ -6,7 +6,7 @@ const { signToken, requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
 const { validateRegistration, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
 const config = require('../config');
-const { DEMO_LOGIN } = require('../seed/demoData');
+const { createDemoWorld, pruneDemoWorlds, dayIn } = require('../seed/demoData');
 
 const { isTest, bcryptRounds } = config;
 
@@ -76,15 +76,30 @@ router.post('/login', attemptLimiter, async (req, res) => {
   res.json({ token: signToken(user), user });
 });
 
-// One-tap sign-in as the demo user, for people trying the app. Only in
-// demo mode, where the demo data is public anyway; elsewhere it doesn't exist.
-// No attempt limit: there's no password to guess, and on a host where the
-// client IP can't be read reliably, a shared limit would lock everyone out
+// Private demo worlds last a day, and at most this many are kept
+const DEMO_WORLD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const MAX_DEMO_WORLDS = 300;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// The visitor's own date, if it's a real calendar day within one of ours
+// (time zones span about a day either side of UTC)
+const visitorToday = (value) => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const now = Date.now();
+  return value >= dayIn('UTC', now - DAY_MS) && value <= dayIn('UTC', now + DAY_MS) ? value : undefined;
+};
+
+// One-tap sign-in for people trying the app, as John in a private copy of
+// the demo: what one visitor changes, the next never sees. Only in demo
+// mode; elsewhere it doesn't exist. body.today puts the picnic on the
+// visitor's today. No IP attempt limit (there's no password to guess, and
+// where client IPs can't be read reliably a shared limit would lock everyone
+// out); pruning bounds how many worlds exist instead.
 router.post('/demo', async (req, res) => {
   if (!config.demoMode) throw new HttpError(404, 'Not found.');
-  const user = await User.findOne({ email: DEMO_LOGIN.email });
-  if (!user) throw new HttpError(503, 'The demo is still getting ready. Try again in a moment.');
-  res.json({ token: signToken(user), user });
+  await pruneDemoWorlds({ maxAgeMs: DEMO_WORLD_MAX_AGE_MS, maxWorlds: MAX_DEMO_WORLDS });
+  const user = await createDemoWorld({ today: visitorToday(req.body?.today) });
+  res.status(201).json({ token: signToken(user), user });
 });
 
 router.get('/me', requireAuth, (req, res) => {

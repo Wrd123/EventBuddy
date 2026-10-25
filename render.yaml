@@ -1,8 +1,8 @@
 # Render Blueprint for the free hosted demo: the web app as a static site
 # (always on) and the API on a free web service (sleeps after 15 idle
 # minutes; the app shows a waking-up screen meanwhile). The API runs in demo
-# mode, with an in-memory database that starts fresh from the demo data each
-# time it wakes, so there's no database to pay for or look after.
+# mode with an in-memory database, and every visitor gets a private copy of
+# the demo data, so there's no database to pay for or look after.
 #
 # Render asks for the values marked sync: false when the Blueprint is
 # created. See "Hosting the demo" in the README.

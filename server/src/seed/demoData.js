@@ -1,5 +1,7 @@
-// Demo accounts and events for development. Never seed this into a
-// production database: the demo password is public.
+// Demo accounts and events: a shared world for development (never seed it
+// into a production database: the demo password is public), and private
+// copies for each visitor to a hosted demo.
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Event = require('../models/Event');
@@ -23,9 +25,17 @@ const DEMO_FRIENDS = [
   { name: 'Casey', username: 'casey', email: 'casey@example.com', color: '#ec4899' }
 ];
 
+// An id that sorts by this time, like one MongoDB would have made then.
+// (ObjectId.createFromTime zero-fills the rest, so two demo worlds made in
+// the same second would collide.)
+const objectIdAt = (date) =>
+  new mongoose.Types.ObjectId(
+    Math.floor(date.getTime() / 1000).toString(16).padStart(8, '0') + crypto.randomBytes(8).toString('hex')
+  );
+
 // Fixed ids so links to demo events (e.g. Groups -> event) stay stable
-// across restarts and re-seeds. Users too: a hosted demo restarts with a
-// fresh database after sleeping, and a saved login should still work.
+// across restarts and re-seeds. Users too: the development server restarts
+// with a fresh in-memory database, and a saved login should still work.
 const DEMO_USER_IDS = {
   me: new mongoose.Types.ObjectId('00000000000000000000a001'),
   Alex: new mongoose.Types.ObjectId('00000000000000000000a002'),
@@ -42,9 +52,10 @@ const DEMO_EVENT_IDS = {
   picnic: new mongoose.Types.ObjectId('000000000000000000000004')
 };
 
-// users: { me, Alex, Taylor, ... } as created below. Map positions are
-// filled in, so the demo map works without looking anything up.
-const demoEvents = (users) => {
+// users: { me, Alex, Taylor, ... } as created below; ids: the world's event
+// ids. Map positions are filled in, so the demo map works without looking
+// anything up.
+const demoEvents = (users, ids) => {
   const { me } = users;
   const member = (name) => {
     const user = users[name];
@@ -57,7 +68,7 @@ const demoEvents = (users) => {
 
   return [
     {
-      _id: DEMO_EVENT_IDS.festival,
+      _id: ids.festival,
       name: 'Summer Music Festival',
       type: 'music-festival',
       startDate: '2027-04-15',
@@ -76,7 +87,7 @@ const demoEvents = (users) => {
       createdBy: me._id
     },
     {
-      _id: DEMO_EVENT_IDS.hiking,
+      _id: ids.hiking,
       name: 'Hiking Trip',
       type: 'outdoor',
       startDate: '2026-11-13',
@@ -92,7 +103,7 @@ const demoEvents = (users) => {
       createdBy: me._id
     },
     {
-      _id: DEMO_EVENT_IDS.beach,
+      _id: ids.beach,
       name: 'Beach Day',
       type: 'outdoor',
       startDate: '2026-08-08',
@@ -112,13 +123,13 @@ const demoEvents = (users) => {
 // The festival chat: yesterday's planning and two new messages this morning,
 // which John hasn't read yet. Chats are ordered by id, so ids are made from
 // the send times.
-const demoChat = (users) => {
+const demoChat = (users, ids) => {
   const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60 * 1000);
   const message = (minutes, name, text) => {
     const createdAt = minutesAgo(minutes);
     return {
-      _id: mongoose.Types.ObjectId.createFromTime(Math.floor(createdAt.getTime() / 1000)),
-      event: DEMO_EVENT_IDS.festival,
+      _id: objectIdAt(createdAt),
+      event: ids.festival,
       sender: { user: users[name]._id, name: users[name].name },
       text,
       createdAt
@@ -133,7 +144,7 @@ const demoChat = (users) => {
     message(90, 'Alex', "Who's bringing a portable charger?"),
     message(85, 'Jamie', "I've got two, I'll bring both 🔋")
   ];
-  const read = { event: DEMO_EVENT_IDS.festival, user: users.me._id, lastRead: messages[3]._id };
+  const read = { event: ids.festival, user: users.me._id, lastRead: messages[3]._id };
   return { messages, read };
 };
 
@@ -151,18 +162,19 @@ const PARK_TIME_ZONE = 'America/New_York';
 const dayIn = (timeZone, now = Date.now()) =>
   new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 
-const demoPicnic = (users) => {
+// today: the visitor's own date when known, else Atlanta's
+const demoPicnic = (users, ids, today) => {
   const now = Date.now();
   const minutesAgo = (minutes) => new Date(now - minutes * 60 * 1000);
-  const todayISO = dayIn(PARK_TIME_ZONE, now);
+  const todayISO = today || dayIn(PARK_TIME_ZONE, now);
   const color = (name) => DEMO_FRIENDS.find((f) => f.name === name)?.color || ORGANIZER_COLOR;
   const member = (name) => ({ user: users[name]._id, name: users[name].name, color: color(name) });
   const until = new Date(now + 6 * 60 * 60 * 1000);
   const share = (name, lat, lng, minutes) =>
-    ({ event: DEMO_EVENT_IDS.picnic, user: users[name]._id, until, lat, lng, accuracy: 12, positionAt: minutesAgo(minutes) });
+    ({ event: ids.picnic, user: users[name]._id, until, lat, lng, accuracy: 12, positionAt: minutesAgo(minutes) });
 
   const event = {
-    _id: DEMO_EVENT_IDS.picnic,
+    _id: ids.picnic,
     name: 'Picnic in the Park',
     type: 'outdoor',
     startDate: todayISO,
@@ -193,8 +205,8 @@ const demoPicnic = (users) => {
 };
 
 // Festival money: who paid for what, and one payment already settled
-const demoLedger = (users) => {
-  const event = DEMO_EVENT_IDS.festival;
+const demoLedger = (users, ids) => {
+  const event = ids.festival;
   const who = (name) => ({ user: users[name]._id, name: users[name].name });
   const equally = (amountCents, ...names) => {
     // Same rule as the app: leftover cents go to the first people listed
@@ -218,39 +230,128 @@ const demoLedger = (users) => {
   };
 };
 
-// Creates the demo accounts and events if the demo user doesn't exist yet.
-// Safe to run repeatedly. Returns the demo user.
+// Saves a whole demo world: accounts, events, money, chat and the picnic's
+// live locations. users: [{ key, _id, name, username, email }] with key 'me'
+// first, then the friends' names.
+const insertDemoWorld = async ({ users: accounts, eventIds, passwordHash, demoWorld, today }) => {
+  const created = await User.create(accounts.map(({ key, ...account }) => ({
+    ...account,
+    passwordHash,
+    demoWorld,
+    // Friends' only payment handle is Zelle at their example.com address:
+    // example.com is reserved, so no one can pay a real stranger by
+    // accident. Made-up Venmo/Cash App/PayPal names could be real people.
+    paymentHandles: key === 'me' ? undefined : { zelle: account.email }
+  })));
+  const users = Object.fromEntries(accounts.map(({ key }, i) => [key, created[i]]));
+
+  // Validation is skipped on purpose: some demo events are in the past
+  await Event.insertMany(demoEvents(users, eventIds));
+  const ledger = demoLedger(users, eventIds);
+  await Expense.insertMany(ledger.expenses);
+  await Payment.insertMany(ledger.payments);
+  const chat = demoChat(users, eventIds);
+  await Message.insertMany(chat.messages);
+  await ChatRead.create(chat.read);
+  const picnic = demoPicnic(users, eventIds, today);
+  await Event.insertMany([picnic.event]);
+  await LocationShare.insertMany(picnic.shares);
+  return users.me;
+};
+
+// The shared demo world for local development: log in as user@example.com
+// (or a friend) with the password "password". Created if missing; safe to
+// run repeatedly. Returns the demo user.
 const seedDemoData = async () => {
   const existing = await User.findOne({ email: DEMO_LOGIN.email });
   if (existing) return existing;
 
-  // One hash for everyone: same password, and hashing is deliberately slow
-  const passwordHash = await User.hashPassword(DEMO_PASSWORD);
-  const [me, ...friends] = await User.create([
-    { _id: DEMO_USER_IDS.me, email: DEMO_LOGIN.email, username: 'johndoe', name: 'John Doe', passwordHash },
-    // Friends' only payment handle is Zelle at their example.com address:
-    // example.com is reserved, so no one can pay a real stranger by
-    // accident. Made-up Venmo/Cash App/PayPal names could be real people.
-    ...DEMO_FRIENDS.map(({ name, username, email }) => ({
-      _id: DEMO_USER_IDS[name], name, username, email, passwordHash, paymentHandles: { zelle: email }
-    }))
-  ]);
-
-  const users = { me };
-  friends.forEach((friend) => { users[friend.name] = friend; });
-
-  // Validation is skipped on purpose: some demo events are in the past
-  await Event.insertMany(demoEvents(users));
-  const ledger = demoLedger(users);
-  await Expense.insertMany(ledger.expenses);
-  await Payment.insertMany(ledger.payments);
-  const chat = demoChat(users);
-  await Message.insertMany(chat.messages);
-  await ChatRead.create(chat.read);
-  const picnic = demoPicnic(users);
-  await Event.insertMany([picnic.event]);
-  await LocationShare.insertMany(picnic.shares);
-  return me;
+  return insertDemoWorld({
+    users: [
+      { key: 'me', _id: DEMO_USER_IDS.me, email: DEMO_LOGIN.email, username: 'johndoe', name: 'John Doe' },
+      ...DEMO_FRIENDS.map(({ name, username, email }) => ({ key: name, _id: DEMO_USER_IDS[name], name, username, email }))
+    ],
+    eventIds: DEMO_EVENT_IDS,
+    // One hash for everyone: same password, and hashing is deliberately slow
+    passwordHash: await User.hashPassword(DEMO_PASSWORD)
+  });
 };
 
-module.exports = { seedDemoData, dayIn, DEMO_LOGIN, DEMO_FRIENDS, DEMO_EVENT_IDS };
+// Private demo worlds: every "Try the demo" gets its own copy, so what one
+// visitor adds or changes never shows up for the next. A world is named by a
+// random tag, and every id in it is derived from that tag, so a saved login
+// can rebuild the same world after a hosted demo restarts with an empty
+// database.
+const newDemoWorldTag = () => crypto.randomBytes(6).toString('hex');
+
+const idInWorld = (tag, key) =>
+  new mongoose.Types.ObjectId(crypto.createHash('sha256').update(`${tag}:${key}`).digest('hex').slice(0, 24));
+
+const demoWorldUserId = (tag) => idInWorld(tag, 'user:me');
+
+// Nobody signs in to a world's accounts with a password (only with the
+// demo's token), so they share one unguessable one, hashed once
+let worldPasswordHash = null;
+const worldPassword = () => {
+  worldPasswordHash = worldPasswordHash || User.hashPassword(crypto.randomBytes(32).toString('hex'));
+  return worldPasswordHash;
+};
+
+// Creates the world named tag (or rebuilds it after a restart) and returns
+// its John.
+// today: the visitor's 'YYYY-MM-DD', so the picnic is on their today.
+const createDemoWorld = async ({ tag = newDemoWorldTag(), today } = {}) => {
+  const account = (key, name, username) => ({
+    key,
+    _id: idInWorld(tag, `user:${key}`),
+    name,
+    username: `${username}-${tag}`,
+    email: `${username}.${tag}@example.com`
+  });
+
+  return insertDemoWorld({
+    users: [account('me', 'John Doe', 'john'), ...DEMO_FRIENDS.map(({ name, username }) => account(name, name, username))],
+    eventIds: Object.fromEntries(Object.keys(DEMO_EVENT_IDS).map((key) => [key, idInWorld(tag, `event:${key}`)])),
+    passwordHash: await worldPassword(),
+    demoWorld: tag,
+    today
+  });
+};
+
+// Deletes demo worlds older than maxAgeMs, and the oldest beyond
+// maxWorlds - 1 (leaving room for one more), with everything in them. A
+// sleeping host starts empty anyway; this bounds a busy one's memory, even
+// if someone signs in to the demo over and over. Returns how many went.
+const pruneDemoWorlds = async ({ maxAgeMs, maxWorlds }) => {
+  const owners = await User.find({ demoWorld: { $exists: true }, username: /^john-/ }, 'demoWorld createdAt')
+    .sort({ createdAt: -1 });
+  const cutoff = Date.now() - maxAgeMs;
+  const tags = owners
+    .filter((owner, newest) => newest >= maxWorlds - 1 || owner.createdAt.getTime() < cutoff)
+    .map((owner) => owner.demoWorld);
+  if (tags.length === 0) return 0;
+
+  const userIds = (await User.find({ demoWorld: { $in: tags } }, '_id')).map((u) => u._id);
+  const eventIds = (await Event.find({ createdBy: { $in: userIds } }, '_id')).map((e) => e._id);
+  await Promise.all([
+    Event.deleteMany({ _id: { $in: eventIds } }),
+    Expense.deleteMany({ event: { $in: eventIds } }),
+    Payment.deleteMany({ event: { $in: eventIds } }),
+    Message.deleteMany({ event: { $in: eventIds } }),
+    ChatRead.deleteMany({ $or: [{ event: { $in: eventIds } }, { user: { $in: userIds } }] }),
+    LocationShare.deleteMany({ $or: [{ event: { $in: eventIds } }, { user: { $in: userIds } }] }),
+    User.deleteMany({ _id: { $in: userIds } })
+  ]);
+  return tags.length;
+};
+
+module.exports = {
+  seedDemoData,
+  createDemoWorld,
+  demoWorldUserId,
+  pruneDemoWorlds,
+  dayIn,
+  DEMO_LOGIN,
+  DEMO_FRIENDS,
+  DEMO_EVENT_IDS
+};

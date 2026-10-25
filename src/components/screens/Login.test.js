@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi } from '../../testUtils/fakeApi';
+import { todayISO } from '../../utils/dates';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -26,8 +27,9 @@ describe('Login', () => {
 
     expect(await screen.findByText('Hey John!')).toBeInTheDocument();
     const signIn = global.fetch.mock.calls.find(([url]) => url === '/api/auth/demo');
-    // No password involved: the server decides who the demo user is
-    expect(signIn[1].body).toBeUndefined();
+    // No password involved: the server makes a private copy of the demo,
+    // with its picnic on this phone's date
+    expect(JSON.parse(signIn[1].body)).toEqual({ today: todayISO() });
   });
 
   it("doesn't offer the demo on a real server", async () => {

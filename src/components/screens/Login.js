@@ -70,7 +70,7 @@ const Login = () => {
               Try the demo
             </Button>
             <p className="text-sm text-muted text-center mt-2">
-              Signs you in as John, with friends, plans and chats ready to explore.
+              Signs you in as John, with friends, plans and chats ready to explore. It's your own copy, so change anything.
             </p>
             <div className="flex items-center mt-6 text-xs text-faint">
               <span className="flex-1 h-px bg-line" />

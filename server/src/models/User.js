@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
     avatar: { type: String, default: null },
     // Where friends can send this person money. Shown only to people who
     // share an event with them (see GET /api/events/:id/payment-handles).
+    // Set on accounts in a private demo world (see seed/demoData.js)
+    demoWorld: { type: String, index: true },
     paymentHandles: {
       venmo: { type: String, default: '' },
       cashapp: { type: String, default: '' },
@@ -32,6 +34,7 @@ userSchema.methods.checkPassword = function (password) {
 userSchema.set('toJSON', {
   transform: (doc, ret) => {
     delete ret.passwordHash;
+    delete ret.demoWorld;
     delete ret.__v;
     return ret;
   }

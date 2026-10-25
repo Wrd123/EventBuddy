@@ -146,38 +146,106 @@ describe('PATCH /api/auth/me', () => {
 
 describe('POST /api/auth/demo', () => {
   const config = require('../src/config');
-  const { seedDemoData } = require('../src/seed/demoData');
+  const mongoose = require('mongoose');
+  const Event = require('../src/models/Event');
+  const Message = require('../src/models/Message');
+  const { seedDemoData, pruneDemoWorlds, dayIn } = require('../src/seed/demoData');
 
-  it('signs in as the demo user in demo mode', async () => {
-    await seedDemoData();
+  const tryDemo = (body = {}) => api().post('/api/auth/demo').send(body).expect(201);
+  const eventsFor = async (token) =>
+    (await api().get('/api/events').set('Authorization', `Bearer ${token}`).expect(200)).body.events;
 
-    const res = await api().post('/api/auth/demo').expect(200);
+  it('signs you in as John in your own copy of the demo', async () => {
+    const res = await tryDemo();
 
-    assert.equal(res.body.user.email, 'user@example.com');
+    assert.equal(res.body.user.name, 'John Doe');
     assert.equal(res.body.user.passwordHash, undefined);
-    await api().get('/api/auth/me').set('Authorization', `Bearer ${res.body.token}`).expect(200);
+    assert.equal(res.body.user.demoWorld, undefined);
+    const events = await eventsFor(res.body.token);
+    assert.deepEqual(events.map((e) => e.name).sort(), ['Beach Day', 'Hiking Trip', 'Picnic in the Park', 'Summer Music Festival']);
   });
 
-  it('keeps a saved demo login working after the demo restarts fresh', async () => {
-    await seedDemoData();
-    const { token } = (await api().post('/api/auth/demo').expect(200)).body;
+  it("keeps each visitor's changes to themselves", async () => {
+    const first = await tryDemo();
+    const second = await tryDemo();
+    assert.notEqual(first.body.user._id, second.body.user._id);
 
-    // A sleeping host wakes up with an empty database and seeds it again
-    const mongoose = require('mongoose');
+    await api().post('/api/events').set('Authorization', `Bearer ${first.body.token}`)
+      .send({ name: 'Secret plan', type: 'concert', startDate: '2099-01-01', endDate: '2099-01-01' })
+      .expect(201);
+
+    const firstNames = (await eventsFor(first.body.token)).map((e) => e.name);
+    const secondNames = (await eventsFor(second.body.token)).map((e) => e.name);
+    assert.ok(firstNames.includes('Secret plan'));
+    assert.ok(!secondNames.includes('Secret plan'));
+    assert.equal(secondNames.length, 4);
+  });
+
+  it("puts the picnic on the visitor's own today", async () => {
+    const tomorrowUtc = dayIn('UTC', Date.now() + 12 * 60 * 60 * 1000);
+    const { body } = await tryDemo({ today: tomorrowUtc });
+    const picnic = (await eventsFor(body.token)).find((e) => e.name === 'Picnic in the Park');
+    assert.equal(picnic.startDate, tomorrowUtc);
+  });
+
+  it("falls back to Atlanta's today for a date that can't be anyone's today", async () => {
+    const { body } = await tryDemo({ today: '1999-01-01' });
+    const picnic = (await eventsFor(body.token)).find((e) => e.name === 'Picnic in the Park');
+    assert.equal(picnic.startDate, dayIn('America/New_York'));
+  });
+
+  it('rebuilds your world for a saved login after the demo restarts empty', async () => {
+    const { body } = await tryDemo();
+
+    // A sleeping host wakes up with an empty database
     await mongoose.connection.dropDatabase();
-    await seedDemoData();
 
-    const res = await api().get('/api/auth/me').set('Authorization', `Bearer ${token}`).expect(200);
-    assert.equal(res.body.user.email, 'user@example.com');
+    const res = await api().get('/api/auth/me').set('Authorization', `Bearer ${body.token}`).expect(200);
+    assert.equal(res.body.user._id, body.user._id);
+    assert.equal((await eventsFor(body.token)).length, 4);
   });
 
-  it('says so while the demo data is still loading', async () => {
-    const res = await api().post('/api/auth/demo').expect(503);
-    assert.equal(res.body.message, 'The demo is still getting ready. Try again in a moment.');
+  it('rebuilds a world only once when requests arrive together', async () => {
+    const { body } = await tryDemo();
+    await mongoose.connection.dropDatabase();
+
+    const auth = `Bearer ${body.token}`;
+    await Promise.all([
+      api().get('/api/events').set('Authorization', auth).expect(200),
+      api().get('/api/chats').set('Authorization', auth).expect(200),
+      api().get('/api/auth/me').set('Authorization', auth).expect(200)
+    ]);
+    assert.equal((await eventsFor(body.token)).length, 4);
+  });
+
+  it("can't be signed in to with a password", async () => {
+    const { body } = await tryDemo();
+    await api().post('/api/auth/login').send({ email: body.user.email, password: 'password' }).expect(401);
+  });
+
+  it('keeps only recent worlds, oldest out first, and leaves the shared one alone', async () => {
+    await seedDemoData();
+    const worlds = [];
+    for (let i = 0; i < 3; i += 1) worlds.push((await tryDemo()).body);
+
+    // Room for one more next to the newest
+    assert.equal(await pruneDemoWorlds({ maxAgeMs: 60 * 60 * 1000, maxWorlds: 2 }), 2);
+
+    assert.equal((await eventsFor(worlds[2].token)).length, 4);
+    assert.equal(await User.countDocuments({ demoWorld: { $exists: true } }), 6);
+    assert.equal(await User.countDocuments({ email: 'user@example.com' }), 1);
+    // The shared world plus one private one
+    assert.equal(await Event.countDocuments(), 8);
+    assert.equal(await Message.countDocuments(), 12);
+  });
+
+  it('lets worlds go after a day', async () => {
+    await tryDemo();
+    assert.equal(await pruneDemoWorlds({ maxAgeMs: -1, maxWorlds: 100 }), 1);
+    assert.equal(await User.countDocuments(), 0);
   });
 
   it("doesn't exist outside demo mode", async () => {
-    await seedDemoData();
     const original = config.demoMode;
     config.demoMode = false;
     try {
