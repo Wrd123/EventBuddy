@@ -42,9 +42,23 @@ New today:
 - **Freshness uses polling, not WebSockets.** Phase 4 can add sockets later; polling stays as the fallback.
 - **No React Query.** The small `freshness.js` rule is deliberate.
 
+## The roadmap
+
+The goal: a reviewer opens EventBuddy and sees senior-level work. That means a distinctive design, a smooth feel, real time and production-grade engineering. Each phase ships on its own with tests passing. The user judges the visual work, so show screenshots before moving on. The $0 budget rules out push notifications and TestFlight.
+
+| Phase | What | Status |
+|---|---|---|
+| 1 | Design directions: Afterglow chosen, with Signal's timeline on Home | Done |
+| 2 | The design system, and every screen rebuilt on it | Done |
+| 3 | Feel: route transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | **In progress** on `phase-3-feel` |
+| 3b | Loading skeletons instead of spinners, and pull-to-refresh | Planned |
+| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now | Planned |
+| 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
+| 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
+
 ## What comes next
 
-The user hasn't chosen yet. I offered **phase 3 (feel)** with D1, D4 and D5 folded in. Plan it in plan mode first, as `CLAUDE.md` asks. Then build, then have the `reviewer` subagent check it.
+Phase 3 is planned and approved. It covers a shared `Sheet` component, tap targets, the small-screen timeline, route transitions, haptics, and optimistic payments and "Going". It has no server edits. Optimistic creates for expenses and schedule items need a server `clientId` first, so they're a follow-up.
 
 **Phase 3:** route transitions, draggable sheets, optimistic UI, haptics.
 - Optimistic UI is now safe for messages and payments, which have idempotent creates. Other creates (expenses, schedule items) don't have a `clientId` yet. Add one before making them optimistic.
@@ -62,12 +76,7 @@ The user hasn't chosen yet. I offered **phase 3 (feel)** with D1, D4 and D5 fold
 - **D6:** the Wordmark is hardcoded at 19px. Reduced transparency doesn't cover `.sheet`, `.sheet-scrim` or the photo backdrop.
 - After phase 3, retake the README screenshots (`docs/screenshots/*.jpg`), which still show the look from before Afterglow.
 
-**Phases 4–6 are unchanged:**
-- **4:** real time
-- **5:** TypeScript, Playwright, Lighthouse and accessibility audits, Sentry, a keep-awake ping
-- **6:** day-of mode, a case study and a demo video
-
-Don't start a phase until the user asks.
+Phases 3b to 6 are in the roadmap above. Don't start a phase until the user asks.
 
 ## Traps
 
