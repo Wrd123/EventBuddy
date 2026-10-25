@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -45,6 +45,7 @@ describe('Editing an event', () => {
       startDate: '2027-04-15',
       endDate: '2027-04-18'
     });
+    await settle();
   });
 
   it("tells a member who isn't the organizer they can't edit it", async () => {

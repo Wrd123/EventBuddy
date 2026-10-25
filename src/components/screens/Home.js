@@ -17,7 +17,7 @@ const PREVIEW_COUNT = 3;
 const SUGGESTION_COUNT = 8;
 
 const Home = () => {
-  const { events, currentUser } = useAppContext();
+  const { events, eventsStatus, reloadEvents, currentUser } = useAppContext();
   const navigate = useNavigate();
   const openEvent = (event) => navigate(`/events/${event._id}`);
   const { place } = usePlace();
@@ -34,7 +34,8 @@ const Home = () => {
   const pastEvents = withStatus
     .filter(({ status }) => status === 'past')
     .sort((a, b) => byStartDate(b.event, a.event));
-  const nextUp = activeEvents[0];
+  // The soonest one gets the big card; the list holds the rest
+  const [nextUp, ...laterEvents] = activeEvents;
 
   const firstName = currentUser?.name?.split(' ')[0];
 
@@ -51,48 +52,23 @@ const Home = () => {
             {firstName ? `Hey ${firstName}!` : 'Welcome!'}
             <Music2 size={26} className="ml-2 text-violet-soft" aria-hidden="true" />
           </h2>
-          <p className="text-muted mt-1">
-            You have {activeEvents.length} upcoming event{activeEvents.length === 1 ? '' : 's'}
-          </p>
+          {eventsStatus === 'ready' && (
+            <p className="text-muted mt-1">
+              You have {activeEvents.length} upcoming event{activeEvents.length === 1 ? '' : 's'}
+            </p>
+          )}
         </section>
 
-        <button
-          onClick={() => setChoosingPlace(true)}
-          aria-label={place ? `Change location, now near ${place.label}` : 'Choose a location'}
-          className="w-full flex items-center justify-between rounded-2xl bg-surface/80 border border-line backdrop-blur px-3 py-2.5 mb-4 text-left"
-        >
-          <span className="flex items-center font-semibold min-w-0">
-            <MapPin size={20} className="mr-2 text-violet-soft shrink-0" aria-hidden="true" />
-            <span className="truncate">{place ? `Near ${place.label}` : 'Events near you'}</span>
-          </span>
-          {place?.source === 'device' ? (
-            <span className="flex items-center text-sm font-semibold text-go bg-go/10 border border-go/30 px-3 py-1 rounded-full shrink-0">
-              <Navigation size={14} className="mr-1.5" aria-hidden="true" />
-              Location On
-            </span>
-          ) : (
-            <span className="flex items-center text-sm font-semibold text-violet-soft bg-violet/10 border border-violet/30 px-3 py-1 rounded-full shrink-0">
-              <Navigation size={14} className="mr-1.5" aria-hidden="true" />
-              {place ? 'Change' : 'Turn on location'}
-            </span>
-          )}
-        </button>
+        {/* Without a place, Suggestions below asks for one instead */}
+        {place && <PlaceBar place={place} onChange={() => setChoosingPlace(true)} />}
 
         {nextUp && <NextUpCard event={nextUp.event} status={nextUp.status} onOpen={() => openEvent(nextUp.event)} />}
 
-        <EventSection
-          title="Your Events"
-          items={activeEvents}
-          onOpen={openEvent}
-          empty={
-            <div className="card p-5 text-center">
-              <p className="font-semibold mb-1">No upcoming events yet</p>
-              <p className="text-sm text-muted">Tap + to plan something and invite your friends.</p>
-            </div>
-          }
-        />
+        {!nextUp && <NoEvents status={eventsStatus} onRetry={reloadEvents} />}
 
-        {pastEvents.length > 0 && <EventSection title="Past Events" items={pastEvents} onOpen={openEvent} />}
+        {laterEvents.length > 0 && <EventSection title="Coming up" items={laterEvents} onOpen={openEvent} />}
+
+        {pastEvents.length > 0 && <EventSection title="Past events" items={pastEvents} onOpen={openEvent} />}
 
         <Suggestions
           place={place}
@@ -111,6 +87,54 @@ const Home = () => {
   );
 };
 
+// What goes where the Next up card would be, depending on why there isn't
+// one: still loading, couldn't load, or no upcoming events
+const NoEvents = ({ status, onRetry }) => {
+  if (status === 'loading') {
+    return <div className="h-60 rounded-card bg-surface border border-line animate-pulse" aria-label="Loading your events" />;
+  }
+  if (status === 'error') {
+    return (
+      <div className="card p-5 text-center" role="alert">
+        <p className="font-semibold mb-1">Couldn't load your events</p>
+        <p className="text-sm text-muted mb-3">Check your connection and try again.</p>
+        <button onClick={onRetry} className="text-sm font-semibold text-violet-soft">Try again</button>
+      </div>
+    );
+  }
+  return (
+    <div className="card p-5 text-center">
+      <p className="font-semibold mb-1">No upcoming events yet</p>
+      <p className="text-sm text-muted">Tap + to plan something and invite your friends.</p>
+    </div>
+  );
+};
+
+// Where suggestions come from, and a way to change it
+const PlaceBar = ({ place, onChange }) => (
+  <button
+    onClick={onChange}
+    aria-label={`Change location, now near ${place.label}`}
+    className="w-full flex items-center justify-between rounded-2xl bg-surface/80 border border-line backdrop-blur px-3 py-2.5 mb-4 text-left"
+  >
+    <span className="flex items-center font-semibold min-w-0">
+      <MapPin size={20} className="mr-2 text-violet-soft shrink-0" aria-hidden="true" />
+      <span className="truncate">Near {place.label}</span>
+    </span>
+    {place.source === 'device' ? (
+      <span className="flex items-center text-sm font-semibold text-go bg-go/10 border border-go/30 px-3 py-1 rounded-full shrink-0">
+        <Navigation size={14} className="mr-1.5" aria-hidden="true" />
+        Location on
+      </span>
+    ) : (
+      <span className="flex items-center text-sm font-semibold text-violet-soft bg-violet/10 border border-violet/30 px-3 py-1 rounded-full shrink-0">
+        <Navigation size={14} className="mr-1.5" aria-hidden="true" />
+        Change
+      </span>
+    )}
+  </button>
+);
+
 // Real events near you, a tap away from planning with friends
 const Suggestions = ({ place, nearby, onChoosePlace, onOpen }) => {
   // Errors and empty areas are explained on Discover; Home just stays quiet
@@ -119,7 +143,7 @@ const Suggestions = ({ place, nearby, onChoosePlace, onOpen }) => {
   return (
     <section className="mt-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xl font-bold">Suggested For You</h3>
+        <h3 className="text-xl font-bold">Suggested for you</h3>
         {place && (
           <Link to="/discover" className="flex items-center text-sm font-semibold text-violet-soft">
             View all <ChevronRight size={16} aria-hidden="true" />
@@ -129,7 +153,10 @@ const Suggestions = ({ place, nearby, onChoosePlace, onOpen }) => {
       {!place ? (
         <button onClick={onChoosePlace} className="card w-full p-4 text-left">
           <span className="font-semibold block">Find concerts, games and shows near you</span>
-          <span className="text-sm text-violet-soft">Choose a location</span>
+          <span className="flex items-center text-sm text-violet-soft mt-0.5">
+            <Navigation size={14} className="mr-1.5" aria-hidden="true" />
+            Choose a location
+          </span>
         </button>
       ) : nearby.status === 'loading' ? (
         <div className="flex space-x-3" aria-label="Loading suggestions">
@@ -233,7 +260,7 @@ const NextUpCard = ({ event, status, onOpen }) => (
 );
 
 // A titled list of event cards that previews the first few
-const EventSection = ({ title, items, onOpen, empty = null }) => {
+const EventSection = ({ title, items, onOpen }) => {
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? items : items.slice(0, PREVIEW_COUNT);
 
@@ -247,13 +274,11 @@ const EventSection = ({ title, items, onOpen, empty = null }) => {
           </button>
         )}
       </div>
-      {items.length === 0 ? empty : (
-        <div className="flex flex-col space-y-3">
-          {visible.map(({ event, status }) => (
-            <EventCard key={event._id} event={event} status={status} onSelect={() => onOpen(event)} />
-          ))}
-        </div>
-      )}
+      <div className="flex flex-col space-y-3">
+        {visible.map(({ event, status }) => (
+          <EventCard key={event._id} event={event} status={status} onSelect={() => onOpen(event)} />
+        ))}
+      </div>
     </section>
   );
 };

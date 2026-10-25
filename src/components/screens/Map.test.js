@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -69,6 +69,7 @@ describe('Map', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open event' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Summer Music Festival' })).toBeInTheDocument();
+    await settle();
   });
 
   it("lists a venue's events, each ready to plan with friends", async () => {
@@ -365,7 +366,7 @@ describe('Sharing across the app', () => {
     renderAt('/profile');
     await waitFor(() => expect(report).toBeDefined());
 
-    fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
 
     await screen.findByLabelText('Email');
     expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(1);

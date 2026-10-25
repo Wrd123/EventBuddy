@@ -1,3 +1,5 @@
+import { act } from 'react';
+
 // An in-memory stand-in for the EventBuddy API, installed as global.fetch,
 // so screen tests run without a server. Only covers what the screens call.
 const TOKEN = 'fake-token';
@@ -409,7 +411,13 @@ const route = (method, path, body, authed, params) => {
     events.push(event);
     return respond(201, { event });
   }
-  if (path === '/events') return respond(200, { events: events.filter(isMember) });
+  if (path === '/events') {
+    if (fakeOptions.eventsFailures > 0) {
+      fakeOptions.eventsFailures -= 1;
+      return respond(503, { message: 'Service unavailable' });
+    }
+    return respond(200, { events: events.filter(isMember) });
+  }
   if (path === '/chats') return chatList();
   if (path === '/map/events') {
     return respond(200, {
@@ -512,9 +520,14 @@ const route = (method, path, body, authed, params) => {
 // options.noLocalEvents / options.discoverError change Discover's results;
 // options.chats replaces the starting chats ({ eventId: [messages] });
 // options.chatSendError makes sending a message fail with that message;
-// options.liveEvent adds an event happening today with live locations
+// options.liveEvent adds an event happening today with live locations;
+// options.eventsFailures makes loading your events fail that many times
+// Lets requests still in flight (like a screen's background counts) finish
+// inside act, for tests that end before they would otherwise land
+export const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
 export const installFakeApi = (options = {}) => {
-  fakeOptions = options;
+  fakeOptions = { ...options };
   events = options.liveEvent ? [...demoEvents(), picnicEvent()] : demoEvents();
   live = options.liveEvent ? demoLive() : {};
   chats = options.chats || demoChats();

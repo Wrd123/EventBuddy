@@ -39,13 +39,13 @@ class ErrorBoundary extends Component {
                 className="bg-violet text-white px-4 py-2 rounded-xl font-medium"
                 onClick={this.handleRetry}
               >
-                Try Again
+                Try again
               </button>
             </div>
             
             {process.env.NODE_ENV !== 'production' && this.state.error && (
               <details className="text-left bg-raised p-4 rounded-xl mt-4 overflow-auto max-h-60">
-                <summary className="font-semibold cursor-pointer">Error Details (Development Only)</summary>
+                <summary className="font-semibold cursor-pointer">Error details (development only)</summary>
                 <pre className="text-sm text-red-300 mt-2 whitespace-pre-wrap">
                   {this.state.error.toString()}
                 </pre>

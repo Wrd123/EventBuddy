@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 
@@ -19,15 +19,15 @@ export const Wordmark = () => (
   </span>
 );
 
-// Screen header on the night background. Top-level tabs show the bell and
-// your avatar; inner screens show a back arrow instead, and can put an
+// Screen header on the night background. Top-level tabs show your avatar; inner screens show a back arrow instead, and can put an
 // action (like Edit) on the right. A screen whose content starts with its
-// own big title can leave title out.
+// own big title can leave title out. subtitle (inner screens) names what
+// the screen belongs to, like the event.
 const Header = ({
   title,
+  subtitle = '',
   type = 'default',
   showBack = false,
-  showNotifications = true,
   showProfile = true,
   backTo = '/',
   action = null
@@ -51,27 +51,25 @@ const Header = ({
             </button>
           )}
           {title && (
-            <h1 className={`${type === 'default' ? 'text-2xl font-extrabold tracking-tight' : 'text-lg font-bold'} truncate`}>
-              {title === 'EventBuddy' ? <Wordmark /> : title}
-            </h1>
+            <div className="min-w-0">
+              <h1 className={`${type === 'default' ? 'text-2xl font-extrabold tracking-tight' : 'text-lg font-bold'} truncate`}>
+                {title === 'EventBuddy' ? <Wordmark /> : title}
+              </h1>
+              {subtitle && <p className="text-sm text-muted truncate -mt-0.5">{subtitle}</p>}
+            </div>
           )}
         </div>
 
         {action && <div className="shrink-0 ml-3">{action}</div>}
 
-        {(showNotifications || showProfile) && (
-          <div className="flex items-center space-x-3 shrink-0">
-            {showNotifications && <Bell size={22} className="text-muted" aria-hidden="true" />}
-            {showProfile && (
-              <button
-                onClick={() => navigate('/profile')}
-                className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-soft to-violet-deep text-white text-sm font-bold flex items-center justify-center shadow-glow-sm"
-                aria-label="Open profile"
-              >
-                {getInitials(currentUser?.name) || '?'}
-              </button>
-            )}
-          </div>
+        {showProfile && (
+          <button
+            onClick={() => navigate('/profile')}
+            className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-violet-soft to-violet-deep text-white text-sm font-bold flex items-center justify-center shadow-glow-sm"
+            aria-label="Open profile"
+          >
+            {getInitials(currentUser?.name) || '?'}
+          </button>
         )}
       </div>
     </header>

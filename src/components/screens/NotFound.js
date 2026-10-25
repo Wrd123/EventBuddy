@@ -14,7 +14,6 @@ const NotFound = ({ title = 'Page not found', message = "We couldn't find what y
         type="screen"
         showBack={true}
         showProfile={false}
-        showNotifications={false}
       />
 
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">

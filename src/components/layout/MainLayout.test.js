@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from './MainLayout';
 
@@ -66,13 +66,15 @@ describe('routing', () => {
     renderAt('/no-such-page');
 
     expect(await screenTitle('Page not found')).toBeInTheDocument();
+    await settle();
   });
 
   it('sends logged-in users away from the login screen', async () => {
     fakeApi.logIn();
     renderAt('/login');
 
-    expect(await screen.findByText('Your Events')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Hey John/ })).toBeInTheDocument();
+    await settle();
   });
 
   it('returns to the requested page after logging in', async () => {
@@ -107,14 +109,14 @@ describe('routing', () => {
     fakeApi.logIn();
     renderAt('/profile');
 
-    fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
     fireEvent.change(await screen.findByLabelText('Email'), {
       target: { value: 'user@example.com' }
     });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
-    expect(await screen.findByText('Your Events')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Hey John/ })).toBeInTheDocument();
   });
 
   it('logs out when the server rejects a saved login', async () => {

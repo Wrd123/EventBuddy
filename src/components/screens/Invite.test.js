@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -44,6 +44,7 @@ describe('opening an invite link', () => {
 
     expect(await screenTitle('Game Night')).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
+    await settle();
   });
 
   it('adds the joined event to the Home list', async () => {
@@ -54,7 +55,7 @@ describe('opening an invite link', () => {
     await screenTitle('Game Night');
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
 
-    expect(await screen.findByText('Your Events')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Hey John/ })).toBeInTheDocument();
     expect(screen.getByText('Game Night')).toBeInTheDocument();
   });
 
@@ -63,6 +64,7 @@ describe('opening an invite link', () => {
     renderAt('/invite/festival-code');
 
     expect(await screenTitle('Summer Music Festival')).toBeInTheDocument();
+    await settle();
   });
 
   it('explains an invalid link', async () => {
@@ -143,5 +145,6 @@ describe('inviting from an event', () => {
 
     expect(await screenTitle('Brunch')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Invite friends' })).toBeInTheDocument();
+    await settle();
   });
 });

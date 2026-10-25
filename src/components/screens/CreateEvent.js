@@ -161,7 +161,7 @@ const CreateEvent = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="New event" type="screen" showBack showProfile={false} showNotifications={false} />
+      <Header title="New event" type="screen" showBack showProfile={false} />
       <EventForm
         submitLabel="Create event"
         savingLabel="Creating..."
@@ -198,7 +198,7 @@ export const EditEvent = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Edit event" type="screen" showBack backTo={backTo} showProfile={false} showNotifications={false} />
+      <Header title="Edit event" type="screen" showBack backTo={backTo} showProfile={false} />
       <EventForm
         initial={{
           name: event.name,

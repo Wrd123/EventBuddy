@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Calendar, MessageSquare, DollarSign, Map, Plus, ExternalLink, Pencil } from 'lucide-react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
@@ -9,11 +9,46 @@ import { useAppContext } from '../../context/AppContext';
 import { useEvent } from '../../hooks/useEvent';
 import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay } from '../../utils/dates';
 import { formatTimeRange, sortSchedule } from '../../utils/schedule';
+import { computeBalances } from '../../utils/ledger';
+import { formatCents } from '../../utils/money';
+import * as chatService from '../../services/chatService';
+import * as eventService from '../../services/eventService';
+
+// What's waiting behind the Chat and Expenses buttons: unread messages and
+// your balance in cents (null until known, or if there are no expenses).
+// Loaded once; each screen has the live version.
+const useEventSummary = (eventId) => {
+  const [summary, setSummary] = useState({ unread: 0, ledger: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([chatService.getChats(), eventService.getLedger(eventId)]).then(([chats, ledger]) => {
+      if (cancelled) return;
+      setSummary({
+        unread: chats.status === 'fulfilled' ? chats.value.find(c => c.eventId === eventId)?.unread ?? 0 : 0,
+        ledger: ledger.status === 'fulfilled' ? ledger.value : null
+      });
+    });
+    return () => { cancelled = true; };
+  }, [eventId]);
+
+  return summary;
+};
+
+// "You owe $12.50" style hint for the Expenses button, or '' if there's
+// nothing to say yet
+const balanceHint = (event, ledger, me) => {
+  if (!ledger || ledger.expenses.length === 0) return '';
+  const mine = computeBalances(event.members, ledger.expenses, ledger.payments).find(b => b.user === me);
+  if (!mine || mine.netCents === 0) return 'All settled';
+  return mine.netCents > 0 ? `Owed ${formatCents(mine.netCents)}` : `Owe ${formatCents(-mine.netCents)}`;
+};
 
 const EventDetails = () => {
   const { eventId } = useParams();
   const { event, status, error } = useEvent(eventId);
   const { currentUser } = useAppContext();
+  const summary = useEventSummary(eventId);
   // Create Event sends new organizers here with the invite sheet open
   const location = useLocation();
   const [showInvite, setShowInvite] = useState(Boolean(location.state?.showInvite));
@@ -35,7 +70,6 @@ const EventDetails = () => {
         type="screen"
         showBack
         showProfile={false}
-        showNotifications={false}
         action={isOrganizer && (
           <Link
             to={`/events/${eventId}/edit`}
@@ -52,7 +86,11 @@ const EventDetails = () => {
         {event.description && (
           <p className="px-4 pt-4 text-fg/90 whitespace-pre-wrap break-words">{event.description}</p>
         )}
-        <EventActions eventId={eventId} />
+        <EventActions
+          eventId={eventId}
+          unread={summary.unread}
+          balance={balanceHint(event, summary.ledger, currentUser?._id)}
+        />
         {event.ticketUrl && (
           // Events planned from Discover keep their ticket page
           <a
@@ -89,28 +127,30 @@ const EventCover = ({ event }) => (
   </div>
 );
 
-const EventActions = ({ eventId }) => {
+const EventActions = ({ eventId, unread, balance }) => {
   const navigate = useNavigate();
 
   return (
     <div className="grid grid-cols-4 gap-2 px-4 pt-4">
-      <ActionButton 
-        Icon={Calendar} 
+      <ActionButton
+        Icon={Calendar}
         label="Schedule"
         onClick={() => navigate(`/events/${eventId}/schedule`)}
       />
-      <ActionButton 
-        Icon={MessageSquare} 
-        label="Group Chat"
+      <ActionButton
+        Icon={MessageSquare}
+        label="Chat"
+        badge={unread}
         onClick={() => navigate(`/events/${eventId}/chat`)}
       />
-      <ActionButton 
-        Icon={DollarSign} 
+      <ActionButton
+        Icon={DollarSign}
         label="Expenses"
+        hint={balance}
         onClick={() => navigate(`/events/${eventId}/expenses`)}
       />
-      <ActionButton 
-        Icon={Map} 
+      <ActionButton
+        Icon={Map}
         label="Map"
         onClick={() => navigate('/map', { state: { focus: eventId } })}
       />
@@ -118,13 +158,21 @@ const EventActions = ({ eventId }) => {
   );
 };
 
-const ActionButton = ({ Icon, label, onClick }) => (
-  <button 
-    onClick={onClick} 
-    className="card flex flex-col items-center py-3 text-fg/90"
+// badge: an unread count on the icon. hint: a short status under the label.
+const ActionButton = ({ Icon, label, badge = 0, hint = '', onClick }) => (
+  <button
+    onClick={onClick}
+    className="card relative flex flex-col items-center py-3 px-1 text-fg/90"
+    aria-label={[label, badge > 0 && `${badge} unread`, hint].filter(Boolean).join(', ')}
   >
-    <Icon size={20} className="text-violet-soft" />
+    <Icon size={20} className="text-violet-soft" aria-hidden="true" />
     <span className="text-xs mt-1.5 font-medium">{label}</span>
+    {hint && <span className="text-[11px] text-muted leading-tight mt-0.5">{hint}</span>}
+    {badge > 0 && (
+      <span className="absolute top-1.5 right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-violet text-white text-[11px] font-bold flex items-center justify-center" aria-hidden="true">
+        {badge > 99 ? '99+' : badge}
+      </span>
+    )}
   </button>
 );
 
@@ -133,11 +181,11 @@ const EventContent = ({ event, onInvite }) => {
   // The Schedule screen shows every day.
   const day = defaultScheduleDay(event);
   const items = sortSchedule(event.schedule.filter(item => item.date === day));
-  const heading = getEventStatus(event) === 'ongoing' ? "Today's Schedule" : `Schedule · ${formatDay(day)}`;
+  const heading = getEventStatus(event) === 'ongoing' ? "Today's schedule" : `Schedule for ${formatDay(day)}`;
 
   return (
     <div className="p-4">
-      <h3 className="text-xl font-bold mb-3">Group Members</h3>
+      <h3 className="text-xl font-bold mb-3">Who's going</h3>
       <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar">
         {event.members.map((member) => (
           // shrink-0 so a big group scrolls instead of squashing
@@ -148,6 +196,9 @@ const EventContent = ({ event, onInvite }) => {
               size="md" 
             />
             <span className="text-xs mt-1">{member.name}</span>
+            {member.user === event.createdBy && (
+              <span className="text-[10px] font-semibold text-violet-soft leading-none mt-0.5">Organizer</span>
+            )}
           </div>
         ))}
         <button onClick={onInvite} className="flex flex-col items-center shrink-0">

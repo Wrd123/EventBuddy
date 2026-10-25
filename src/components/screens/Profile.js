@@ -15,7 +15,6 @@ const Profile = () => {
         type="screen"
         showBack={true}
         showProfile={false}
-        showNotifications={false}
       />
 
       <div className="p-4 flex-1 flex flex-col overflow-y-auto">
@@ -36,7 +35,7 @@ const Profile = () => {
           className="mt-auto w-full flex items-center justify-center py-3 text-red-400 font-medium"
         >
           <LogOut size={18} className="mr-2" />
-          Log Out
+          Log out
         </button>
       </div>
     </div>

@@ -107,7 +107,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
           </button>
         </div>
 
-        {error && <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded mb-4">{error}</div>}
+        {error && <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded-xl mb-4" role="alert">{error}</div>}
 
         <label htmlFor="expense-description" className="block text-sm font-medium text-fg/80 mb-1">What was it for</label>
         <input id="expense-description" className={`${inputClass} mb-3`} maxLength={80} placeholder="Airbnb" value={fields.description} onChange={set('description')} />
@@ -151,7 +151,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
             <div className="space-y-1">
               {members.map(m => (
                 <label key={m.user} className="flex items-center text-sm py-1">
-                  <input type="checkbox" className="mr-2 h-4 w-4 accent-purple-600" checked={included.has(m.user)} onChange={() => toggle(m.user)} />
+                  <input type="checkbox" className="mr-2 h-4 w-4 accent-violet" checked={included.has(m.user)} onChange={() => toggle(m.user)} />
                   {m.name}
                 </label>
               ))}
@@ -169,7 +169,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
                   <input
                     id={`exact-${m.user}`}
                     inputMode="decimal"
-                    className="w-28 p-1.5 border border-line rounded-xl text-right"
+                    className="w-28 px-2.5 py-1.5 rounded-xl bg-raised border border-line text-fg text-right placeholder-faint focus:border-violet outline-none"
                     placeholder="0.00"
                     value={exact[m.user]}
                     onChange={e => setExact(prev => ({ ...prev, [m.user]: e.target.value }))}

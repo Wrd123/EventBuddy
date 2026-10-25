@@ -51,7 +51,7 @@ const MainLayout = () => (
 );
 
 // Logged-out users are sent to /login, remembering where they were going
-// so they land there after logging in. Not after tapping Log Out, though:
+// so they land there after logging in. Not after tapping Log out, though:
 // the next person to log in should start at Home, not on the old Profile.
 const RequireAuth = () => {
   const { isAuthenticated, isLoading, loggedOutByUser } = useAppContext();

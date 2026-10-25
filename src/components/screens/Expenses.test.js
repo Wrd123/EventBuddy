@@ -57,10 +57,10 @@ describe('Expenses', () => {
   it('adds an expense split equally and updates balances', async () => {
     await openExpenses();
 
-    fireEvent.click(screen.getByRole('button', { name: /Add Expense/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
     fillForm({ 'What was it for': 'Dinner', 'Amount ($)': '60' });
     expect(screen.getByText('$30.00 each')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
 
     expect(await screen.findByText('Dinner')).toBeInTheDocument();
     // Owed $150, then paid $60 of which $30 was Alex's: now owes $120
@@ -71,7 +71,7 @@ describe('Expenses', () => {
   it('splits by exact amounts', async () => {
     await openExpenses();
 
-    fireEvent.click(screen.getByRole('button', { name: /Add Expense/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
     fillForm({ 'What was it for': 'Tickets', 'Amount ($)': '100' });
     fireEvent.click(screen.getByRole('radio', { name: 'Exact amounts' }));
     fillForm({ 'John Doe': '70', Alex: '20' });
@@ -79,7 +79,7 @@ describe('Expenses', () => {
 
     fillForm({ Alex: '30' });
     expect(screen.getByText('Adds up to the total')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
 
     expect(await screen.findByText('Tickets')).toBeInTheDocument();
     expect(screen.getByText('Your share $70.00')).toBeInTheDocument();
@@ -89,11 +89,11 @@ describe('Expenses', () => {
     await openExpenses();
     const callsBefore = global.fetch.mock.calls.length;
 
-    fireEvent.click(screen.getByRole('button', { name: /Add Expense/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
     fillForm({ 'What was it for': 'Tickets', 'Amount ($)': '100' });
     fireEvent.click(screen.getByRole('radio', { name: 'Exact amounts' }));
     fillForm({ 'John Doe': '70' });
-    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
 
     expect(screen.getByText('The amounts must add up to the total.')).toBeInTheDocument();
     expect(global.fetch.mock.calls.length).toBe(callsBefore);
@@ -102,9 +102,9 @@ describe('Expenses', () => {
   it('rejects an amount it cannot read', async () => {
     await openExpenses();
 
-    fireEvent.click(screen.getByRole('button', { name: /Add Expense/ }));
-    fillForm({ 'What was it for': 'Dinner', 'Amount ($)': '12.345' });
     fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fillForm({ 'What was it for': 'Dinner', 'Amount ($)': '12.345' });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
 
     expect(screen.getByText('Enter an amount like 42 or 42.50.')).toBeInTheDocument();
   });

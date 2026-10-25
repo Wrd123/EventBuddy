@@ -50,7 +50,7 @@ const Invite = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="You're invited" type="screen" showBack={true} showProfile={false} showNotifications={false} />
+      <Header title="You're invited" type="screen" showBack={true} showProfile={false} />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="card p-5 text-center">

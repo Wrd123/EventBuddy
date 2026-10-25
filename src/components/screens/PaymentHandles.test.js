@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -109,10 +109,10 @@ describe('when the recipient has no payment info', () => {
 describe('asking for your own payment info', () => {
   const addExpensePaidByMe = async () => {
     // John pays a $400 dinner split with Alex: now Alex owes John $50
-    fireEvent.click(screen.getByRole('button', { name: /Add Expense/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
     fireEvent.change(screen.getByLabelText('What was it for'), { target: { value: 'Dinner' } });
     fireEvent.change(screen.getByLabelText('Amount ($)'), { target: { value: '400' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
     await screen.findByText('Dinner');
   };
 
@@ -171,5 +171,6 @@ describe('Profile: Get paid', () => {
   it('explains who can see the handles', async () => {
     const form = await openProfile();
     expect(within(form).getByText(/Only people in your events can see these/)).toBeInTheDocument();
+    await settle();
   });
 });

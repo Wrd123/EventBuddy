@@ -66,11 +66,11 @@ const Expenses = () => {
   return (
     <div className="flex flex-col h-full relative">
       <Header
-        title="Group Expenses"
+        title="Expenses"
+        subtitle={event.name}
         type="screen"
         showBack={true}
         showProfile={false}
-        showNotifications={false}
         backTo={`/events/${eventId}`}
       />
 
@@ -93,7 +93,7 @@ const Expenses = () => {
             <h3 className="font-medium">Expenses</h3>
             <button onClick={() => setEditing('new')} className="text-violet-soft text-sm font-medium flex items-center">
               <Plus size={16} className="mr-1" />
-              Add Expense
+              Add expense
             </button>
           </div>
           {ledger.expenses.length === 0 ? (

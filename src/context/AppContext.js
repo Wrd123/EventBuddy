@@ -36,8 +36,8 @@ export const AppProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [events, setEvents] = useState([]);
   const [place, setPlace] = useState(readStoredPlace);
-  const [error, setError] = useState(null);
-  // True after the user taps Log Out (vs. a session that expired), so the
+  const [eventsStatus, setEventsStatus] = useState('loading');
+  // True after the user taps Log out (vs. a session that expired), so the
   // login guard doesn't send the next login back to the page they left
   const [loggedOutByUser, setLoggedOutByUser] = useState(false);
   
@@ -91,63 +91,36 @@ export const AppProvider = ({ children }) => {
     initAuth();
   }, [clearSession]);
   
-  // Fetch events when authenticated
-  useEffect(() => {
-    const fetchEvents = async () => {
-      if (isAuthenticated) {
-        try {
-          // Fetch user events
-          const userEvents = await eventService.getUserEvents();
-          setEvents(userEvents);
-        } catch (error) {
-          console.error('Fetch events error:', error);
-          setError('Failed to load events. Please try again.');
-        }
-      }
-    };
-    
-    fetchEvents();
-  }, [isAuthenticated]);
-  
-  // Authentication functions
-  const login = async (credentials) => {
+  // Your events, loaded after login. eventsStatus lets Home tell "still
+  // loading" and "couldn't load" apart from "no events yet".
+  const loadEvents = useCallback(async () => {
+    setEventsStatus('loading');
     try {
-      const response = await authService.login(credentials);
-      
-      setCurrentUser(response.user);
-      setIsAuthenticated(true);
-      setLoggedOutByUser(false);
-      
-      return response;
+      setEvents(await eventService.getUserEvents());
+      setEventsStatus('ready');
     } catch (error) {
-      setError(error.message || 'Login failed. Please check your credentials.');
-      throw error;
+      setEventsStatus('error');
     }
-  };
-  
-  const loginDemo = async () => {
-    const response = await authService.loginDemo();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) loadEvents();
+  }, [isAuthenticated, loadEvents]);
+
+  // Authentication. Errors are thrown for the screen to show.
+  const startSession = (response) => {
     setCurrentUser(response.user);
     setIsAuthenticated(true);
     setLoggedOutByUser(false);
     return response;
   };
 
-  const register = async (userData) => {
-    try {
-      const response = await authService.register(userData);
-      
-      setCurrentUser(response.user);
-      setIsAuthenticated(true);
-      setLoggedOutByUser(false);
-      
-      return response;
-    } catch (error) {
-      setError(error.message || 'Registration failed. Please try again.');
-      throw error;
-    }
-  };
-  
+  const login = async (credentials) => startSession(await authService.login(credentials));
+
+  const loginDemo = async () => startSession(await authService.loginDemo());
+
+  const register = async (userData) => startSession(await authService.register(userData));
+
   const logout = () => {
     // Friends shouldn't keep seeing where you were; this needs the login
     // token, so it goes before the session is cleared
@@ -155,61 +128,31 @@ export const AppProvider = ({ children }) => {
     clearSession();
     setLoggedOutByUser(true);
   };
-  
+
   const updateProfile = async (profileData) => {
-    try {
-      const response = await authService.updateProfile(profileData);
-      setCurrentUser(response.user);
-      return response;
-    } catch (error) {
-      setError(error.message || 'Failed to update profile.');
-      throw error;
-    }
+    const response = await authService.updateProfile(profileData);
+    setCurrentUser(response.user);
+    return response;
   };
-  
-  // Event functions
+
+  // Event changes; the caller decides where to go next
   const createNewEvent = async (eventData) => {
-    try {
-      const response = await eventService.createEvent(eventData);
-      
-      // Add new event to state; the caller decides where to go next
-      setEvents(prev => [...prev, response.event]);
-      
-      return response;
-    } catch (error) {
-      setError(error.message || 'Failed to create event.');
-      throw error;
-    }
+    const response = await eventService.createEvent(eventData);
+    setEvents(prev => [...prev, response.event]);
+    return response;
   };
-  
+
   const updateEventData = async (eventId, eventData) => {
-    try {
-      const response = await eventService.updateEvent(eventId, eventData);
-      
-      // Update event in state
-      setEvents(prev => prev.map(event => 
-        event._id === eventId ? response.event : event
-      ));
-      
-      return response;
-    } catch (error) {
-      setError(error.message || 'Failed to update event.');
-      throw error;
-    }
+    const response = await eventService.updateEvent(eventId, eventData);
+    setEvents(prev => prev.map(event => (event._id === eventId ? response.event : event)));
+    return response;
   };
-  
+
   const deleteEventData = async (eventId) => {
-    try {
-      await eventService.deleteEvent(eventId);
-      
-      // Remove event from state
-      setEvents(prev => prev.filter(event => event._id !== eventId));
-    } catch (error) {
-      setError(error.message || 'Failed to delete event.');
-      throw error;
-    }
+    await eventService.deleteEvent(eventId);
+    setEvents(prev => prev.filter(event => event._id !== eventId));
   };
-  
+
   // Replace an event in the list with a fresh copy from the server, or add it
   // if the list doesn't have it yet (e.g. it was opened from a link)
   const storeEvent = (updated) => {
@@ -222,7 +165,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Schedule actions. Errors are thrown for the screen to show next to the
-  // form or button, rather than stored in the shared error state.
+  // form or button.
   const addScheduleItem = async (eventId, item) =>
     storeEvent(await eventService.addScheduleItem(eventId, item));
 
@@ -242,11 +185,6 @@ export const AppProvider = ({ children }) => {
   const resetInviteLink = async (eventId) =>
     storeEvent(await eventService.resetInviteLink(eventId));
 
-  // Clear any errors
-  const clearError = () => {
-    setError(null);
-  };
-
   // Values to be provided to consumers
   const value = {
     currentUser,
@@ -254,10 +192,10 @@ export const AppProvider = ({ children }) => {
     isLoading,
     loggedOutByUser,
     events,
+    eventsStatus,
+    reloadEvents: loadEvents,
     place,
     savePlace,
-    error,
-    clearError,
     login,
     loginDemo,
     register,

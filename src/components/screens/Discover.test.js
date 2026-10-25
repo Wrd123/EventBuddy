@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -142,6 +142,7 @@ describe('Discover with a location', () => {
     fireEvent.click(within(screen.getByRole('group', { name: 'Distance' })).getByRole('button', { name: '50 mi' }));
     await waitFor(() => expect(eventRequests().at(-1).get('radius')).toBe('50'));
     expect(eventRequests().at(-1).get('category')).toBe('sports');
+    await settle();
   });
 
   it('narrows the list by name or venue', async () => {
@@ -176,6 +177,7 @@ describe('Discover with a location', () => {
       location: 'State Farm Arena, Atlanta, GA',
       ticketUrl: 'https://www.ticketmaster.com/event/1'
     });
+    await settle();
   });
 
   it('lets you change the location', async () => {
@@ -200,6 +202,7 @@ describe('Discover edge cases', () => {
     expect(await screen.findByText('Nothing within 25 miles')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Search farther' }));
     await waitFor(() => expect(eventRequests().at(-1).get('radius')).toBe('50'));
+    await settle();
   });
 
   it("shows the server's message when events can't load", async () => {
@@ -229,6 +232,7 @@ describe('Home suggestions', () => {
 
     expect(await screen.findByText('Find concerts, games and shows near you')).toBeInTheDocument();
     expect(eventRequests()).toHaveLength(0);
+    await settle();
   });
 
   it('forgets the location on log out', async () => {
@@ -236,9 +240,10 @@ describe('Home suggestions', () => {
     installFakeApi().logIn();
     renderAt('/profile');
 
-    fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
 
     await screen.findByLabelText('Email');
     expect(localStorage.getItem('eventbuddy_place')).toBeNull();
+    await settle();
   });
 });

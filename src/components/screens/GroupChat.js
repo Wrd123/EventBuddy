@@ -34,7 +34,7 @@ const GroupChat = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={event.name} type="screen" showBack backTo={backTo} showNotifications={false} showProfile={false} />
+      <Header title={event.name} type="screen" showBack backTo={backTo} showProfile={false} />
       <Link
         to={`/events/${eventId}`}
         className="flex items-center px-4 pb-3 -mt-1 text-sm text-muted border-b border-line"

@@ -34,10 +34,10 @@ const Schedule = () => {
     <div className="flex flex-col h-full relative">
       <Header
         title="Schedule"
+        subtitle={event.name}
         type="screen"
         showBack={true}
         showProfile={false}
-        showNotifications={false}
         backTo={`/events/${eventId}`}
       />
 

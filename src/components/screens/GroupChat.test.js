@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, receiveMessage } from '../../testUtils/fakeApi';
+import { installFakeApi, receiveMessage, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -61,6 +61,7 @@ describe('Groups', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     // Opened from the event, so Back goes to the event
     expect(await screen.findByRole('heading', { level: 1, name: 'Hiking Trip' })).toBeInTheDocument();
+    await settle();
   });
 });
 

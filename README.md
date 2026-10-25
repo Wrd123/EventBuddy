@@ -54,7 +54,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet |
 | iPhone | Capacitor 7, background geolocation, native HTTP |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
-| Testing | Jest and Testing Library (222 tests), Node's test runner with Supertest and an in-memory MongoDB (241 tests) |
+| Testing | Jest and Testing Library (228 tests), Node's test runner with Supertest and an in-memory MongoDB (241 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
