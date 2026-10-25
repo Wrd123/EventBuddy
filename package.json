@@ -2,6 +2,7 @@
     "name": "eventbuddy",
     "version": "0.1.0",
     "private": true,
+    "license": "MIT",
     "dependencies": {
         "@capacitor-community/background-geolocation": "~1.2.26",
         "@capacitor/core": "~7.6.9",

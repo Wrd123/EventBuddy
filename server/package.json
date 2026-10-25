@@ -2,6 +2,7 @@
   "name": "eventbuddy-server",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "EventBuddy API: Express + MongoDB",
   "main": "src/index.js",
   "engines": {

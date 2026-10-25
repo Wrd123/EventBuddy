@@ -6,6 +6,10 @@ Built end to end by me: React front end, Express and MongoDB API, and a native i
 
 **[Try the live demo](https://eventbuddy-exic.onrender.com)** and tap **Try the demo** to look around as John. It runs on a free server that sleeps when idle, so the first visit can take up to a minute to wake it.
 
+| Home | Event | Live map | Group chat | Split costs |
+|---|---|---|---|---|
+| <img src="docs/screenshots/home.jpg" width="160" alt="Home: the picnic happening now and the trips coming up"> | <img src="docs/screenshots/event.jpg" width="160" alt="An event page with unread chat messages and what you owe"> | <img src="docs/screenshots/map.jpg" width="160" alt="Friends sharing their location at the picnic, with a meetup point"> | <img src="docs/screenshots/chat.jpg" width="160" alt="The festival group chat"> | <img src="docs/screenshots/expenses.jpg" width="160" alt="Festival expenses with balances and who pays whom"> |
+
 ## What it does
 
 - **Plan together.** Single or multi-day events, a shared schedule with who's going to what, and invite links that let friends join in one tap.
@@ -110,6 +114,7 @@ EventBuddy/
 │   │   └── seed/            # Demo data
 │   └── tests/               # API tests
 ├── ios/                     # Native iPhone project (Capacitor)
+├── docs/screenshots/        # README screenshots
 ├── resources/               # Icon source
 ├── render.yaml              # Free hosted demo (Render Blueprint)
 └── .github/workflows/       # CI
@@ -125,3 +130,7 @@ EventBuddy/
 | `npm run build` | Production build of the app |
 | `npm run ios` | Build and open the iPhone app in Xcode |
 | `npm run build:ios` | Build for iOS against `EVENTBUDDY_API_URL` (default: the local API) |
+
+## License
+
+[MIT](LICENSE)
