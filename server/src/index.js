@@ -1,13 +1,15 @@
 const { createApp } = require('./app');
 const { connectDatabase, disconnectDatabase } = require('./db');
 const { seedDemoData, DEMO_LOGIN } = require('./seed/demoData');
-const { port } = require('./config');
+const { port, demoMode } = require('./config');
 
 const start = async () => {
   const inMemory = await connectDatabase();
 
-  if (inMemory) {
+  if (inMemory || demoMode) {
     await seedDemoData();
+  }
+  if (inMemory) {
     console.log('Using a temporary in-memory database (set MONGODB_URI to use Atlas).');
     console.log(`Demo login: ${DEMO_LOGIN.email} / ${DEMO_LOGIN.password}`);
     console.log('Demo friends (same password): alex@, taylor@, jordan@, jamie@, casey@example.com');

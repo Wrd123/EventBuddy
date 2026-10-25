@@ -5,7 +5,10 @@ const User = require('../models/User');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
 const { validateRegistration, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
-const { isTest, bcryptRounds } = require('../config');
+const config = require('../config');
+const { DEMO_LOGIN } = require('../seed/demoData');
+
+const { isTest, bcryptRounds } = config;
 
 const router = express.Router();
 
@@ -70,6 +73,15 @@ router.post('/login', attemptLimiter, async (req, res) => {
     throw new HttpError(401, 'Invalid email or password');
   }
 
+  res.json({ token: signToken(user), user });
+});
+
+// One-tap sign-in as the demo user, for people trying the app. Only in
+// demo mode, where the demo data is public anyway; elsewhere it doesn't exist.
+router.post('/demo', attemptLimiter, async (req, res) => {
+  if (!config.demoMode) throw new HttpError(404, 'Not found.');
+  const user = await User.findOne({ email: DEMO_LOGIN.email });
+  if (!user) throw new HttpError(503, 'The demo is still getting ready. Try again in a moment.');
   res.json({ token: signToken(user), user });
 });
 

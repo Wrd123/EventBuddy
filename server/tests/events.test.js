@@ -130,6 +130,32 @@ describe('GET /api/events/:id', () => {
 });
 
 describe('PATCH /api/events/:id', () => {
+  const edit = (auth, id, changes, status = 200) =>
+    api().patch(`/api/events/${id}`).set('Authorization', auth).send(changes).expect(status);
+
+  it('saves a description, up to 500 characters', async () => {
+    const { auth } = await registerUser();
+    const { body } = await createEvent(auth);
+
+    const res = await edit(auth, body.event._id, { description: '  Bring a dish to share.  ' });
+    assert.equal(res.body.event.description, 'Bring a dish to share.');
+    const long = await edit(auth, body.event._id, { description: 'x'.repeat(501) }, 400);
+    assert.equal(long.body.message, 'Keep the description under 500 characters.');
+  });
+
+  it("won't shorten the dates past days that have schedule items", async () => {
+    const { auth } = await registerUser();
+    const { body } = await createEvent(auth);
+    const id = body.event._id;
+    await api().post(`/api/events/${id}/schedule`).set('Authorization', auth)
+      .send({ date: '2099-11-27', startTime: '18:00', activity: 'Dinner' }).expect(201);
+
+    const res = await edit(auth, id, { endDate: '2099-11-26' }, 400);
+    assert.equal(res.body.message, 'A schedule item is on a day outside the new dates. Move or delete it first.');
+    // Longer is fine
+    await edit(auth, id, { endDate: '2099-11-28' });
+  });
+
   it('lets the organizer edit the event', async () => {
     const { auth } = await registerUser();
     const { body } = await createEvent(auth);

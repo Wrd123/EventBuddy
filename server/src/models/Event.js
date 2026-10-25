@@ -52,7 +52,7 @@ const eventSchema = new mongoose.Schema(
     startDate: { type: String, required: true, match: ISO_DATE },
     endDate: { type: String, required: true, match: ISO_DATE },
     location: { type: String, default: '', trim: true },
-    description: { type: String, default: '', trim: true },
+    description: { type: String, default: '', trim: true, maxlength: 500 },
     // Where to buy tickets, for events planned from Discover
     ticketUrl: { type: String, default: '', trim: true, maxlength: 500 },
     members: [memberSchema],

@@ -25,6 +25,12 @@ const parseTrustProxy = (value) => {
   return value;
 };
 
+// Demo mode: a public showcase. The database starts fresh from the demo
+// data on every start (in memory unless MONGODB_URI is set), and anyone can
+// sign in as the demo user with one tap. On by default in development
+// without a database; a hosted demo sets DEMO_MODE=true.
+const demoMode = process.env.DEMO_MODE === 'true' || (!isProduction && !process.env.MONGODB_URI);
+
 const jwtSecret = (() => {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   if (isProduction) return required('JWT_SECRET');
@@ -37,8 +43,9 @@ module.exports = {
   isProduction,
   isTest: env === 'test',
   port: Number(process.env.PORT) || 4000,
-  // Unset in development means "use an in-memory database"
-  mongoUri: isProduction ? required('MONGODB_URI') : process.env.MONGODB_URI,
+  demoMode,
+  // Unset in development (or a demo) means "use an in-memory database"
+  mongoUri: isProduction && !demoMode ? required('MONGODB_URI') : process.env.MONGODB_URI,
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:3000',

@@ -65,4 +65,15 @@ describe('validateEvent', () => {
   it('does not trim on its own', () => {
     expect(validate({ name: '   ' })).toBe('');
   });
+
+  it('allows a start date that has passed when editing without moving it', () => {
+    const started = { startDate: '2026-10-20', endDate: '2026-10-25' };
+    expect(validate(started)).toBe("The event can't start in the past.");
+    expect(validateEvent({ ...valid, ...started }, TODAY, { allowPastStart: true })).toBe('');
+  });
+
+  it('limits the description to 500 characters', () => {
+    expect(validate({ description: 'x'.repeat(500) })).toBe('');
+    expect(validate({ description: 'x'.repeat(501) })).toBe('Keep the description under 500 characters.');
+  });
 });

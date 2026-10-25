@@ -20,14 +20,17 @@ export const Wordmark = () => (
 );
 
 // Screen header on the night background. Top-level tabs show the bell and
-// your avatar; inner screens show a back arrow instead.
+// your avatar; inner screens show a back arrow instead, and can put an
+// action (like Edit) on the right. A screen whose content starts with its
+// own big title can leave title out.
 const Header = ({
   title,
   type = 'default',
   showBack = false,
   showNotifications = true,
   showProfile = true,
-  backTo = '/'
+  backTo = '/',
+  action = null
 }) => {
   const { currentUser } = useAppContext();
   const navigate = useNavigate();
@@ -47,10 +50,14 @@ const Header = ({
               <ArrowLeft size={22} />
             </button>
           )}
-          <h1 className={`${type === 'default' ? 'text-2xl font-extrabold tracking-tight' : 'text-lg font-bold'} truncate`}>
-            {title === 'EventBuddy' ? <Wordmark /> : title}
-          </h1>
+          {title && (
+            <h1 className={`${type === 'default' ? 'text-2xl font-extrabold tracking-tight' : 'text-lg font-bold'} truncate`}>
+              {title === 'EventBuddy' ? <Wordmark /> : title}
+            </h1>
+          )}
         </div>
+
+        {action && <div className="shrink-0 ml-3">{action}</div>}
 
         {(showNotifications || showProfile) && (
           <div className="flex items-center space-x-3 shrink-0">

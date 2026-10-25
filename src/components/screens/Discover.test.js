@@ -238,7 +238,7 @@ describe('Home suggestions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
 
-    await screen.findByPlaceholderText('your@email.com');
+    await screen.findByLabelText('Email');
     expect(localStorage.getItem('eventbuddy_place')).toBeNull();
   });
 });

@@ -29,7 +29,9 @@ const isRealDate = (value) => {
 const earliestTodayAnywhere = (now = new Date()) =>
   new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-const validateEventFields = ({ name, startDate, endDate, ticketUrl = '' }) => {
+const MAX_DESCRIPTION_LENGTH = 500;
+
+const validateEventFields = ({ name, startDate, endDate, ticketUrl = '', description = '' }) => {
   if (!name) return 'Please enter an event name.';
   if (name.length > MAX_NAME_LENGTH) return `Event name must be ${MAX_NAME_LENGTH} characters or fewer.`;
   if (!startDate) return 'Please choose a date.';
@@ -38,6 +40,9 @@ const validateEventFields = ({ name, startDate, endDate, ticketUrl = '' }) => {
   if (!isRealDate(endDate)) return 'Please choose a valid end date.';
   if (endDate < startDate) return 'The end date must be on or after the start date.';
   if (!isTicketUrl(ticketUrl)) return 'The ticket link must be an https:// address.';
+  if (description.length > MAX_DESCRIPTION_LENGTH) {
+    return `Keep the description under ${MAX_DESCRIPTION_LENGTH} characters.`;
+  }
   return '';
 };
 

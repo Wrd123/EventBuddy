@@ -24,9 +24,10 @@ const renderAt = (path) =>
 
 const screenTitle = (name) => screen.findByRole('heading', { level: 1, name });
 
+// Fills fields by their labels
 const fill = (fields) => {
-  for (const [placeholder, value] of Object.entries(fields)) {
-    fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value } });
+  for (const [label, value] of Object.entries(fields)) {
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
   }
 };
 
@@ -76,8 +77,8 @@ describe('opening an invite link', () => {
     renderAt('/invite/game-code');
 
     expect(await screen.findByText('Log in or sign up to see your invite.')).toBeInTheDocument();
-    fill({ 'your@email.com': 'user@example.com', '••••••••': 'password' });
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fill({ Email: 'user@example.com', Password: 'password' });
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screen.findByRole('button', { name: 'Join event' })).toBeInTheDocument();
   });
@@ -87,13 +88,12 @@ describe('opening an invite link', () => {
 
     fireEvent.click(await screen.findByRole('link', { name: 'Sign up' }));
     fill({
-      johndoe: 'newfriend',
-      'john@example.com': 'new@example.com'
+      Username: 'newfriend',
+      Email: 'new@example.com',
+      Password: 'secret123',
+      'Confirm password': 'secret123'
     });
-    for (const input of screen.getAllByPlaceholderText('••••••••')) {
-      fireEvent.change(input, { target: { value: 'secret123' } });
-    }
-    fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
 
     expect(await screen.findByRole('button', { name: 'Join event' })).toBeInTheDocument();
   });
@@ -137,9 +137,9 @@ describe('inviting from an event', () => {
     fakeApi.logIn();
     renderAt('/create');
 
-    fireEvent.change(await screen.findByPlaceholderText('Summer Music Festival 2025'), { target: { value: 'Brunch' } });
+    fireEvent.change(await screen.findByLabelText('Event name'), { target: { value: 'Brunch' } });
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2099-05-01' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create event' }));
 
     expect(await screenTitle('Brunch')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Invite friends' })).toBeInTheDocument();

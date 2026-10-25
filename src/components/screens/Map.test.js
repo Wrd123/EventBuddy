@@ -367,7 +367,7 @@ describe('Sharing across the app', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
 
-    await screen.findByPlaceholderText('your@email.com');
+    await screen.findByLabelText('Email');
     expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(1);
     expect(geolocation.clearWatch).toHaveBeenCalledWith(3);
     expect(storedShare()).toBeNull();

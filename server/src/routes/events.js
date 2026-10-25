@@ -89,6 +89,16 @@ router.patch('/:id', async (req, res) => {
     : validateEventFields(event);
   if (error) throw new HttpError(400, error);
 
+  // Shorter dates mustn't strand schedule items on days the event no longer has
+  if (event.isModified('startDate') || event.isModified('endDate')) {
+    const outside = event.schedule.filter((i) => i.date < event.startDate || i.date > event.endDate).length;
+    if (outside > 0) {
+      throw new HttpError(400, outside === 1
+        ? 'A schedule item is on a day outside the new dates. Move or delete it first.'
+        : `${outside} schedule items are on days outside the new dates. Move or delete them first.`);
+    }
+  }
+
   await event.save();
   res.json({ event });
 });

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { mongoUri, isProduction } = require('./config');
+const { mongoUri, isProduction, demoMode } = require('./config');
 
 let memoryServer = null;
 
@@ -11,7 +11,7 @@ const connectDatabase = async () => {
     await mongoose.connect(mongoUri);
     return false;
   }
-  if (isProduction) throw new Error('MONGODB_URI is required in production');
+  if (isProduction && !demoMode) throw new Error('MONGODB_URI is required in production');
 
   // Dev-only dependency, so only load it when needed
   const { MongoMemoryServer } = require('mongodb-memory-server');

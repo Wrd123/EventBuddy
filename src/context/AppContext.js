@@ -125,6 +125,14 @@ export const AppProvider = ({ children }) => {
     }
   };
   
+  const loginDemo = async () => {
+    const response = await authService.loginDemo();
+    setCurrentUser(response.user);
+    setIsAuthenticated(true);
+    setLoggedOutByUser(false);
+    return response;
+  };
+
   const register = async (userData) => {
     try {
       const response = await authService.register(userData);
@@ -251,6 +259,7 @@ export const AppProvider = ({ children }) => {
     error,
     clearError,
     login,
+    loginDemo,
     register,
     logout,
     updateProfile,

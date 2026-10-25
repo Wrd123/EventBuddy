@@ -369,6 +369,11 @@ const discoverRoute = (path, params) => {
 };
 
 const route = (method, path, body, authed, params) => {
+  // options.demo: the server runs in demo mode (one-tap demo sign-in)
+  if (path === '/health') return respond(200, { status: 'ok', demo: Boolean(fakeOptions.demo) });
+  if (method === 'POST' && path === '/auth/demo') {
+    return fakeOptions.demo ? respond(200, { token: TOKEN, user: currentUser() }) : respond(404, { message: 'Not found.' });
+  }
   if (method === 'POST' && path === '/auth/register') {
     return respond(201, { token: TOKEN, user: currentUser() });
   }
@@ -492,6 +497,10 @@ const route = (method, path, body, authed, params) => {
 
   if (path.includes('/schedule')) {
     return scheduleRoute(event, method, match[2] && decodeURIComponent(match[2]), match[3], body);
+  }
+  if (method === 'DELETE') {
+    events = events.filter((e) => e !== event);
+    return respond(204);
   }
   if (method === 'PATCH') Object.assign(event, body);
   return respond(200, { event });

@@ -143,3 +143,39 @@ describe('PATCH /api/auth/me', () => {
     await api().patch('/api/auth/me').set('Authorization', auth).send({ name: '   ' }).expect(400);
   });
 });
+
+describe('POST /api/auth/demo', () => {
+  const config = require('../src/config');
+  const { seedDemoData } = require('../src/seed/demoData');
+
+  it('signs in as the demo user in demo mode', async () => {
+    await seedDemoData();
+
+    const res = await api().post('/api/auth/demo').expect(200);
+
+    assert.equal(res.body.user.email, 'user@example.com');
+    assert.equal(res.body.user.passwordHash, undefined);
+    await api().get('/api/auth/me').set('Authorization', `Bearer ${res.body.token}`).expect(200);
+  });
+
+  it('says so while the demo data is still loading', async () => {
+    const res = await api().post('/api/auth/demo').expect(503);
+    assert.equal(res.body.message, 'The demo is still getting ready. Try again in a moment.');
+  });
+
+  it("doesn't exist outside demo mode", async () => {
+    await seedDemoData();
+    const original = config.demoMode;
+    config.demoMode = false;
+    try {
+      await api().post('/api/auth/demo').expect(404);
+    } finally {
+      config.demoMode = original;
+    }
+  });
+
+  it('is announced by the health check', async () => {
+    const res = await api().get('/api/health').expect(200);
+    assert.deepEqual(res.body, { status: 'ok', demo: true });
+  });
+});

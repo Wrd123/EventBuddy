@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- EventBuddy icon for browser tabs: the app icon (resources/icon.svg)
+       with rounded corners -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#5b2fc9"/>
+      <stop offset="0.55" stop-color="#2a1866"/>
+      <stop offset="1" stop-color="#0c0a1f"/>
+    </radialGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ddd3ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#glow)"/>
+  <path d="M512 846 C 418 720 272 608 272 438 A 240 240 0 1 1 752 438 C 752 608 606 720 512 846 Z" fill="url(#pin)"/>
+  <circle cx="448" cy="438" r="96" fill="#7c3aed"/>
+  <circle cx="576" cy="438" r="96" fill="#a78bfa" fill-opacity="0.92"/>
+</svg>

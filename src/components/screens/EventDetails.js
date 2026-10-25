@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Calendar, MessageSquare, DollarSign, Map, Plus, ExternalLink } from 'lucide-react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Calendar, MessageSquare, DollarSign, Map, Plus, ExternalLink, Pencil } from 'lucide-react';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
 import { Avatar, EventArt, ScreenLoader } from '../common';
 import NotFound from './NotFound';
@@ -26,18 +26,32 @@ const EventDetails = () => {
     return <NotFound title="Couldn't load event" message={error} />;
   }
 
+  const isOrganizer = event.createdBy === currentUser?._id;
+
   return (
     <div className="flex flex-col h-full relative">
-      <Header 
-        title={event.name} 
-        type="screen" 
-        showBack={true} 
-        showProfile={false} 
+      {/* The cover carries the event's name, so the header only has actions */}
+      <Header
+        type="screen"
+        showBack
+        showProfile={false}
         showNotifications={false}
+        action={isOrganizer && (
+          <Link
+            to={`/events/${eventId}/edit`}
+            className="flex items-center rounded-full border border-line bg-surface px-3 py-1.5 text-sm font-semibold text-fg/90"
+          >
+            <Pencil size={14} className="mr-1.5 text-violet-soft" aria-hidden="true" />
+            Edit
+          </Link>
+        )}
       />
-      
+
       <div className="flex-1 overflow-y-auto pb-16">
         <EventCover event={event} />
+        {event.description && (
+          <p className="px-4 pt-4 text-fg/90 whitespace-pre-wrap break-words">{event.description}</p>
+        )}
         <EventActions eventId={eventId} />
         {event.ticketUrl && (
           // Events planned from Discover keep their ticket page
@@ -56,7 +70,7 @@ const EventDetails = () => {
       {showInvite && (
         <InviteSheet
           event={event}
-          isOrganizer={event.createdBy === currentUser?._id}
+          isOrganizer={isOrganizer}
           onClose={() => setShowInvite(false)}
         />
       )}
@@ -69,7 +83,7 @@ const EventCover = ({ event }) => (
     <EventArt type={event.type} seed={event._id} className="absolute inset-0 w-full h-full" />
     <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-night/90 via-night/30 to-transparent" />
     <div className="absolute bottom-3 left-4 right-4">
-      <h2 className="text-white text-2xl font-extrabold tracking-tight">{event.name}</h2>
+      <h1 className="text-white text-2xl font-extrabold tracking-tight">{event.name}</h1>
       <p className="text-white/90">{[formatDateRange(event.startDate, event.endDate), event.location].filter(Boolean).join(' • ')}</p>
     </div>
   </div>

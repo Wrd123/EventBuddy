@@ -8,7 +8,7 @@ const discoverRoutes = require('./routes/discover');
 const chatRoutes = require('./routes/chats');
 const mapRoutes = require('./routes/map');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
-const { clientOrigin, trustProxy } = require('./config');
+const { clientOrigin, trustProxy, demoMode } = require('./config');
 
 // Builds the Express app without starting it, so tests can call it directly
 const createApp = () => {
@@ -19,7 +19,8 @@ const createApp = () => {
   app.use(cors({ origin: clientOrigin }));
   app.use(express.json({ limit: '100kb' }));
 
-  app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+  // demo: whether the one-tap demo sign-in is available
+  app.get('/api/health', (req, res) => res.json({ status: 'ok', demo: demoMode }));
   app.use('/api/auth', authRoutes);
   app.use('/api/events', eventRoutes);
   app.use('/api/invites', inviteRoutes);

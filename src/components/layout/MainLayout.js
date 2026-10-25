@@ -5,7 +5,7 @@ import { useAppContext } from '../../context/AppContext';
 // Import all screens
 import Home from '../screens/Home';
 import EventDetails from '../screens/EventDetails';
-import CreateEvent from '../screens/CreateEvent';
+import CreateEvent, { EditEvent } from '../screens/CreateEvent';
 import Expenses from '../screens/Expenses';
 import Schedule from '../screens/Schedule';
 import GroupChat from '../screens/GroupChat';
@@ -39,6 +39,7 @@ const MainLayout = () => (
         <Route path="/create" element={<CreateEvent />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/events/:eventId" element={<EventDetails />} />
+        <Route path="/events/:eventId/edit" element={<EditEvent />} />
         <Route path="/events/:eventId/schedule" element={<Schedule />} />
         <Route path="/events/:eventId/chat" element={<GroupChat />} />
         <Route path="/events/:eventId/expenses" element={<Expenses />} />

@@ -29,7 +29,7 @@ describe('routing', () => {
   it('sends logged-out users to the login screen', async () => {
     renderAt('/events/1');
 
-    expect(await screen.findByText("Don't have an account?")).toBeInTheDocument();
+    expect(await screen.findByText("New to EventBuddy?")).toBeInTheDocument();
   });
 
   it('opens an event straight from its URL', async () => {
@@ -78,13 +78,13 @@ describe('routing', () => {
   it('returns to the requested page after logging in', async () => {
     renderAt('/events/2');
 
-    fireEvent.change(await screen.findByPlaceholderText('your@email.com'), {
+    fireEvent.change(await screen.findByLabelText('Email'), {
       target: { value: 'user@example.com' }
     });
-    fireEvent.change(screen.getByPlaceholderText('••••••••'), {
+    fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'password' }
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screenTitle('Hiking Trip')).toBeInTheDocument();
   });
@@ -92,13 +92,13 @@ describe('routing', () => {
   it("shows the server's message for a wrong password", async () => {
     renderAt('/login');
 
-    fireEvent.change(await screen.findByPlaceholderText('your@email.com'), {
+    fireEvent.change(await screen.findByLabelText('Email'), {
       target: { value: 'user@example.com' }
     });
-    fireEvent.change(screen.getByPlaceholderText('••••••••'), {
+    fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'wrong' }
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
   });
@@ -108,11 +108,11 @@ describe('routing', () => {
     renderAt('/profile');
 
     fireEvent.click(await screen.findByRole('button', { name: /Log Out/ }));
-    fireEvent.change(await screen.findByPlaceholderText('your@email.com'), {
+    fireEvent.change(await screen.findByLabelText('Email'), {
       target: { value: 'user@example.com' }
     });
-    fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'password' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screen.findByText('Your Events')).toBeInTheDocument();
   });
@@ -123,7 +123,7 @@ describe('routing', () => {
     localStorage.setItem('eventbuddy_user', JSON.stringify({ name: 'John Doe' }));
     renderAt('/');
 
-    expect(await screen.findByText("Don't have an account?")).toBeInTheDocument();
+    expect(await screen.findByText("New to EventBuddy?")).toBeInTheDocument();
     expect(localStorage.getItem('eventbuddy_token')).toBeNull();
   });
 });

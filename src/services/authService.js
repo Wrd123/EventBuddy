@@ -19,6 +19,22 @@ export const login = async (credentials) => {
   return data;
 };
 
+// One-tap sign-in as the demo user (only when the server runs in demo mode)
+export const loginDemo = async () => {
+  const data = await apiRequest('/auth/demo', { method: 'POST' });
+  saveSession(data);
+  return data;
+};
+
+// Whether the server offers the demo sign-in. False if it can't be reached.
+export const isDemoAvailable = async () => {
+  try {
+    return Boolean((await apiRequest('/health')).demo);
+  } catch {
+    return false;
+  }
+};
+
 export const register = async (userData) => {
   const data = await apiRequest('/auth/register', { method: 'POST', body: userData });
   saveSession(data);
