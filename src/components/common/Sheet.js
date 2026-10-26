@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { tap } from '../../services/haptics';
 
 // The one bottom sheet every dialog in the app uses: a labelled modal with
 // a scrim, focus handling, an exit animation and drag-to-dismiss.
@@ -150,8 +151,7 @@ const Sheet = ({
     };
   }, [lockBackground, initialFocus, close]);
 
-  // The one place to add a light haptic when a drag dismisses (step 5)
-  const onDragDismiss = () => {};
+  const onDragDismiss = () => tap();
 
   const setDragOffset = (offset, height) => {
     const panel = panelRef.current;

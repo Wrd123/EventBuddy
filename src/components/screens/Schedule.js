@@ -8,6 +8,7 @@ import { useEvent } from '../../hooks/useEvent';
 import { useAppContext } from '../../context/AppContext';
 import { eachDay, formatDay, defaultScheduleDay } from '../../utils/dates';
 import { formatTimeRange, sortSchedule, isGoing, validateScheduleItem } from '../../utils/schedule';
+import { tap } from '../../services/haptics';
 
 const Schedule = () => {
   const { eventId } = useParams();
@@ -126,6 +127,7 @@ const ScheduleItem = ({ event, item, onEdit }) => {
   const isPopular = item.attendees.length > 2;
 
   const toggleGoing = async () => {
+    tap();
     setError('');
     setIsSaving(true);
     try {

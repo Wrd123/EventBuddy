@@ -8,6 +8,7 @@ import { useEvent } from '../../hooks/useEvent';
 import { useChat } from '../../hooks/useChat';
 import { useAppContext } from '../../context/AppContext';
 import { layoutChat } from '../../utils/chat';
+import { tap } from '../../services/haptics';
 
 // For someone who has left the event since they wrote
 const FORMER_MEMBER_COLOR = '#64748b';
@@ -190,6 +191,7 @@ const Composer = ({ eventName, onSend }) => {
   const submit = (e) => {
     e.preventDefault();
     if (!trimmed) return;
+    tap();
     onSend(trimmed);
     setText('');
   };

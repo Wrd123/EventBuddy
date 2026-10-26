@@ -14,6 +14,7 @@ import { formatDateRange, formatDay, getEventStatus, parseISODate, toISODate, to
 import { groupByVenue, listNames } from '../../utils/map';
 import { agoText, isStale } from '../../utils/live';
 import { formatTime } from '../../utils/schedule';
+import { success } from '../../services/haptics';
 
 const hasPosition = (e) => e.lat !== null && e.lng !== null;
 
@@ -131,6 +132,7 @@ const Map = () => {
 
   const saveMeetup = async ({ note, time }) => {
     await live.setMeetup({ ...canvasRef.current.getCenter(), note, time });
+    success();
     setPlacingMeetup(false);
     setSelectedId('meetup');
   };
@@ -257,7 +259,7 @@ const Map = () => {
       {choosingPlace && <PlaceSheet onClose={() => setChoosingPlace(false)} />}
       {openEvent && <LocalEventSheet event={openEvent} onClose={() => setOpenEvent(null)} />}
       {sharingOpen && liveEvent && (
-        <ShareSheet event={liveEvent} onShare={live.startSharing} onClose={() => setSharingOpen(false)} />
+        <ShareSheet event={liveEvent} onShare={async (until) => { await live.startSharing(until); success(); }} onClose={() => setSharingOpen(false)} />
       )}
     </div>
   );

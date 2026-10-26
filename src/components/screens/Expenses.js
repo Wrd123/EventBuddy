@@ -15,6 +15,7 @@ import { formatDay, todayISO } from '../../utils/dates';
 import { payOptions } from '../../utils/payLinks';
 import { newClientId, mightHaveSaved } from '../../utils/clientId';
 import { createFreshness } from '../../utils/freshness';
+import { success } from '../../services/haptics';
 
 // The event's expenses and payments, reloaded after every change so the
 // balances are always computed from what the server has, and every so often
@@ -305,6 +306,7 @@ const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded, on
     try {
       await eventService.recordPayment(event._id, attempt);
       uncertain.current = null;
+      success();
       await onRecorded();
     } catch (err) {
       uncertain.current = mightHaveSaved(err) ? attempt : null;
