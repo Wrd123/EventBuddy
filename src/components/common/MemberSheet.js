@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Avatar from './Avatar';
+import Sheet from './Sheet';
 import { useAppContext } from '../../context/AppContext';
 import { useSharing } from '../../context/SharingContext';
 
 // Bottom sheet for one person in "Who's going": you can leave from your own,
-// and the organizer can remove anyone else. The parent must be position:
-// relative, since the sheet covers it.
+// and the organizer can remove anyone else.
 const MemberSheet = ({ event, member, onClose }) => {
   const { currentUser, leaveEvent, removeMember } = useAppContext();
   const { share, setShare } = useSharing();
@@ -57,52 +56,44 @@ const MemberSheet = ({ event, member, onClose }) => {
     : (confirming ? `Tap again to remove ${firstName}` : 'Remove from event');
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="member-title">
-      <div className="sheet p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Avatar initial={member.name.charAt(0)} color={member.color} size="lg" />
-            <div className="min-w-0">
-              <h2 id="member-title" className="text-lg font-semibold truncate">{isMe ? `${member.name} (you)` : member.name}</h2>
-              {isOrganizerCard && <p className="text-sm text-accent-soft">Organizer</p>}
-            </div>
-          </div>
-          <button onClick={onClose} className="text-faint p-2 -m-2" aria-label="Close">
-            <X size={20} />
-          </button>
+    <Sheet
+      title={isMe ? `${member.name} (you)` : member.name}
+      lead={<Avatar initial={member.name.charAt(0)} color={member.color} size="lg" />}
+      subtitle={isOrganizerCard && <p className="text-sm text-accent-soft">Organizer</p>}
+      onClose={onClose}
+      className="p-4"
+  >
+
+      {action === 'remove' && confirming && (
+        <p className="text-sm text-muted mb-3">
+          {firstName} will lose access to the plans, chat and map, and can't rejoin with the invite link unless you let them back in.
+        </p>
+      )}
+      {action === 'leave' && confirming && (
+        <p className="text-sm text-muted mb-3">
+          You'll lose access to the plans, chat and map. You can rejoin with the invite link.
+        </p>
+      )}
+
+      {error && (
+        <div className="text-sm text-red-400 mb-3" role="alert">
+          {error.message}
+          {error.unsettled && (
+            <Link to={`/events/${event._id}/expenses`} className="block mt-1 text-accent-soft font-medium">Go to Expenses</Link>
+          )}
         </div>
+      )}
 
-        {action === 'remove' && confirming && (
-          <p className="text-sm text-muted mb-3">
-            {firstName} will lose access to the plans, chat and map, and can't rejoin with the invite link unless you let them back in.
-          </p>
-        )}
-        {action === 'leave' && confirming && (
-          <p className="text-sm text-muted mb-3">
-            You'll lose access to the plans, chat and map. You can rejoin with the invite link.
-          </p>
-        )}
-
-        {error && (
-          <div className="text-sm text-red-400 mb-3" role="alert">
-            {error.message}
-            {error.unsettled && (
-              <Link to={`/events/${event._id}/expenses`} className="block mt-1 text-accent-soft font-medium">Go to Expenses</Link>
-            )}
-          </div>
-        )}
-
-        {action && (
-          <button
-            onClick={act}
-            disabled={isWorking}
-            className="w-full h-12 rounded-full border border-red-400/40 text-red-400 font-semibold transition-transform active:scale-[0.97] disabled:opacity-50"
-          >
-            {isWorking ? (action === 'leave' ? 'Leaving...' : 'Removing...') : label}
-          </button>
-        )}
-      </div>
-    </div>
+      {action && (
+        <button
+          onClick={act}
+          disabled={isWorking}
+          className="w-full h-12 rounded-full border border-red-400/40 text-red-400 font-semibold transition-transform active:scale-[0.97] disabled:opacity-50"
+        >
+          {isWorking ? (action === 'leave' ? 'Leaving...' : 'Removing...') : label}
+        </button>
+      )}
+    </Sheet>
   );
 };
 

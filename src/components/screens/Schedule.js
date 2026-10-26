@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, Pencil, Plus, X } from 'lucide-react';
+import { Check, Pencil, Plus } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import Header from '../common/Header';
-import { Button, ScreenLoader } from '../common';
+import { Button, ScreenLoader, Sheet } from '../common';
 import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
 import { useAppContext } from '../../context/AppContext';
@@ -266,59 +266,55 @@ const ScheduleItemForm = ({ event, days, item, defaultDay, onClose, onSaved }) =
   const inputClass = 'field';
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="schedule-form-title">
-      <form onSubmit={handleSubmit} className="sheet p-4 max-h-full overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 id="schedule-form-title" className="text-lg font-semibold">
-            {item ? 'Edit schedule item' : 'Add to schedule'}
-          </h2>
-          <button type="button" onClick={onClose} className="text-faint" aria-label="Close">
-            <X size={20} />
-          </button>
+    <Sheet
+      as="form"
+      title={item ? 'Edit schedule item' : 'Add to schedule'}
+      onSubmit={handleSubmit}
+      onClose={onClose}
+      className="p-4 max-h-full overflow-y-auto"
+    >
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded mb-4">{error}</div>
+      )}
+
+      <label htmlFor="item-activity" className="block text-sm font-medium text-fg/80 mb-1">What's happening</label>
+      <input id="item-activity" className={`${inputClass} mb-3`} maxLength={80} placeholder="Arctic Monkeys" value={fields.activity} onChange={handleChange('activity')} />
+
+      <label htmlFor="item-day" className="block text-sm font-medium text-fg/80 mb-1">Day</label>
+      <select id="item-day" className={`${inputClass} mb-3`} value={fields.date} onChange={handleChange('date')}>
+        {days.map(day => <option key={day} value={day}>{formatDay(day)}</option>)}
+      </select>
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div>
+          <label htmlFor="item-start" className="block text-sm font-medium text-fg/80 mb-1">Starts</label>
+          <input id="item-start" type="time" className={inputClass} value={fields.startTime} onChange={handleChange('startTime')} />
         </div>
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded mb-4">{error}</div>
-        )}
-
-        <label htmlFor="item-activity" className="block text-sm font-medium text-fg/80 mb-1">What's happening</label>
-        <input id="item-activity" className={`${inputClass} mb-3`} maxLength={80} placeholder="Arctic Monkeys" value={fields.activity} onChange={handleChange('activity')} />
-
-        <label htmlFor="item-day" className="block text-sm font-medium text-fg/80 mb-1">Day</label>
-        <select id="item-day" className={`${inputClass} mb-3`} value={fields.date} onChange={handleChange('date')}>
-          {days.map(day => <option key={day} value={day}>{formatDay(day)}</option>)}
-        </select>
-
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div>
-            <label htmlFor="item-start" className="block text-sm font-medium text-fg/80 mb-1">Starts</label>
-            <input id="item-start" type="time" className={inputClass} value={fields.startTime} onChange={handleChange('startTime')} />
-          </div>
-          <div>
-            <label htmlFor="item-end" className="block text-sm font-medium text-fg/80 mb-1">Ends (optional)</label>
-            <input id="item-end" type="time" className={inputClass} value={fields.endTime} onChange={handleChange('endTime')} />
-          </div>
+        <div>
+          <label htmlFor="item-end" className="block text-sm font-medium text-fg/80 mb-1">Ends (optional)</label>
+          <input id="item-end" type="time" className={inputClass} value={fields.endTime} onChange={handleChange('endTime')} />
         </div>
+      </div>
 
-        <label htmlFor="item-location" className="block text-sm font-medium text-fg/80 mb-1">Location (optional)</label>
-        <input id="item-location" className={`${inputClass} mb-4`} maxLength={80} placeholder="Main Stage" value={fields.location} onChange={handleChange('location')} />
+      <label htmlFor="item-location" className="block text-sm font-medium text-fg/80 mb-1">Location (optional)</label>
+      <input id="item-location" className={`${inputClass} mb-4`} maxLength={80} placeholder="Main Stage" value={fields.location} onChange={handleChange('location')} />
 
-        <Button type="submit" fullWidth size="lg" disabled={isSaving}>
-          {isSaving ? 'Saving...' : item ? 'Save changes' : 'Add to schedule'}
-        </Button>
+      <Button type="submit" fullWidth size="lg" disabled={isSaving}>
+        {isSaving ? 'Saving...' : item ? 'Save changes' : 'Add to schedule'}
+      </Button>
 
-        {item && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isSaving}
-            className="w-full mt-2 py-3 text-red-400 font-medium disabled:opacity-50"
-          >
-            {confirmingDelete ? 'Tap again to delete' : 'Delete from schedule'}
-          </button>
-        )}
-      </form>
-    </div>
+      {item && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isSaving}
+          className="w-full mt-2 py-3 text-red-400 font-medium disabled:opacity-50"
+        >
+          {confirmingDelete ? 'Tap again to delete' : 'Delete from schedule'}
+        </button>
+      )}
+    </Sheet>
   );
 };
 

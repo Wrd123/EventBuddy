@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Flag, Navigation, Radio, X } from 'lucide-react';
-import { Button } from '../common';
+import { Flag, Navigation, Radio } from 'lucide-react';
+import { Button, Sheet, useSheet } from '../common';
 import { agoText, directionsUrl, shareDurations, untilText } from '../../utils/live';
 import { tracksInBackground } from '../../services/locationTracker';
 
@@ -66,7 +66,16 @@ export const LiveBar = ({ event, live, trackingError, onShare, onSetMeetup }) =>
 };
 
 // Choosing how long to share
-export const ShareSheet = ({ event, onShare, onClose }) => {
+export const ShareSheet = ({ event, onShare, onClose }) => (
+  <Sheet title="Share your location" onClose={onClose} className="p-4">
+    <ShareChoices event={event} onShare={onShare} />
+  </Sheet>
+);
+
+// Its own component so it can close the sheet with the exit animation once
+// sharing has started
+const ShareChoices = ({ event, onShare }) => {
+  const { close } = useSheet();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -75,7 +84,7 @@ export const ShareSheet = ({ event, onShare, onClose }) => {
     setError('');
     try {
       await onShare(until);
-      onClose();
+      close();
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -83,28 +92,22 @@ export const ShareSheet = ({ event, onShare, onClose }) => {
   };
 
   return (
-    <div className="absolute inset-0 z-[1200] flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="share-title">
-      <div className="sheet p-4">
-        <div className="flex items-center justify-between mb-1">
-          <h2 id="share-title" className="text-lg font-bold">Share your location</h2>
-          <button onClick={onClose} className="text-faint" aria-label="Close"><X size={20} /></button>
-        </div>
-        <p className="text-sm text-muted mb-4">
-          Everyone in {event.name} will see where you are on the map until it ends or you stop.
-          {tracksInBackground
-            ? ' It keeps working with your phone locked, and your phone shows that location is in use.'
-            : " On the web, updates pause while EventBuddy isn't open."}
-        </p>
-        {error && <p className="text-sm text-red-300 mb-3" role="alert">{error}</p>}
-        <div className="space-y-2">
-          {shareDurations().map(option => (
-            <Button key={option.label} variant="secondary" fullWidth disabled={busy} onClick={() => share(option.until)}>
-              {option.label}
-            </Button>
-          ))}
-        </div>
+    <>
+      <p className="text-sm text-muted mb-4">
+        Everyone in {event.name} will see where you are on the map until it ends or you stop.
+        {tracksInBackground
+          ? ' It keeps working with your phone locked, and your phone shows that location is in use.'
+          : " On the web, updates pause while EventBuddy isn't open."}
+      </p>
+      {error && <p className="text-sm text-red-300 mb-3" role="alert">{error}</p>}
+      <div className="space-y-2">
+        {shareDurations().map(option => (
+          <Button key={option.label} variant="secondary" fullWidth disabled={busy} onClick={() => share(option.until)}>
+            {option.label}
+          </Button>
+        ))}
       </div>
-    </div>
+    </>
   );
 };
 

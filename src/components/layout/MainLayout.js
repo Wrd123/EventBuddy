@@ -16,7 +16,7 @@ import Register from '../screens/Register';
 import Profile from '../screens/Profile';
 import NotFound from '../screens/NotFound';
 import Invite from '../screens/Invite';
-import { AmbientGlow, ScreenLoader } from '../common';
+import { AmbientGlow, ScreenLoader, SheetHostProvider } from '../common';
 
 // The map brings in Leaflet, so it loads only when the Map tab is opened
 const Map = lazy(() => import('../screens/Map'));
@@ -26,8 +26,9 @@ const Map = lazy(() => import('../screens/Map'));
 const MainLayout = () => (
   <div className="w-full h-full max-w-md mx-auto bg-night overflow-hidden relative">
     <AmbientGlow />
-    {/* Positioned, so every screen paints above the glow */}
-    <div className="relative h-full">
+    {/* The routes sit in their own stacking context, with the sheet host
+        after them, so sheets always paint above screens (and the map) */}
+    <SheetHostProvider>
     <Routes>
       <Route element={<PublicOnly />}>
         <Route path="/login" element={<Login />} />
@@ -50,7 +51,7 @@ const MainLayout = () => (
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
-    </div>
+    </SheetHostProvider>
   </div>
 );
 

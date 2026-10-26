@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Share2, X } from 'lucide-react';
+import { Copy, Share2 } from 'lucide-react';
 import Button from './Button';
+import Sheet from './Sheet';
 import { useAppContext } from '../../context/AppContext';
 import { inviteUrl } from '../../utils/invites';
 import * as eventService from '../../services/eventService';
 
-// Bottom sheet for sharing an event's invite link. The parent must be
-// position: relative, since the sheet covers it.
+// Bottom sheet for sharing an event's invite link.
 const InviteSheet = ({ event, isOrganizer, onClose }) => {
   const { resetInviteLink } = useAppContext();
   const [message, setMessage] = useState('');
@@ -55,51 +55,43 @@ const InviteSheet = ({ event, isOrganizer, onClose }) => {
   };
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col justify-end sheet-scrim" role="dialog" aria-modal="true" aria-labelledby="invite-title">
-      <div className="sheet p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 id="invite-title" className="text-lg font-semibold">Invite friends</h2>
-          <button onClick={onClose} className="text-faint" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-        <p className="text-sm text-muted mb-3">
-          Anyone with this link can join {event.name}. They'll sign up first if they're new.
-        </p>
+    <Sheet title="Invite friends" onClose={onClose} className="p-4">
+      <p className="text-sm text-muted mb-3">
+        Anyone with this link can join {event.name}. They'll sign up first if they're new.
+      </p>
 
-        <input
-          readOnly
-          value={url}
-          aria-label="Invite link"
-          onFocus={(e) => e.target.select()}
-          className="field bg-raised text-sm mb-3"
-        />
+      <input
+        readOnly
+        value={url}
+        aria-label="Invite link"
+        onFocus={(e) => e.target.select()}
+        className="field bg-raised text-sm mb-3"
+      />
 
-        {message && <p className="text-sm text-go mb-3" role="status">{message}</p>}
-        {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
+      {message && <p className="text-sm text-go mb-3" role="status">{message}</p>}
+      {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
-        <div className={canShare ? 'grid grid-cols-2 gap-2' : ''}>
-          {canShare && (
-            <Button onClick={share} fullWidth icon={<Share2 size={16} />}>Share</Button>
-          )}
-          <Button onClick={copy} variant={canShare ? 'outline' : 'primary'} fullWidth icon={<Copy size={16} />}>
-            Copy link
-          </Button>
-        </div>
-
-        {isOrganizer && <RemovedPeople eventId={event._id} />}
-
-        {isOrganizer && (
-          <button
-            onClick={reset}
-            disabled={isResetting}
-            className="w-full mt-3 py-2 text-sm text-red-400 font-medium disabled:opacity-50"
-          >
-            {confirmingReset ? 'Tap again: the current link will stop working' : 'Reset link'}
-          </button>
+      <div className={canShare ? 'grid grid-cols-2 gap-2' : ''}>
+        {canShare && (
+          <Button onClick={share} fullWidth icon={<Share2 size={16} />}>Share</Button>
         )}
+        <Button onClick={copy} variant={canShare ? 'outline' : 'primary'} fullWidth icon={<Copy size={16} />}>
+          Copy link
+        </Button>
       </div>
-    </div>
+
+      {isOrganizer && <RemovedPeople eventId={event._id} />}
+
+      {isOrganizer && (
+        <button
+          onClick={reset}
+          disabled={isResetting}
+          className="w-full mt-3 py-2 text-sm text-red-400 font-medium disabled:opacity-50"
+        >
+          {confirmingReset ? 'Tap again: the current link will stop working' : 'Reset link'}
+        </button>
+      )}
+    </Sheet>
   );
 };
 
