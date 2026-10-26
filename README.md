@@ -78,9 +78,9 @@ flowchart LR
 | Layer | Technologies |
 |---|---|
 | App | React 18, React Router, Tailwind CSS, Leaflet |
-| iPhone | Capacitor 7, background geolocation, native HTTP |
+| iPhone | Capacitor 7, background geolocation, native HTTP, haptics |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
-| Testing | Jest and Testing Library (244 tests), Node's test runner with Supertest and an in-memory MongoDB (259 tests) |
+| Testing | Jest and Testing Library (323 tests), Node's test runner with Supertest and an in-memory MongoDB (301 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
@@ -93,6 +93,8 @@ flowchart LR
 - **Third-party APIs stay behind the server.** API keys never ship to the phone, results are cached (30 minutes for events, a day for places), OpenStreetMap's one-request-per-second rule is enforced with a queue, and user coordinates are rounded to about 1 km before they leave the phone for Discover.
 - **The map updates pins in place.** Friends' positions refresh every 10 seconds; markers are matched by id and moved rather than redrawn, so labels don't flicker. Debugging the first version turned up that Leaflet silently ignores a new view while a zoom animation is running, so automatic fits are instant.
 - **Cover photos without photo storage or choosing.** Each event type has 10 hand-picked free [Unsplash](https://unsplash.com) photos, served by Unsplash's image CDN at the size each screen draws them. Nobody picks one: each organizer's events of a type take the photos in turn (your first concert gets concert photo 1, your second photo 2), so a list of plans never repeats a picture until the 11th. The server assigns the number and the app owns the photo list, so there's nothing to upload, store or pay for. If a photo can't load, an illustrated cover drawn in SVG stands in.
+- **Taps answer at once, and the server still gets the last word.** Marking a payment paid or tapping Going changes the screen before the server replies. A payment carries an id the app made, so a retry after a lost reply can't be saved twice, and a poll that lands mid-request can't erase it or count it double. Going sends at most one request per plan at a time, and the last one always carries your final tap, because a server can apply two quick requests in either order. If the server says no, the change is undone with a short reason.
+- **One bottom sheet for every dialog.** Each sheet traps focus, closes on Escape or a downward drag, switches the screen behind it off for screen readers and taps, and gives focus back to whatever opened it. Screens slide in like a native stack, and every animation respects Reduce Motion.
 - **Demo mode instead of production infrastructure.** For a showcase, an in-memory database is cheaper and safer than a real one: no stored personal data and nothing to clean up.
 - **Every demo visitor gets a private world.** Tapping **Try the demo** creates a fresh copy of John, his friends, their events, chat and costs, so nothing one visitor adds shows up for the next. Every id in a world is derived from a random tag carried in the login token, so when the free server sleeps and wakes with an empty database, a saved login rebuilds the same world. Worlds expire after a day and at most 300 are kept, which bounds memory no matter how often someone taps the button. The picnic is placed on the visitor's own date, so it's happening "today" in any time zone.
 

@@ -1,31 +1,36 @@
-# Handoff: where EventBuddy stands (25 Oct 2026, evening)
+# Handoff: where EventBuddy stands (25 Oct 2026, late evening)
 
 `CLAUDE.md` has the stack, commands and conventions. This note covers what was just finished, what comes next, and the traps to avoid.
 
 ## State
 
-- `main` is at `bd82652e` and pushed. CI passed for both of today's commits (runs 40227714242 and 40229933950: API and Web app both succeeded).
-- Both commits changed the API *and* the web app, so both Render services need to be on `bd82652e`. Deploying the API resets everyone's in-memory demo copy, which is expected.
-- Tests: 301 server, 284 app and 4 script tests, all passing. The script tests run with `npm run test:scripts`, which CI now runs too.
-- **Uncommitted, and not ours:** two `waitFor` edits in `src/components/screens/Map.test.js` (around lines 261 and 505), probably from Codex. Leave them alone, and don't commit them with your own work; stage your hunks only. Ask the user what they want done with them.
+- **Branch `phase-3-feel`** holds phase 3 (feel). It's 10 commits on top of `main` (`b642993f`), which is pushed. The branch is **not merged, not pushed**, and waiting on the user.
+- **The web app only.** The server is unchanged, so after a merge only the web Render service needs redeploying, and nobody's demo copy resets. The iOS project gained the haptics plugin (`ios/App/CapApp-SPM/Package.swift`).
+- **Tests:** 323 app, 301 server and 4 script tests, all passing. `CI=true npm run build` is clean.
+- **Live-checked** at 375–430px on `127.0.0.1:3001`:
+  - sheets: focus, Escape and drag-dismiss, above the map
+  - Mark paid with a 3s held request
+  - rapid Going taps match the server
+  - push and back slides, the timeline, and the Mark paid row
+- **Not checked:** the iOS build and the haptics on a device.
 
-## What was done today
+## What was done today (phase 3)
 
-Codex reviewed the Afterglow commit and listed engineering findings E1–E6 and design findings D1–D6. All of E1–E6 are now done:
+Planned in plan mode, built step by step by Sonnet agents, each step checked and committed, then reviewed by the `reviewer` agent. All seven of its findings were fixed in `7814d6da`.
 
 | | What people get | Where |
 |---|---|---|
-| E1 | Friends' changes show without a refresh. An open event rechecks every 15s, the events list every 30s, the event page's balance and unread hints too. | `src/utils/freshness.js` (one rule: a read only counts if nothing changed locally while it was out and no later read landed first), `AppContext`, `useEvent`, `usePolling` |
-| E2 | A payment is counted once. A payment that would take anyone past even gets a 409 ("That's already settled"); retries reuse a `clientId`. | `server/src/idempotency.js`, `server/src/ledger.js`, `server/src/eventLock.js`, `SettlementRow` in `Expenses.js` |
-| E3 | A retried chat message is saved once. | `clientId` on messages, `useChat` |
-| E4 | Leave an event, or (organizer) remove someone and later let them back in. Only with an even balance. Removed people can't rejoin with an old link. Location sharing stops reliably: a removed phone stops tracking, logout warns if the server still has your share. | `DELETE /api/events/:id/members/:userId`, `Event.removed` (`select: false`), `MemberSheet`, `InviteSheet` removed list, `useLogOut` in `Profile.js`, `SharingContext` (`unstopped`) |
-| E5 | iOS release builds require matching `https` API and web URLs, so invite links work. | `scripts/native-env.js`, README |
-| E6 | Place lookups answer in time or say "busy": one 10s deadline covering queue and request, a bounded queue, shared in-flight lookups, a 10s budget for the map. | `server/src/discover/places.js`, `routes/map.js` |
+| D5 | Every dialog is one bottom sheet. It traps focus, closes on Escape, a scrim tap or a downward drag, and returns focus to the trigger (or the screen's h1 if the trigger is gone). The screen behind is `inert`. | `common/Sheet.js` (`SheetHostProvider` in `MainLayout` renders the routes container plus a portal host above it; `isolate` keeps Leaflet under it). `useSheet().close()` closes with the exit animation. |
+| D4 | Small controls have 44×44 hit areas. Mark paid is a real pill. | the `.tap` utility in `styles/index.css` (an invisible `::before`) |
+| D1 | The Home timeline marker column is 54px instead of 68px, with stacked day markers and two-line titles. | `Home.js`, `EventCard.js`, `daysAwayParts` in `utils/dates.js` |
+| Motion | Tabs fade, and going deeper slides in from the right. Back slides in from the left, from browser back or the header arrow (`state: { back: true }`). | `layout/RouteTransition.js`. Enter animations only, no fill mode. |
+| Haptics | Light taps and success buzzes in the iPhone app; nothing on the web. | `services/haptics.js`, `@capacitor/haptics` 7.0.5 |
+| Optimistic | Mark paid and Going change the screen at once and roll back with a reason. | `useLedger.recordPayment` in `Expenses.js`, `setGoing` in `AppContext.js` |
 
-**How the money rules hang together:**
-- Every change to an event's money or membership runs under `withEventLock` (an in-process, per-event queue), and loads the event *inside* the lock (`ledgerChange` in `routes/expenses.js`).
-- This only works because the API is a single process. Running more than one instance needs a Mongo transaction or a ledger revision first; the comment in `eventLock.js` says so.
-- Old expenses stay editable after someone leaves, but no edit or delete may move a former member's balance off even (`formerMembersLeftUneven`).
+**How the optimistic rules hang together:**
+- **Payments:** a pending payment stays across polls until a read contains its `clientId`. Retry ids live in a Map keyed by `from|to|amount` in `useLedger`. An entry is dropped once the server confirms that `clientId`, so a later debt of the same size gets a new id.
+- **Going:** at most one request per item is in flight. Taps meanwhile only change `wanted`, and a loop sends again until the server matches. A reply merges only that item's attendees.
+- **Error messages:** the generic "Couldn't record ..." shows only for network errors and 5xx. Other failures show the server's message.
 
 ## Decisions already made (don't reopen them)
 
@@ -41,6 +46,9 @@ New today:
 - **The organizer can't leave**; they delete the event instead.
 - **Freshness uses polling, not WebSockets.** Phase 4 can add sockets later; polling stays as the fallback.
 - **No React Query.** The small `freshness.js` rule is deliberate.
+- **Phase 3 has no server edits.** Optimistic creates for expenses and schedule items need a server `clientId` first, so they're a follow-up.
+- **The map's bottom panel is not a Sheet.** It's part of the screen, not a dialog, so it doesn't trap focus or drag.
+- **Expense and schedule forms close instantly after saving**, with no slide-down, since animating them would delay the reload.
 
 ## The roadmap
 
@@ -50,7 +58,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 |---|---|---|
 | 1 | Design directions: Afterglow chosen, with Signal's timeline on Home | Done |
 | 2 | The design system, and every screen rebuilt on it | Done |
-| 3 | Feel: route transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | **In progress** on `phase-3-feel` |
+| 3 | Feel: route transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Built on `phase-3-feel`, awaiting merge |
 | 3b | Loading skeletons instead of spinners, and pull-to-refresh | Planned |
 | 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now | Planned |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
@@ -58,23 +66,16 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 
 ## What comes next
 
-Phase 3 is planned and approved. It covers a shared `Sheet` component, tap targets, the small-screen timeline, route transitions, haptics, and optimistic payments and "Going". It has no server edits. Optimistic creates for expenses and schedule items need a server `clientId` first, so they're a follow-up.
-
-**Phase 3:** route transitions, draggable sheets, optimistic UI, haptics.
-- Optimistic UI is now safe for messages and payments, which have idempotent creates. Other creates (expenses, schedule items) don't have a `clientId` yet. Add one before making them optimistic.
-- Haptics: `@capacitor/haptics` on iOS, nothing on the web, and only free packages.
-- Motion must respect `prefers-reduced-motion`. Keep the existing reduced-transparency fallbacks and the ones for browsers without `backdrop-filter`.
-
-**Codex's design findings to fold in:**
-- **D5:** one shared `Sheet` component, with initial focus, focus trapping, Escape to close, focus returned to the trigger, and the background shut off while it's open. It replaces the hand-rolled `.sheet`/`.sheet-scrim` in InviteSheet, MemberSheet, PlaceSheet, LocalEventSheet and the map panels. Dragging (phase 3) belongs on the same component.
-- **D1:** small screens. The Home timeline has a 56px marker column next to cards with one-line titles. Test at 375–430px; 320px phones can't run current iOS, so skip that width. Allow two-line titles and shrink the gutter.
-- **D4:** tap targets toward 44×44. "Mark paid" is about 26px tall (`Expenses.js`, `text-xs px-3 py-1`), and small close and edit buttons need the same treatment.
+1. **The user decides on `phase-3-feel`:** merge to `main` (fast-forward), push, and watch CI.
+2. **iOS check:** `npm run build:ios`, then a Simulator run to see the sheets, the transitions and the haptics wiring.
+3. **Retake the README screenshots** (`docs/screenshots/*.jpg`). They still show the look from before Afterglow.
+4. **Then phase 3b** (skeletons, pull-to-refresh) or the polish below, whichever the user picks.
 
 **Later polish:**
 - **D2:** the greeting repeats the event name.
 - **D3:** switch the map from the CSS-filtered OSM tiles to CARTO dark or Voyager tiles, which are free with attribution.
-- **D6:** the Wordmark is hardcoded at 19px. Reduced transparency doesn't cover `.sheet`, `.sheet-scrim` or the photo backdrop.
-- After phase 3, retake the README screenshots (`docs/screenshots/*.jpg`), which still show the look from before Afterglow.
+- **D6:** the Wordmark is hardcoded at 19px. Reduced transparency now covers `.sheet` and `.sheet-scrim`, but not the photo backdrop.
+- Optimistic creates for expenses and schedule items, after adding a server `clientId` to both (a server edit, so ask first; see Traps).
 
 Phases 3b to 6 are in the roadmap above. Don't start a phase until the user asks.
 
@@ -82,14 +83,17 @@ Phases 3b to 6 are in the roadmap above. Don't start a phase until the user asks
 
 - **Editing `server/` wipes the user's local demo world.** `npm run server` runs `node --watch` with an in-memory MongoDB; `server/.env` has no `MONGODB_URI`. Every save restarts the API and erases everything created locally. Today that cost the user their Hike, Coachella and Stage Coach events. Before the first server edit, check `lsof -iTCP:4000 -sTCP:LISTEN` and ask.
 - **Live checks:** use throwaway users at `http://127.0.0.1:3001`. Browser storage is per origin, so this never touches the user's `localhost:3000` session.
-  - The :3001 dev server runs from this checkout. The one on :3000 has been hanging. Neither is ours to restart.
+  - The :3000 dev server hangs. Leave it alone. Start :3001 from this checkout with `preview_start` and the `web-3001` entry in `.claude/launch.json` (which is gitignored).
+  - **Try the demo** gives a throwaway world without credentials. It's safe while the local API is less than 24h old, because older worlds get pruned on the next demo login. Check the start time with `ps -o lstart= -p <api pid>`.
   - The scratch scripts that create two users (register, join, share, pay) were in the session scratchpad and are gone, so rewrite them against `http://localhost:4000/api`.
 - **The fake API in app tests** (`src/testUtils/fakeApi.js`) has helpers for the cases above:
   - `holdNext(method, path)` holds a response back to simulate a slow read.
   - `changeEvent` and `removeEvent` simulate another person's edits.
-  - Options cover failures: `chatSendsLost`, `paymentOutcomes`, `memberRemovalError`, `stopShareFails`.
+  - Options cover failures: `chatSendsLost`, `paymentOutcomes`, `memberRemovalError`, `stopShareFails`, `goingError`.
   - Polling is triggered with `fireEvent(document, new Event('visibilitychange'))`; no fake timers.
-- **Switching branches** fails while the Map.test.js edits are uncommitted. Today `main` was fast-forwarded with `git branch -f main <branch>` after checking it was an ancestor, then checked out.
+- **Sheets in jsdom:** a missing `matchMedia` counts as reduced motion, so sheets close at once in tests. The animated path is covered in `Sheet.test.js` by mocking `matchMedia`.
+- **Fast-forwarding `main`:** use `git branch -f main <branch>` after checking `main` is an ancestor, then check it out.
+- **Sonnet agents hit the session limit once.** Resume the same agent with SendMessage after the reset instead of starting over.
 
 ## Working with this user
 
