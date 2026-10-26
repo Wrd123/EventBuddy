@@ -22,7 +22,7 @@ const EventCard = ({ event, status, onSelect }) => (
       )}
     </div>
     <div className="flex-1 min-w-0">
-      <div className="font-semibold truncate">{event.name}</div>
+      <div className="font-semibold line-clamp-2">{event.name}</div>
       <div className="text-[13px] text-fg/65 truncate">
         {[formatDateRangeShort(event.startDate, event.endDate), event.location].filter(Boolean).join(', ')}
       </div>

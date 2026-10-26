@@ -35,6 +35,22 @@ describe('Home', () => {
     expect(comingUp.getByText('Summer Music Festival')).toBeInTheDocument();
   });
 
+  it('keeps the full distance as the marker text, and lets long titles wrap', async () => {
+    installFakeApi({ liveEvent: true }).logIn();
+    renderHome();
+
+    await screen.findByText('Hiking Trip');
+    // The compact visual is aria-hidden; the readable label is still there
+    const comingUp = within(section('Coming up'));
+    expect(comingUp.getAllByText(/^(Today|Tomorrow|\d+ days)$/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Now')).toBeInTheDocument();
+
+    // Two lines, not one clipped line
+    expect(comingUp.getByText('Hiking Trip')).toHaveClass('line-clamp-2');
+    expect(comingUp.getByText('Hiking Trip')).not.toHaveClass('truncate');
+    expect(screen.getByText('Picnic in the Park')).toHaveClass('line-clamp-2');
+  });
+
   it('asks for a location in one place when none is set', async () => {
     installFakeApi().logIn();
     renderHome();

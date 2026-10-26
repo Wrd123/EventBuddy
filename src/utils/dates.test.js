@@ -2,6 +2,7 @@ import {
   formatDateRangeShort,
   daysUntil,
   daysAwayLabel,
+  daysAwayParts,
   toISODate,
   parseISODate,
   eachDay,
@@ -100,6 +101,12 @@ describe('daysUntil and daysAwayLabel', () => {
     expect(daysAwayLabel('2026-10-25', TODAY)).toBe('Today');
     expect(daysAwayLabel('2026-10-26', TODAY)).toBe('Tomorrow');
     expect(daysAwayLabel('2026-11-13', TODAY)).toBe('19 days');
+  });
+
+  it('splits the distance into a number and a unit for the compact marker', () => {
+    expect(daysAwayParts('2026-11-13', TODAY)).toEqual({ value: '19', unit: 'days' });
+    expect(daysAwayParts('2026-10-26', TODAY)).toEqual({ value: '1', unit: 'day' });
+    expect(daysAwayParts('2026-10-25', TODAY)).toEqual({ value: 'Today', unit: null });
   });
 });
 

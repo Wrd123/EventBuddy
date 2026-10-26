@@ -98,6 +98,14 @@ export const daysAwayLabel = (iso, today = todayISO()) => {
   return `${days} days`;
 };
 
+// The same distance split for a compact marker: a number over a small
+// unit ("12" / "days"), or a single word when there's no number to show
+export const daysAwayParts = (iso, today = todayISO()) => {
+  const days = daysUntil(iso, today);
+  if (days <= 0) return { value: 'Today', unit: null };
+  return { value: String(days), unit: days === 1 ? 'day' : 'days' };
+};
+
 // The day a schedule should open on: today while the event is running,
 // otherwise its first day
 export const defaultScheduleDay = (event, today = todayISO()) =>

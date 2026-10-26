@@ -7,7 +7,7 @@ import { useNearbyEvents } from '../../hooks/useNearbyEvents';
 import Header from '../common/Header';
 import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
 import { AvatarStack, EventCard, EventCover, LocalEventSheet, PhotoBackdrop, PlaceSheet, SuggestedEventCard } from '../common';
-import { todayISO, getEventStatus, formatDay, daysAwayLabel } from '../../utils/dates';
+import { todayISO, getEventStatus, formatDay, daysAwayLabel, daysAwayParts } from '../../utils/dates';
 
 const byStartDate = (a, b) => a.startDate.localeCompare(b.startDate);
 
@@ -104,19 +104,19 @@ const Home = () => {
 // on, otherwise how many days off it is
 const Timeline = ({ nextUp, later, today, onOpen }) => (
   <div className="relative">
-    <span className="absolute left-[27px] top-4 bottom-6 w-px bg-white/15" aria-hidden="true" />
+    <span className="absolute left-[21px] top-4 bottom-6 w-px bg-white/15" aria-hidden="true" />
 
-    <TimelineStop marker={<StopMarker status={nextUp.status} label={daysAwayLabel(nextUp.event.startDate, today)} />}>
+    <TimelineStop marker={<StopMarker status={nextUp.status} label={daysAwayLabel(nextUp.event.startDate, today)} parts={daysAwayParts(nextUp.event.startDate, today)} />}>
       <NextUpCard event={nextUp.event} status={nextUp.status} onOpen={() => onOpen(nextUp.event)} />
     </TimelineStop>
 
     {later.length > 0 && (
       <section aria-labelledby="coming-up" className="mt-6">
-        <h2 id="coming-up" className="ml-[68px] mb-3 text-lg font-semibold tracking-[-0.01em]">Coming up</h2>
+        <h2 id="coming-up" className="ml-[54px] mb-3 text-lg font-semibold tracking-[-0.01em]">Coming up</h2>
         <ol className="flex flex-col gap-2.5">
           {later.map(({ event, status }) => (
             <li key={event._id}>
-              <TimelineStop marker={<StopMarker status={status} label={daysAwayLabel(event.startDate, today)} />}>
+              <TimelineStop marker={<StopMarker status={status} label={daysAwayLabel(event.startDate, today)} parts={daysAwayParts(event.startDate, today)} />}>
                 <EventCard event={event} status={status} onSelect={() => onOpen(event)} />
               </TimelineStop>
             </li>
@@ -128,18 +128,26 @@ const Timeline = ({ nextUp, later, today, onOpen }) => (
 );
 
 const TimelineStop = ({ marker, children }) => (
-  <div className="flex items-center gap-3">
-    <div className="w-14 shrink-0 flex justify-center">{marker}</div>
+  <div className="flex items-center gap-2.5">
+    <div className="w-11 shrink-0 flex justify-center">{marker}</div>
     <div className="flex-1 min-w-0">{children}</div>
   </div>
 );
 
 // A pill that sits on the spine: glowing green for now, frosted otherwise
-const StopMarker = ({ status, label }) =>
+const StopMarker = ({ status, label, parts }) =>
   status === 'ongoing' ? (
-    <span className="relative px-2.5 py-1 rounded-full bg-go text-night text-xs font-bold shadow-[0_0_16px_rgba(74,222,128,0.55)]">Now</span>
+    <span className="relative px-2 py-1 rounded-full bg-go text-night text-xs font-bold shadow-[0_0_16px_rgba(74,222,128,0.55)]">Now</span>
   ) : (
-    <span className="relative px-2 py-1 rounded-full bg-night/85 border border-line text-[11px] font-semibold text-fg/85 whitespace-nowrap">{label}</span>
+    // Fits the 44px column: the number over a tiny unit. The full label
+    // stays as text for screen readers.
+    <span className="relative w-11 py-1 flex flex-col items-center rounded-full bg-night/85 border border-line text-fg/85 whitespace-nowrap">
+      <span className="sr-only">{label}</span>
+      <span aria-hidden="true" className={`flex flex-col items-center ${parts.unit ? 'leading-none gap-0.5 py-0.5' : ''}`}>
+        <span className={parts.unit ? 'text-[13px] font-bold' : 'text-[11px] font-semibold'}>{parts.value}</span>
+        {parts.unit && <span className="text-[9px] font-medium text-fg/60">{parts.unit}</span>}
+      </span>
+    </span>
   );
 
 // What goes where the timeline would be, depending on why there isn't
@@ -188,7 +196,7 @@ const NextUpCard = ({ event, status, onOpen }) => (
 
     <span className="glass absolute inset-x-2.5 bottom-2.5 rounded-[22px] px-4 py-3.5 flex flex-col gap-2.5">
       <span className="flex flex-col min-w-0">
-        <span className="text-[22px] font-bold tracking-[-0.025em] truncate">{event.name}</span>
+        <span className="text-[22px] leading-[1.15] font-bold tracking-[-0.025em] line-clamp-2">{event.name}</span>
         {event.location && <span className="text-sm text-fg/75 truncate">{event.location}</span>}
       </span>
       <span className="flex items-center justify-between">
