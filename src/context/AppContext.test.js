@@ -5,7 +5,7 @@ import { installFakeApi, holdNext, delayNext, changeEvent, serverEvent, settle, 
 
 // Shows the events list and offers the changes the tests make
 const Probe = () => {
-  const { events, isAuthenticated, updateEvent, deleteEvent, logout, login } = useAppContext();
+  const { events, isAuthenticated, updateEvent, deleteEvent, createEvent, setGoing, logout, login } = useAppContext();
   if (!isAuthenticated) {
     return (
       <div>
@@ -21,6 +21,9 @@ const Probe = () => {
       </ul>
       <button onClick={() => updateEvent('1', { name: 'Festival (edited here)' })}>Rename</button>
       <button onClick={() => deleteEvent('2')}>Delete hike</button>
+      <button onClick={() => createEvent({ name: 'Late night', startDate: '2027-01-01', endDate: '2027-01-01' })}>Create</button>
+      <button onClick={() => setGoing('1', 's2', true).catch(() => {})}>Join Tame Impala</button>
+      <button onClick={() => setGoing('1', 's2', false).catch(() => {})}>Leave Tame Impala</button>
       <button onClick={logout}>Log out</button>
     </div>
   );
@@ -102,6 +105,53 @@ describe('keeping events fresh', () => {
 
     expect(names()).toContain('Festival (newer)');
     expect(names()).not.toContain('Summer Music Festival');
+  });
+});
+
+describe('changes that land after the session ends', () => {
+  it("doesn't add an event whose answer lands after logging out", async () => {
+    await renderProbe();
+    const release = holdNext('POST', '/events');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await screen.findByRole('button', { name: 'Log in' });
+    await release();
+
+    expect(screen.getByText('0 events kept')).toBeInTheDocument();
+  });
+
+  it("doesn't add it twice when the answer lands after logging in again", async () => {
+    await renderProbe();
+    const release = holdNext('POST', '/events');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log in' }));
+    // The server saved it, so the new session reads it once
+    await screen.findByText('Late night');
+    await release();
+    await settle();
+
+    expect(names().filter((name) => name === 'Late night')).toHaveLength(1);
+  });
+
+  it('stops sending Going taps once you log out', async () => {
+    await renderProbe();
+    // Join is a PUT and Leave a DELETE
+    const goingRequests = () => global.fetch.mock.calls.filter(([url]) => url.endsWith('/s2/going'));
+    const release = holdNext('PUT', '/events/1/schedule/s2/going');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join Tame Impala' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Tame Impala' })); // waits for the Join
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await screen.findByRole('button', { name: 'Log in' });
+    await release();
+    await settle();
+
+    // Without a login token, the queued Leave mustn't go out for the old user
+    expect(goingRequests()).toHaveLength(1);
+    expect(screen.getByText('0 events kept')).toBeInTheDocument();
   });
 });
 

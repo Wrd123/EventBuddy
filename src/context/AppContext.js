@@ -67,6 +67,21 @@ export const AppProvider = ({ children }) => {
     setEvents(update);
   }, [freshness]);
 
+  // Which login this is. It changes on every login and logout, so an answer
+  // to a change made before then (creating an event, say) can tell it
+  // arrived too late and leave the list alone. Reads have freshness instead.
+  const session = useRef(0);
+  // Call before sending a change; the function it returns applies the
+  // change to your events only if the same person is still logged in
+  const changeForThisSession = useCallback(() => {
+    const askedIn = session.current;
+    return (update) => {
+      if (session.current !== askedIn) return false;
+      changeEvents(update);
+      return true;
+    };
+  }, [changeEvents]);
+
   // Going taps the server hasn't confirmed yet, by "eventId:itemId", as
   // { wanted, confirmed, promise } (see setGoing below). A read that started
   // after the tap but reached the server before it is accepted as fresh, yet
@@ -93,7 +108,8 @@ export const AppProvider = ({ children }) => {
   // Stable identity, since the effects below depend on it.
   const clearSession = useCallback(() => {
     authService.logout();
-    // Reads still on their way belong to the old session
+    // Reads and changes still on their way belong to the old session
+    session.current += 1;
     freshness.changed();
     setCurrentUser(null);
     setIsAuthenticated(false);
@@ -228,7 +244,8 @@ export const AppProvider = ({ children }) => {
 
   // Authentication. Errors are thrown for the screen to show.
   const startSession = (response) => {
-    // Nothing read before this login belongs to it
+    // Nothing read or changed before this login belongs to it
+    session.current += 1;
     freshness.changed();
     setCurrentUser(response.user);
     setIsAuthenticated(true);
@@ -250,34 +267,39 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateProfile = async (profileData) => {
+    const askedIn = session.current;
     const response = await authService.updateProfile(profileData);
-    setCurrentUser(response.user);
+    if (session.current === askedIn) setCurrentUser(response.user);
     return response;
   };
 
   // Event changes; the caller decides where to go next
   const createNewEvent = async (eventData) => {
+    const apply = changeForThisSession();
     const response = await eventService.createEvent(eventData);
-    changeEvents(prev => [...prev, response.event]);
+    apply(prev => [...prev, response.event]);
     return response;
   };
 
   const updateEventData = async (eventId, eventData) => {
+    const apply = changeForThisSession();
     const response = await eventService.updateEvent(eventId, eventData);
-    changeEvents(prev => prev.map(event => (event._id === eventId ? response.event : event)));
+    apply(prev => prev.map(event => (event._id === eventId ? response.event : event)));
     return response;
   };
 
   const deleteEventData = async (eventId) => {
+    const apply = changeForThisSession();
     await eventService.deleteEvent(eventId);
-    changeEvents(prev => prev.filter(event => event._id !== eventId));
+    apply(prev => prev.filter(event => event._id !== eventId));
   };
 
   // Replace an event in the list with a fresh copy from the server, or add it
-  // if the list doesn't have it yet (e.g. it was opened from a link)
-  const storeEvent = (updated) => {
+  // if the list doesn't have it yet (e.g. it was opened from a link). apply
+  // comes from changeForThisSession, taken before the request went out.
+  const storeEvent = (apply, updated) => {
     const shown = withPendingGoing(updated);
-    changeEvents(prev =>
+    apply(prev =>
       prev.some(event => event._id === updated._id)
         ? prev.map(event => (event._id === updated._id ? shown : event))
         : [...prev, shown]
@@ -288,27 +310,35 @@ export const AppProvider = ({ children }) => {
   // Leaving takes the event off your list. Errors (like a balance that
   // isn't settled) are thrown for the screen to show.
   const leaveEvent = async (eventId) => {
+    const apply = changeForThisSession();
     await eventService.removeMember(eventId, currentUser._id);
-    changeEvents(prev => prev.filter(event => event._id !== eventId));
+    apply(prev => prev.filter(event => event._id !== eventId));
   };
 
   const removeMember = async (eventId, userId) => {
+    const apply = changeForThisSession();
     await eventService.removeMember(eventId, userId);
-    changeEvents(prev => prev.map(event => (
+    apply(prev => prev.map(event => (
       event._id === eventId ? { ...event, members: event.members.filter(m => m.user !== userId) } : event
     )));
   };
 
   // Schedule actions. Errors are thrown for the screen to show next to the
   // form or button.
-  const addScheduleItem = async (eventId, item) =>
-    storeEvent(await eventService.addScheduleItem(eventId, item));
+  const addScheduleItem = async (eventId, item) => {
+    const apply = changeForThisSession();
+    return storeEvent(apply, await eventService.addScheduleItem(eventId, item));
+  };
 
-  const updateScheduleItem = async (eventId, itemId, changes) =>
-    storeEvent(await eventService.updateScheduleItem(eventId, itemId, changes));
+  const updateScheduleItem = async (eventId, itemId, changes) => {
+    const apply = changeForThisSession();
+    return storeEvent(apply, await eventService.updateScheduleItem(eventId, itemId, changes));
+  };
 
-  const deleteScheduleItem = async (eventId, itemId) =>
-    storeEvent(await eventService.deleteScheduleItem(eventId, itemId));
+  const deleteScheduleItem = async (eventId, itemId) => {
+    const apply = changeForThisSession();
+    return storeEvent(apply, await eventService.deleteScheduleItem(eventId, itemId));
+  };
 
   // Going shows at once and the server catches up. Taps can come faster than
   // answers, and the server may apply two requests in either order, so each
@@ -346,14 +376,18 @@ export const AppProvider = ({ children }) => {
     if (state.promise) return state.promise;
 
     const run = async () => {
+      // A logout clears the queue; whatever lands after it is dropped
+      const askedIn = session.current;
+      const stillHere = () => session.current === askedIn;
       let sent;
       try {
-        while (sent !== state.wanted) {
+        while (stillHere() && sent !== state.wanted) {
           sent = state.wanted;
           // The answer is also a read of who else is going, as of when it
           // was sent, so it follows the same freshness rule as any read
           const read = freshness.start();
           const updated = await eventService.setGoing(eventId, itemId, sent);
+          if (!stillHere()) return;
           state.confirmed = sent;
           // Friends' attendance from the answer unless a newer read already
           // landed; mine is what's wanted now either way
@@ -364,6 +398,7 @@ export const AppProvider = ({ children }) => {
         // Back to what the server last confirmed. The queue goes first, so
         // the check with the server below isn't laid over with the failed tap.
         if (goingState.current[key] === state) delete goingState.current[key];
+        if (!stillHere()) throw err;
         changeEvents(withMyAttendance(eventId, itemId, state.confirmed));
         fetchEvent(eventId).catch(() => {});
         warning();
@@ -378,11 +413,15 @@ export const AppProvider = ({ children }) => {
   };
 
   // Invites: joining adds the event to your list right away
-  const joinEvent = async (inviteCode) =>
-    storeEvent(await eventService.joinInvite(inviteCode));
+  const joinEvent = async (inviteCode) => {
+    const apply = changeForThisSession();
+    return storeEvent(apply, await eventService.joinInvite(inviteCode));
+  };
 
-  const resetInviteLink = async (eventId) =>
-    storeEvent(await eventService.resetInviteLink(eventId));
+  const resetInviteLink = async (eventId) => {
+    const apply = changeForThisSession();
+    return storeEvent(apply, await eventService.resetInviteLink(eventId));
+  };
 
   // Values to be provided to consumers
   const value = {
