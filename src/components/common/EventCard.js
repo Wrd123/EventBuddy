@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, MapPin } from 'lucide-react';
 import EventCover from './EventCover';
 import { formatDateRangeShort } from '../../utils/dates';
 
@@ -23,9 +23,15 @@ const EventCard = ({ event, status, onSelect }) => (
     </div>
     <div className="flex-1 min-w-0">
       <div className="font-semibold line-clamp-2">{event.name}</div>
-      <div className="text-[13px] text-fg/65 truncate">
-        {[formatDateRangeShort(event.startDate, event.endDate), event.location].filter(Boolean).join(', ')}
-      </div>
+      {/* Date and place each get a line, so a long place never pushes the
+          date out of view on a narrow phone */}
+      <div className="text-[13px] leading-[1.3] text-fg/65 truncate">{formatDateRangeShort(event.startDate, event.endDate)}</div>
+      {event.location && (
+        <div className="flex items-center gap-1 text-[13px] leading-[1.3] text-fg/55 min-w-0">
+          <MapPin size={12} className="shrink-0" aria-hidden="true" />
+          <span className="truncate">{event.location}</span>
+        </div>
+      )}
     </div>
     <ChevronRight size={18} className="text-fg/40 shrink-0" aria-hidden="true" />
   </button>

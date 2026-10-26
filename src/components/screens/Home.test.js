@@ -51,6 +51,19 @@ describe('Home', () => {
     expect(screen.getByText('Picnic in the Park')).toHaveClass('line-clamp-2');
   });
 
+  it('gives the date and the place their own lines in each row', async () => {
+    installFakeApi({ liveEvent: true }).logIn();
+    renderHome();
+
+    await screen.findByText('Hiking Trip');
+    const comingUp = within(section('Coming up'));
+    const date = comingUp.getByText(/^Nov 13/);
+    const place = comingUp.getByText('Smoky Mountains');
+    expect(date).toHaveClass('truncate');
+    expect(place).toHaveClass('truncate');
+    expect(date).not.toContainElement(place);
+  });
+
   it('asks for a location in one place when none is set', async () => {
     installFakeApi().logIn();
     renderHome();
