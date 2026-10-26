@@ -42,11 +42,13 @@ export const LiveBar = ({ event, live, trackingError, onShare, onSetMeetup }) =>
         <span className="truncate">Live at {event.name}</span>
       </div>
       <p className="text-sm text-muted mb-3">
-        {live.sharing
-          ? `You're sharing your location ${untilText(live.sharing.until)}.`
-          : sharingCount === 0
-            ? 'Nobody is sharing their location yet.'
-            : `${sharingCount} ${sharingCount === 1 ? 'friend is' : 'friends are'} sharing their location.`}
+        {live.stopPending
+          ? `Couldn't stop sharing yet. Friends can still see your last spot ${untilText(live.sharing.until)}.`
+          : live.sharing
+            ? `You're sharing your location ${untilText(live.sharing.until)}.`
+            : sharingCount === 0
+              ? 'Nobody is sharing their location yet.'
+              : `${sharingCount} ${sharingCount === 1 ? 'friend is' : 'friends are'} sharing their location.`}
       </p>
       {(trackingError || error) && (
         <p className="text-sm text-red-300 mb-3" role="alert">{trackingError || error}</p>

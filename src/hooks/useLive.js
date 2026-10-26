@@ -15,9 +15,30 @@ export const useLive = (eventId) => {
   const current = useRef(eventId);
   current.current = eventId;
   // The app-wide share (see SharingContext) follows what the server says
-  const { share, setShare } = useSharing();
+  const { share, setShare, unstopped, setUnstopped } = useSharing();
   const shareRef = useRef(share);
   shareRef.current = share;
+  // A share you asked to stop that the server still has (see SharingContext).
+  // Stopping is what you wanted, so the server's copy is never taken up again.
+  const unstoppedRef = useRef(unstopped);
+  unstoppedRef.current = unstopped;
+  const retryingStop = useRef(false);
+
+  // Tries that stop again in the background, once per refresh. The warning
+  // stays until it gets through.
+  const retryStop = useCallback(async () => {
+    if (retryingStop.current) return;
+    retryingStop.current = true;
+    try {
+      await endShareOnServer(eventId);
+      if (unstoppedRef.current?.eventId === eventId) setUnstopped(null);
+      if (current.current === eventId) setState(prev => ({ ...prev, sharing: null }));
+    } catch {
+      // Still unreachable: the next refresh tries again
+    } finally {
+      retryingStop.current = false;
+    }
+  }, [eventId, setUnstopped]);
 
   const load = useCallback(async () => {
     if (!eventId) return;
@@ -25,8 +46,14 @@ export const useLive = (eventId) => {
       const { sharing, people, meetup } = await liveService.getLive(eventId);
       if (current.current !== eventId) return;
       setState({ status: 'ready', sharing, people, meetup, error: '' });
-      // Started on another device, or ended (stopped elsewhere, time up)
       const mine = shareRef.current;
+      if (unstoppedRef.current?.eventId === eventId) {
+        if (sharing) retryStop();
+        // Ended some other way (time up, stopped elsewhere), so nothing to warn about
+        else setUnstopped(null);
+        return;
+      }
+      // Started on another device, or ended (stopped elsewhere, time up)
       if (sharing && (mine?.eventId !== eventId || mine.until !== sharing.until)) {
         setShare({ eventId, until: sharing.until });
       } else if (!sharing && mine?.eventId === eventId) {
@@ -38,7 +65,7 @@ export const useLive = (eventId) => {
         setState(prev => (prev.status === 'ready' ? prev : { ...prev, status: 'error', error: err.message }));
       }
     }
-  }, [eventId, setShare]);
+  }, [eventId, setShare, setUnstopped, retryStop]);
 
   useEffect(() => {
     setState({ status: eventId ? 'loading' : 'idle', sharing: null, people: [], meetup: null, error: '' });
@@ -67,7 +94,8 @@ export const useLive = (eventId) => {
     await endShareOnServer(eventId);
     setState(prev => ({ ...prev, sharing: null }));
     if (shareRef.current?.eventId === eventId) setShare(null);
-  }, [eventId, setShare]);
+    if (unstoppedRef.current?.eventId === eventId) setUnstopped(null);
+  }, [eventId, setShare, setUnstopped]);
 
   const setMeetup = useCallback(async (meetup) => {
     const saved = await liveService.setMeetup(eventId, meetup);
@@ -79,5 +107,8 @@ export const useLive = (eventId) => {
     setState(prev => ({ ...prev, meetup: null }));
   }, [eventId]);
 
-  return { ...state, reload: load, startSharing, stopSharing, setMeetup, clearMeetup };
+  // This phone stopped, but friends may still see its last spot here
+  const stopPending = Boolean(state.sharing) && unstopped?.eventId === eventId;
+
+  return { ...state, stopPending, reload: load, startSharing, stopSharing, setMeetup, clearMeetup };
 };

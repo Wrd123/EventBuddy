@@ -466,6 +466,53 @@ describe('Sharing across the app', () => {
     expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(2);
   });
 
+  it("doesn't start sharing again when the map sees the share you couldn't stop", async () => {
+    installFakeApi({ liveEvent: true, stopShareFails: 2 }).logIn();
+    await alreadySharing();
+    renderAt('/profile');
+    await waitFor(() => expect(report).toBeDefined());
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
+    await screen.findByRole('alert');
+
+    // Still logged in, so the map opens and reads the server's stale share
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+    await pin('Friend: Alex');
+    await settle();
+
+    // Stopping is what you asked for, so the phone stays stopped
+    expect(storedShare()).toBeNull();
+    expect(geolocation.watchPosition).toHaveBeenCalledTimes(1);
+    // and the map tries the stop again (failing once more here)
+    expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(2);
+
+    // The next refresh gets it through, and the warning goes
+    fireEvent(document, new Event('visibilitychange'));
+    await waitFor(() => expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(3));
+    await settle();
+    expect(JSON.parse(localStorage.getItem('eventbuddy_unstopped_share'))).toBeNull();
+    expect(storedShare()).toBeNull();
+  });
+
+  it('lets you stop from the map after logging out failed to', async () => {
+    installFakeApi({ liveEvent: true, stopShareFails: 2 }).logIn();
+    await alreadySharing();
+    renderAt('/profile');
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+    await pin('Friend: Alex');
+    await settle();
+
+    expect(screen.getByText(/Couldn't stop sharing yet. Friends can still see your last spot until/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop sharing' }));
+
+    expect(await screen.findByRole('button', { name: 'Share my location' })).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('eventbuddy_unstopped_share'))).toBeNull();
+    expect(storedShare()).toBeNull();
+  });
+
   it('lets you log out anyway when the server still has your share', async () => {
     installFakeApi({ liveEvent: true, stopShareFails: 1 }).logIn();
     await alreadySharing();
