@@ -1,4 +1,4 @@
-# Handoff: where EventBuddy stands (25 Oct 2026, late evening)
+# Handoff: where EventBuddy stands (25 Oct 2026, night)
 
 `CLAUDE.md` has the stack, commands and conventions. This note covers what was just finished, what comes next, and the traps to avoid.
 
@@ -60,19 +60,59 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
-## What comes next
+## What comes next: the small fixes (chosen by the user)
 
+The user asked for **all six small items below, in one batch**, before the iOS check and phase 3b. None needs a server edit. Work on a new branch (e.g. `small-fixes`) with one commit per item. Each needs tests, and both suites must pass. Show screenshots of the visual ones (1–4) at 375 and 390px. Then have the `reviewer` subagent check the branch before asking the user about merging. The pointers are from a quick read; check them before building.
+
+**1. Home rows squeeze dates and locations** (Codex, phase 3 review)
+- `src/components/common/EventCard.js` puts `formatDateRangeShort(...)` and `event.location` on one truncating line, so at 375px "Nov 13 – 15, Smoky Mountains" gets cut off.
+- Give each its own line: date first, then location, each truncating on its own. Or use a date line with a small `MapPin` location line. Keep the two-line title from phase 3.
+- Check the past-events rows on Home use the same card, and check the row height still looks right next to the timeline markers.
+
+**2. The greeting repeats the event name** (D2)
+- `headline()` in `src/components/screens/Home.js` (around line 30) gives "Hey John, Picnic in the Park is on." directly above the hero card titled "Picnic in the Park".
+- Make the headline say something the card doesn't, without the name. For example, "something's on right now." for an ongoing event, or "your next plan is in 19 days." / "tomorrow's the day." for an upcoming one. Keep "what's the plan?" when there's nothing.
+- Update `Home.test.js`, which asserts on the greeting text. Keep it short and friendly, matching the voice.
+
+**3. Clearer map tiles** (D3)
+- `src/components/map/MapCanvas.js` uses OpenStreetMap's tiles darkened with a long CSS `filter` (`.eb-tiles-darkened` in `map.css`), which looks muddy. OSM's tile policy is also meant for light use.
+- Switch the default to CARTO's free dark basemap, `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png` with `subdomains: 'abcd'`. Its attribution must credit both OpenStreetMap contributors and CARTO.
+- Drop the CSS filter for these tiles, and keep the `REACT_APP_MAP_TILE_URL` override.
+- Check the coral and lilac pins, the friend avatars and the meetup flag still stand out. If plain `dark_all` is too neutral against the plum theme, a light tint is fine.
+- Update the comment block above `TILE_URL`, and the README if it mentions the tiles.
+- It must stay free and keyless ($0 budget). Don't add a key-based provider.
+- CARTO's basemaps are free for non-commercial use within a monthly view limit, which a portfolio demo stays well under. Check their current terms and say so in the code comment.
+
+**4. Wordmark size and the photo backdrop under Reduce Transparency** (D6)
+- `Wordmark` in `src/components/common/Header.js:16` hardcodes `text-[19px]`. That overrides its parents: the Login `text-4xl` h1, the Register `text-3xl` h1 and ShowcaseFrame's `text-5xl` all render "EventBuddy" at 19px.
+- Make the Wordmark inherit its size (keep the tracking), and give the Header's use its own 19px class.
+- Then check the Login and Register screens and the laptop showcase frame visually.
+- Reduce Transparency: `@media (prefers-reduced-transparency: reduce)` in `src/styles/index.css` covers `.glass`, `.sheet` and `.sheet-scrim`, but not `PhotoBackdrop`'s blurred photo (`common/PhotoBackdrop.js`). Under that setting, hide the photo or swap it for a flat `bg-night` plus the existing ambient glow, so text never sits on a moving, busy backdrop.
+
+**5. A late response can restore data after logout** (Codex backlog)
+- The mutation helpers in `src/context/AppContext.js` (`createNewEvent` around line 260, `updateEventData`, `storeEvent`, `joinEvent`, the schedule helpers, and the `setGoing` loop) apply the server's answer with `changeEvents` whenever it arrives.
+- Scenario: create an event, log out before the answer lands, and the new event is added to the logged-out (or next user's) list. `freshness` only guards reads.
+- Fix: a session counter (a ref bumped in `clearSession` and `startSession`). Each mutation captures it before awaiting and drops its local update if it changed. Return or throw as before so screens behave the same.
+- `setGoing` already clears `goingState` on logout, but its loop still calls `setEvents` afterwards, so guard that too.
+- Tests in `AppContext.test.js`: use `holdNext` on the POST, log out, release, and check nothing came back. Do the same for logging in as someone else.
+
+**6. Sharing can switch itself back on after a failed stop** (Codex backlog)
+- Likely path, to confirm with a test first:
+  - `useLogOut` in `src/components/screens/Profile.js` sets `unstopped`, clears `share` (tracking stops), then `endShareOnServer` fails.
+  - The user stays logged in. Any `useLive` poll (`src/hooks/useLive.js`, the "started on another device" branch around line 30) sees the server still sharing and calls `setShare(...)` again, so the phone starts tracking without anyone asking.
+- Fix idea: while `unstopped` names that event, `useLive` must not adopt the server's share for it. It should keep showing the "couldn't stop" warning and retry the stop rather than resume tracking. Alternatively, retry the stop in the background until it succeeds or the share's `until` passes.
+- Whichever you choose, the user's intent (stop) wins over the server's stale state.
+- Tests: use the `stopShareFails` option in `fakeApi.js`.
+
+After the batch:
 1. **iOS check:** `npm run build:ios`, then a Simulator run to see the sheets, the transitions and the haptics wiring.
 2. **Retake the README screenshots** (`docs/screenshots/*.jpg`). They still show the look from before Afterglow.
-3. **Then phase 3b** (skeletons, pull-to-refresh) or the polish below, whichever the user picks.
+3. **Phase 3b** (skeletons, pull-to-refresh), when the user asks.
 
-**Later polish:**
-- **D2:** the greeting repeats the event name.
-- **D3:** switch the map from the CSS-filtered OSM tiles to CARTO dark or Voyager tiles, which are free with attribution.
-- **D6:** the Wordmark is hardcoded at 19px. Reduced transparency now covers `.sheet` and `.sheet-scrim`, but not the photo backdrop.
-- Home rows still squeeze dates and locations (Codex, phase 3 review).
-- **Backlog Codex reported earlier, acknowledged and not yet fixed:** a late create response can restore state after logout, and a failed stop-sharing request can be followed by sharing switching itself back on.
-- Optimistic creates for expenses and schedule items, after adding a server `clientId` to both (a server edit, so ask first; see Traps).
+**Later:**
+- Optimistic creates for expenses and schedule items, after adding a server `clientId` to both. That's a server edit, so ask first; see Traps.
+- The sheet needs a check with a real phone keyboard, enlarged text and VoiceOver on a device.
+- A Map test ("shows your upcoming events and nearby venues") failed once in about 9 full runs during phase 3 and never again. If it recurs, look at its timing.
 
 Phases 3b to 6 are in the roadmap above. Don't start a phase until the user asks.
 
