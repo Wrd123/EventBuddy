@@ -5,11 +5,12 @@ import { installFakeApi, holdNext, delayNext, changeEvent, serverEvent, settle, 
 
 // Shows the events list and offers the changes the tests make
 const Probe = () => {
-  const { events, isAuthenticated, updateEvent, deleteEvent, createEvent, setGoing, logout, login } = useAppContext();
+  const { events, isAuthenticated, currentUser, updateEvent, deleteEvent, createEvent, setGoing, joinEvent, updateProfile, logout, login } = useAppContext();
   if (!isAuthenticated) {
     return (
       <div>
         <p>{events.length} events kept</p>
+        <p>{currentUser ? `${currentUser.name} kept` : 'Nobody kept'}</p>
         <button onClick={() => login({ email: demoUser.email, password: 'password' })}>Log in</button>
       </div>
     );
@@ -24,6 +25,8 @@ const Probe = () => {
       <button onClick={() => createEvent({ name: 'Late night', startDate: '2027-01-01', endDate: '2027-01-01' })}>Create</button>
       <button onClick={() => setGoing('1', 's2', true).catch(() => {})}>Join Tame Impala</button>
       <button onClick={() => setGoing('1', 's2', false).catch(() => {})}>Leave Tame Impala</button>
+      <button onClick={() => joinEvent('game-code')}>Join game night</button>
+      <button onClick={() => updateProfile({ paymentHandles: { venmo: 'john-doe' } })}>Save profile</button>
       <button onClick={logout}>Log out</button>
     </div>
   );
@@ -134,6 +137,31 @@ describe('changes that land after the session ends', () => {
     await settle();
 
     expect(names().filter((name) => name === 'Late night')).toHaveLength(1);
+  });
+
+  it("doesn't add an event you joined when the answer lands after logging out", async () => {
+    await renderProbe();
+    const release = holdNext('POST', '/invites/game-code/join');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join game night' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await screen.findByRole('button', { name: 'Log in' });
+    await release();
+
+    expect(screen.getByText('0 events kept')).toBeInTheDocument();
+  });
+
+  it("doesn't bring back your profile when its answer lands after logging out", async () => {
+    await renderProbe();
+    const release = holdNext('PATCH', '/auth/me');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await screen.findByRole('button', { name: 'Log in' });
+    await release();
+
+    expect(screen.getByText('Nobody kept')).toBeInTheDocument();
+    expect(localStorage.getItem('eventbuddy_user')).toBeNull();
   });
 
   it('stops sending Going taps once you log out', async () => {

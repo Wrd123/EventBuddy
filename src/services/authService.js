@@ -10,8 +10,10 @@ const saveSession = ({ token, user }) => {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
-const saveUser = (user) => {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+// Only while the login the request was sent with is still the current one,
+// so an answer that lands after logging out can't put the old user back
+const saveUserFor = (token, user) => {
+  if (localStorage.getItem(TOKEN_KEY) === token) localStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
 export const login = async (credentials) => {
@@ -64,14 +66,16 @@ export const getCurrentUser = () => {
 
 // Fresh user from the server; also checks the token is still valid
 export const getProfile = async () => {
+  const token = localStorage.getItem(TOKEN_KEY);
   const { user } = await apiRequest('/auth/me');
-  saveUser(user);
+  saveUserFor(token, user);
   return user;
 };
 
 export const updateProfile = async (profileData) => {
+  const token = localStorage.getItem(TOKEN_KEY);
   const data = await apiRequest('/auth/me', { method: 'PATCH', body: profileData });
-  saveUser(data.user);
+  saveUserFor(token, data.user);
   return data;
 };
 
