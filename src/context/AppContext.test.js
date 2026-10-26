@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AppProvider, useAppContext } from './AppContext';
-import { installFakeApi, holdNext, changeEvent, settle, demoUser } from '../testUtils/fakeApi';
+import { installFakeApi, holdNext, delayNext, changeEvent, serverEvent, settle, demoUser } from '../testUtils/fakeApi';
 
 // Shows the events list and offers the changes the tests make
 const Probe = () => {
@@ -102,5 +102,125 @@ describe('keeping events fresh', () => {
 
     expect(names()).toContain('Festival (newer)');
     expect(names()).not.toContain('Summer Music Festival');
+  });
+});
+
+// Who's going to the festival's two plans, and Join/Leave for Tame Impala (s2)
+const GoingProbe = () => {
+  const { events, setGoing } = useAppContext();
+  const [error, setError] = useState('');
+  const festival = events.find((e) => e._id === '1');
+  if (!festival) return <p>Loading</p>;
+  const who = (itemId) => festival.schedule.find((i) => i._id === itemId).attendees.map((a) => a.name).join(', ') || 'nobody';
+  const tap = (going) => setGoing('1', 's2', going).catch((err) => setError(err.message));
+  return (
+    <div>
+      <p>Tame Impala: {who('s2')}</p>
+      <p>Arctic Monkeys: {who('s1')}</p>
+      {error && <p role="alert">{error}</p>}
+      <button onClick={() => tap(true)}>Join</button>
+      <button onClick={() => tap(false)}>Leave</button>
+    </div>
+  );
+};
+
+const GOING_PATH = '/events/1/schedule/s2/going';
+const serverWho = (itemId) => serverEvent('1').schedule.find((i) => i._id === itemId).attendees.map((a) => a.name);
+const shown = (text) => expect(screen.getByText(text)).toBeInTheDocument();
+
+describe('Going while refreshes land', () => {
+  const renderGoing = async () => {
+    render(<AppProvider><GoingProbe /></AppProvider>);
+    await screen.findByText('Tame Impala: nobody');
+  };
+
+  it('keeps your tap through a refresh that reaches the server first', async () => {
+    await renderGoing();
+    const release = delayNext('PUT', GOING_PATH);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    shown('Tame Impala: John Doe');
+    refreshInBackground(); // the server doesn't have the tap yet
+    await settle();
+    shown('Tame Impala: John Doe');
+
+    await release();
+    await settle();
+    shown('Tame Impala: John Doe');
+    expect(serverWho('s2')).toEqual(['John Doe']);
+  });
+
+  it('ends on the last tap through join, leave, join with refreshes in between', async () => {
+    await renderGoing();
+    const release = delayNext('PUT', GOING_PATH);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    refreshInBackground();
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Leave' }));
+    refreshInBackground();
+    await settle();
+    shown('Tame Impala: nobody');
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    refreshInBackground();
+    await settle();
+    shown('Tame Impala: John Doe');
+
+    await release();
+    await settle();
+    shown('Tame Impala: John Doe');
+    expect(serverWho('s2')).toEqual(['John Doe']);
+    // One request carried it all: the taps only changed what was wanted
+    expect(global.fetch.mock.calls.filter(([url]) => url.endsWith(GOING_PATH))).toHaveLength(1);
+  });
+
+  it("keeps a friend's attendance from a refresh that lands before the answer", async () => {
+    await renderGoing();
+    const release = holdNext('PUT', GOING_PATH); // applied, answer held up
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    changeEvent('1', (event) => { event.schedule.find((i) => i._id === 's2').attendees.unshift({ user: 'u3', name: 'Taylor' }); });
+    refreshInBackground();
+    await screen.findByText('Tame Impala: Taylor, John Doe');
+
+    await release();
+    await settle();
+    shown('Tame Impala: Taylor, John Doe');
+  });
+
+  it('shows changes to other plans while your tap is on its way', async () => {
+    await renderGoing();
+    const release = delayNext('PUT', GOING_PATH);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    changeEvent('1', (event) => { event.schedule.find((i) => i._id === 's1').attendees.push({ user: 'u3', name: 'Taylor' }); });
+    refreshInBackground();
+    await screen.findByText('Arctic Monkeys: Alex, Taylor');
+    shown('Tame Impala: John Doe');
+
+    await release();
+    await settle();
+    shown('Arctic Monkeys: Alex, Taylor');
+    shown('Tame Impala: John Doe');
+  });
+
+  it('puts things back and says why when the server refuses', async () => {
+    installFakeApi({ goingError: "Couldn't update that plan." }).logIn();
+    await renderGoing();
+    const release = delayNext('PUT', GOING_PATH);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    refreshInBackground();
+    await settle();
+    shown('Tame Impala: John Doe');
+
+    await release();
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't update that plan.");
+    shown('Tame Impala: nobody');
+    // A refresh after the failure isn't laid over with the failed tap
+    refreshInBackground();
+    await settle();
+    shown('Tame Impala: nobody');
+    expect(serverWho('s2')).toEqual([]);
   });
 });

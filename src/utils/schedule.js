@@ -24,6 +24,12 @@ export const sortSchedule = (items) =>
 export const isGoing = (item, userId) =>
   item.attendees.some((attendee) => attendee.user === userId);
 
+// The item with this person going or not, leaving everyone else as they are
+export const withAttendance = (item, user, going) => {
+  const others = item.attendees.filter((attendee) => attendee.user !== user._id);
+  return { ...item, attendees: going ? [...others, { user: user._id, name: user.name }] : others };
+};
+
 // Mirrors the server's validateScheduleItem so the form can explain problems
 // before sending. Returns the first problem, or '' if valid.
 export const validateScheduleItem = ({ date, startTime, endTime, activity, location }, event) => {

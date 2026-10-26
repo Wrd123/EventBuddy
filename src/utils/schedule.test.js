@@ -1,4 +1,4 @@
-import { formatTime, formatTimeRange, sortSchedule, isGoing, validateScheduleItem } from './schedule';
+import { formatTime, formatTimeRange, sortSchedule, isGoing, withAttendance, validateScheduleItem } from './schedule';
 
 describe('formatTime', () => {
   it.each([
@@ -49,6 +49,19 @@ describe('isGoing', () => {
 
     expect(isGoing(item, 'u1')).toBe(true);
     expect(isGoing(item, 'u2')).toBe(false);
+  });
+});
+
+describe('withAttendance', () => {
+  const me = { _id: 'u1', name: 'John Doe' };
+  const item = { _id: 's1', attendees: [{ user: 'u2', name: 'Alex' }] };
+
+  it('adds or removes only that person, once', () => {
+    const joined = withAttendance(item, me, true);
+    expect(joined.attendees).toEqual([{ user: 'u2', name: 'Alex' }, { user: 'u1', name: 'John Doe' }]);
+    expect(withAttendance(joined, me, true).attendees).toHaveLength(2);
+    expect(withAttendance(joined, me, false).attendees).toEqual([{ user: 'u2', name: 'Alex' }]);
+    expect(item.attendees).toHaveLength(1);
   });
 });
 

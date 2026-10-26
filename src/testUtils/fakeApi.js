@@ -267,6 +267,9 @@ export const changeEvent = (eventId, change) => {
   return event;
 };
 
+// What the server has for an event right now, to check the app agrees
+export const serverEvent = (eventId) => events.find((e) => e._id === eventId);
+
 // Someone else deleting an event, or removing you from it
 export const removeEvent = (eventId) => {
   events = events.filter((e) => e._id !== eventId);
@@ -280,6 +283,20 @@ export const holdNext = (method, path) => {
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
   holds.push({ method, path, gate });
+  return () => act(async () => {
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+};
+
+// Holds the next matching request on its way: the server only sees it on
+// release(). For testing a write that hasn't been applied yet while other
+// requests (a background refresh) get there first.
+let delays = [];
+export const delayNext = (method, path) => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  delays.push({ method, path, gate });
   return () => act(async () => {
     release();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -620,7 +637,8 @@ export const installFakeApi = (options = {}) => {
   ledgers = demoLedger();
   handles = { ...demoHandles(), ...options.handles };
   holds = [];
-  global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) => {
+  delays = [];
+  const serve = (url, method, headers, body) => {
     const [path, search = ''] = url.replace(/^\/api/, '').split('?');
     const response = route(
       method,
@@ -633,6 +651,13 @@ export const installFakeApi = (options = {}) => {
     if (held === -1) return response;
     const [{ gate }] = holds.splice(held, 1);
     return gate.then(() => response);
+  };
+  global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) => {
+    const path = url.replace(/^\/api/, '').split('?')[0];
+    const delayed = delays.findIndex((d) => d.method === method && d.path === path);
+    if (delayed === -1) return serve(url, method, headers, body);
+    const [{ gate }] = delays.splice(delayed, 1);
+    return gate.then(() => serve(url, method, headers, body));
   });
 
   return {

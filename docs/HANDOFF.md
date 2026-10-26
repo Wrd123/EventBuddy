@@ -4,15 +4,10 @@
 
 ## State
 
-- **Branch `phase-3-feel`** holds phase 3 (feel). It's 10 commits on top of `main` (`b642993f`), which is pushed. The branch is **not merged, not pushed**, and waiting on the user.
-- **The web app only.** The server is unchanged, so after a merge only the web Render service needs redeploying, and nobody's demo copy resets. The iOS project gained the haptics plugin (`ios/App/CapApp-SPM/Package.swift`).
-- **Tests:** 323 app, 301 server and 4 script tests, all passing. `CI=true npm run build` is clean.
-- **Live-checked** at 375–430px on `127.0.0.1:3001`:
-  - sheets: focus, Escape and drag-dismiss, above the map
-  - Mark paid with a 3s held request
-  - rapid Going taps match the server
-  - push and back slides, the timeline, and the Mark paid row
-- **Not checked:** the iOS build and the haptics on a device.
+- **Phase 3 is on `main`** at `ef94888a`, pushed. CI passed (run 40251059986: Web app and API both succeeded). Only the web Render service needs redeploying for it; the user does that.
+- **Branch `going-poll-fix`** (not merged, not pushed) fixes Codex's phase 3 review finding (below). Server unchanged.
+- **Tests:** 329 app, 301 server and 4 script tests, all passing. `CI=true npm run build` is clean.
+- **Not checked:** the iOS build and the haptics on a device. The sheets also haven't been tried with a real phone keyboard, enlarged text or VoiceOver on a device.
 
 ## What was done today (phase 3)
 
@@ -31,6 +26,7 @@ Planned in plan mode, built step by step by Sonnet agents, each step checked and
 - **Payments:** a pending payment stays across polls until a read contains its `clientId`. Retry ids live in a Map keyed by `from|to|amount` in `useLedger`. An entry is dropped once the server confirms that `clientId`, so a later debt of the same size gets a new id.
 - **Going:** at most one request per item is in flight. Taps meanwhile only change `wanted`, and a loop sends again until the server matches. A reply merges only that item's attendees.
 - **Error messages:** the generic "Couldn't record ..." shows only for network errors and 5xx. Other failures show the server's message.
+- **Pending Going is laid over every read** (`withPendingGoing` in `AppContext`, used by `readEvents`, `fetchEvent` and `storeEvent`). A read can start after a tap yet reach the server before it, and without the overlay it erased the tap. My own entry always comes from the queue's `wanted`, never from the copy on screen. The write's answer counts as a read started when it was sent, so its friend list is dropped if a newer read already landed (Codex's phase 3 review, fixed on `going-poll-fix`).
 
 ## Decisions already made (don't reopen them)
 
@@ -66,7 +62,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 
 ## What comes next
 
-1. **The user decides on `phase-3-feel`:** merge to `main` (fast-forward), push, and watch CI.
+1. **The user decides on `going-poll-fix`:** merge to `main` (fast-forward), push, and watch CI.
 2. **iOS check:** `npm run build:ios`, then a Simulator run to see the sheets, the transitions and the haptics wiring.
 3. **Retake the README screenshots** (`docs/screenshots/*.jpg`). They still show the look from before Afterglow.
 4. **Then phase 3b** (skeletons, pull-to-refresh) or the polish below, whichever the user picks.
@@ -75,6 +71,8 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 - **D2:** the greeting repeats the event name.
 - **D3:** switch the map from the CSS-filtered OSM tiles to CARTO dark or Voyager tiles, which are free with attribution.
 - **D6:** the Wordmark is hardcoded at 19px. Reduced transparency now covers `.sheet` and `.sheet-scrim`, but not the photo backdrop.
+- Home rows still squeeze dates and locations (Codex, phase 3 review).
+- **Backlog Codex reported earlier, acknowledged and not yet fixed:** a late create response can restore state after logout, and a failed stop-sharing request can be followed by sharing switching itself back on.
 - Optimistic creates for expenses and schedule items, after adding a server `clientId` to both (a server edit, so ask first; see Traps).
 
 Phases 3b to 6 are in the roadmap above. Don't start a phase until the user asks.
@@ -90,6 +88,7 @@ Phases 3b to 6 are in the roadmap above. Don't start a phase until the user asks
   - `holdNext(method, path)` holds a response back to simulate a slow read.
   - `changeEvent` and `removeEvent` simulate another person's edits.
   - Options cover failures: `chatSendsLost`, `paymentOutcomes`, `memberRemovalError`, `stopShareFails`, `goingError`.
+  - `delayNext(method, path)` holds a request *before* the server applies it, for a write that hasn't landed yet while a refresh gets there first. `serverEvent(id)` reads what the server has.
   - Polling is triggered with `fireEvent(document, new Event('visibilitychange'))`; no fake timers.
 - **Sheets in jsdom:** a missing `matchMedia` counts as reduced motion, so sheets close at once in tests. The animated path is covered in `Sheet.test.js` by mocking `matchMedia`.
 - **Fast-forwarding `main`:** use `git branch -f main <branch>` after checking `main` is an ancestor, then check it out.

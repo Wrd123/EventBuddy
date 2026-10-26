@@ -6,7 +6,7 @@ import { setUnauthorizedHandler } from '../services/api';
 import { SharingProvider } from './SharingContext';
 import { usePolling } from '../hooks/usePolling';
 import { createFreshness } from '../utils/freshness';
-import { isGoing } from '../utils/schedule';
+import { isGoing, withAttendance } from '../utils/schedule';
 import { warning } from '../services/haptics';
 
 // While the app is open, your events are checked this often for changes
@@ -67,6 +67,28 @@ export const AppProvider = ({ children }) => {
     setEvents(update);
   }, [freshness]);
 
+  // Going taps the server hasn't confirmed yet, by "eventId:itemId", as
+  // { wanted, confirmed, promise } (see setGoing below). A read that started
+  // after the tap but reached the server before it is accepted as fresh, yet
+  // doesn't have the tap, so every copy that comes in gets these laid over it.
+  const goingState = useRef({});
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
+  const withPendingGoing = useCallback((event) => {
+    const me = currentUserRef.current;
+    const prefix = `${event._id}:`;
+    const wanted = {};
+    Object.entries(goingState.current).forEach(([key, state]) => {
+      if (key.startsWith(prefix)) wanted[key.slice(prefix.length)] = state.wanted;
+    });
+    if (!me || Object.keys(wanted).length === 0) return event;
+    return {
+      ...event,
+      schedule: event.schedule.map(item => (item._id in wanted ? withAttendance(item, me, wanted[item._id]) : item))
+    };
+  }, []);
+
   // Drop the session locally (no navigation; the router's guards react to it).
   // Stable identity, since the effects below depend on it.
   const clearSession = useCallback(() => {
@@ -76,6 +98,7 @@ export const AppProvider = ({ children }) => {
     setCurrentUser(null);
     setIsAuthenticated(false);
     setEvents([]);
+    goingState.current = {};
     // Someone else may use this device next
     setPlace(null);
     writeStoredPlace(null);
@@ -127,10 +150,10 @@ export const AppProvider = ({ children }) => {
     const read = freshness.start();
     const list = await eventService.getUserEvents();
     if (!freshness.accept(read)) return false;
-    setEvents(list);
+    setEvents(list.map(withPendingGoing));
     setEventsStatus('ready');
     return true;
-  }, [freshness]);
+  }, [freshness, withPendingGoing]);
 
   // Your events, loaded after login. eventsStatus lets Home tell "still
   // loading" and "couldn't load" apart from "no events yet".
@@ -164,7 +187,7 @@ export const AppProvider = ({ children }) => {
   const fetchEvent = useCallback(async (eventId) => {
     const read = freshness.start();
     try {
-      const event = await eventService.getEventById(eventId);
+      const event = withPendingGoing(await eventService.getEventById(eventId));
       if (!freshness.accept(read)) return null;
       setEvents(prev =>
         prev.some(e => e._id === event._id) ? prev.map(e => (e._id === event._id ? event : e)) : [...prev, event]
@@ -180,7 +203,7 @@ export const AppProvider = ({ children }) => {
       }
       return { status: 'error', error: err.message };
     }
-  }, [freshness]);
+  }, [freshness, withPendingGoing]);
 
   // Home and Discover look for events around the phone, without asking
   // anyone to choose a place. Once per launch (or login) ask the phone where
@@ -253,10 +276,11 @@ export const AppProvider = ({ children }) => {
   // Replace an event in the list with a fresh copy from the server, or add it
   // if the list doesn't have it yet (e.g. it was opened from a link)
   const storeEvent = (updated) => {
+    const shown = withPendingGoing(updated);
     changeEvents(prev =>
       prev.some(event => event._id === updated._id)
-        ? prev.map(event => (event._id === updated._id ? updated : event))
-        : [...prev, updated]
+        ? prev.map(event => (event._id === updated._id ? shown : event))
+        : [...prev, shown]
     );
     return updated;
   };
@@ -291,20 +315,19 @@ export const AppProvider = ({ children }) => {
   // item gets at most one request in flight. Taps meanwhile only change what
   // is wanted; when the request in flight lands, another goes out if what is
   // wanted has changed, so the last request always carries the last state
-  // tapped. An answer only updates that item's attendees: the event as a
-  // whole may hold newer taps on other items.
-  const goingState = useRef({});
+  // tapped. My own entry always comes from that queue, never from the copy
+  // on screen, since a read may have replaced the copy meanwhile; an answer
+  // only brings friends' attendance for that one item.
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
-  const withMyAttendance = (eventId, itemId, going) => (prev) =>
+  // Sets that item's attendees from fresh ones (or its own), with me as given
+  const withMyAttendance = (eventId, itemId, going, fresh) => (prev) =>
     prev.map(event => event._id !== eventId ? event : {
       ...event,
-      schedule: event.schedule.map(item => {
-        if (item._id !== itemId) return item;
-        const others = item.attendees.filter(a => a.user !== currentUser._id);
-        return { ...item, attendees: going ? [...others, { user: currentUser._id, name: currentUser.name }] : others };
-      })
+      schedule: event.schedule.map(item =>
+        item._id !== itemId ? item : withAttendance({ ...item, attendees: (fresh ?? item).attendees }, currentUser, going)
+      )
     });
 
   const findItem = (list, eventId, itemId) =>
@@ -327,38 +350,27 @@ export const AppProvider = ({ children }) => {
       try {
         while (sent !== state.wanted) {
           sent = state.wanted;
+          // The answer is also a read of who else is going, as of when it
+          // was sent, so it follows the same freshness rule as any read
+          const read = freshness.start();
           const updated = await eventService.setGoing(eventId, itemId, sent);
           state.confirmed = sent;
-          // Friends' attendance from the answer; mine stays as last tapped
-          const fresh = findItem([updated], eventId, itemId);
-          if (fresh) {
-            changeEvents(prev => prev.map(event => event._id !== eventId ? event : {
-              ...event,
-              schedule: event.schedule.map(item => item._id !== itemId ? item : {
-                ...item,
-                attendees: [
-                  ...fresh.attendees.filter(a => a.user !== currentUser._id),
-                  ...item.attendees.filter(a => a.user === currentUser._id)
-                ]
-              })
-            }));
-          }
+          // Friends' attendance from the answer unless a newer read already
+          // landed; mine is what's wanted now either way
+          const fresh = freshness.accept(read) ? findItem([updated], eventId, itemId) : null;
+          setEvents(withMyAttendance(eventId, itemId, state.wanted, fresh));
         }
       } catch (err) {
-        // Back to what the server last confirmed, unless something else has
-        // already changed it; then check with the server for the truth
-        const { wanted, confirmed } = state;
-        changeEvents(prev => {
-          const item = findItem(prev, eventId, itemId);
-          return item && wanted !== confirmed && isGoing(item, currentUser._id) === wanted
-            ? withMyAttendance(eventId, itemId, confirmed)(prev)
-            : prev;
-        });
+        // Back to what the server last confirmed. The queue goes first, so
+        // the check with the server below isn't laid over with the failed tap.
+        if (goingState.current[key] === state) delete goingState.current[key];
+        changeEvents(withMyAttendance(eventId, itemId, state.confirmed));
         fetchEvent(eventId).catch(() => {});
         warning();
         throw err;
       } finally {
-        delete goingState.current[key];
+        // Unless a logout already cleared it, or a new tap started afresh
+        if (goingState.current[key] === state) delete goingState.current[key];
       }
     };
     state.promise = run();
