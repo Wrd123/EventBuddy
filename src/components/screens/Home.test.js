@@ -2,7 +2,8 @@ import React from 'react';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, changeEvent } from '../../testUtils/fakeApi';
+import { toISODate } from '../../utils/dates';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -43,12 +44,27 @@ describe('Home', () => {
     expect(greeting).not.toHaveTextContent('Picnic in the Park');
   });
 
-  it('counts the days to an upcoming event in the greeting', async () => {
+  // Moves the hiking trip (the soonest upcoming event) to that many days from today
+  const hikeInDays = (days) => {
+    const start = new Date();
+    start.setDate(start.getDate() + days);
+    changeEvent('2', (event) => { event.startDate = toISODate(start); event.endDate = toISODate(start); });
+  };
+
+  it('says tomorrow when the next event is tomorrow', async () => {
     installFakeApi().logIn();
+    hikeInDays(1);
     renderHome();
 
-    expect(await screen.findByRole('heading', { name: /^Hey John, (tomorrow's the day|your next plan is in \d+ days)\.$/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: /^Hey John/ })).not.toHaveTextContent('Hiking Trip');
+    expect(await screen.findByRole('heading', { name: "Hey John, tomorrow's the day." })).toBeInTheDocument();
+  });
+
+  it('counts the days to an upcoming event in the greeting', async () => {
+    installFakeApi().logIn();
+    hikeInDays(5);
+    renderHome();
+
+    expect(await screen.findByRole('heading', { name: 'Hey John, your next plan is in 5 days.' })).toBeInTheDocument();
   });
 
   it('keeps the full distance as the marker text, and lets long titles wrap', async () => {
