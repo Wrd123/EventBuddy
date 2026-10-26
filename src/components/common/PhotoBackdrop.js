@@ -6,7 +6,8 @@ import { eventPhotoUrl } from '../../utils/coverPhotos';
 // on top are plain tinted glass and get their frosted look from this one
 // blurred layer. A tiny version of the photo is enough, since blur hides the
 // detail, and it fades in once loaded. Without an event (or until the photo
-// arrives) the night background's ambient glow shows through.
+// arrives) the night background's ambient glow shows through. With Reduce
+// Transparency on, the photo is hidden in index.css and only the glow shows.
 const PhotoBackdrop = ({ event }) => {
   const src = event ? eventPhotoUrl(event, 48) : null;
   const [loadedSrc, setLoadedSrc] = useState(null);
@@ -18,7 +19,7 @@ const PhotoBackdrop = ({ event }) => {
           src={src}
           alt=""
           onLoad={() => setLoadedSrc(src)}
-          className={`absolute -inset-24 w-[calc(100%+12rem)] h-[calc(100%+12rem)] max-w-none object-cover blur-[56px] saturate-[1.6] transition-opacity duration-700 [transform:translateZ(0)] ${
+          className={`photo-backdrop absolute -inset-24 w-[calc(100%+12rem)] h-[calc(100%+12rem)] max-w-none object-cover blur-[56px] saturate-[1.6] transition-opacity duration-700 [transform:translateZ(0)] ${
             loadedSrc === src ? 'opacity-70' : 'opacity-0'
           }`}
         />

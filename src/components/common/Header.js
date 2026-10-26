@@ -12,8 +12,9 @@ export const getInitials = (name = '') =>
     .map(part => part[0].toUpperCase())
     .join('');
 
-// The wordmark: plain and white, letting the photos carry the color
-export const Wordmark = () => <span className="text-[19px] tracking-[-0.03em]">EventBuddy</span>;
+// The wordmark: plain and white, letting the photos carry the color. It
+// takes its size from where it sits, so a big title stays big.
+export const Wordmark = ({ className = '' }) => <span className={`tracking-[-0.03em] ${className}`}>EventBuddy</span>;
 
 // Screen header on the night background. Top-level tabs show your avatar; inner screens show a back arrow instead, and can put an
 // action (like Edit) on the right. A screen whose content starts with its
@@ -57,7 +58,7 @@ const Header = ({
           {title && (
             <div className="min-w-0">
               <h1 className={`${type === 'default' ? 'text-[28px] font-bold tracking-[-0.03em]' : 'text-lg font-semibold tracking-[-0.01em]'} truncate`}>
-                {title === 'EventBuddy' ? <Wordmark /> : title}
+                {title === 'EventBuddy' ? <Wordmark className="text-[19px]" /> : title}
               </h1>
               {subtitle && <p className="text-sm text-muted truncate -mt-0.5">{subtitle}</p>}
             </div>

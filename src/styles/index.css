@@ -189,6 +189,11 @@
   .card {
     background-color: #221c30;
   }
+  /* A blurred, shifting photo is the busiest backdrop of all, so text sits
+     on the plain night background and its ambient glow instead */
+  .photo-backdrop {
+    display: none;
+  }
 }
 
 /* Thin dark scrollbar for the scrolling panes */

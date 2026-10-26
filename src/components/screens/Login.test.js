@@ -19,6 +19,15 @@ const renderLogin = () =>
 beforeEach(() => localStorage.clear());
 
 describe('Login', () => {
+  it('shows the wordmark at the size of its big title', async () => {
+    installFakeApi();
+    renderLogin();
+
+    const title = await screen.findByRole('heading', { level: 1, name: 'EventBuddy' });
+    expect(title).toHaveClass('text-4xl');
+    expect(title.firstChild).not.toHaveClass('text-[19px]');
+  });
+
   it('offers a one-tap demo when the server is a demo', async () => {
     installFakeApi({ demo: true });
     renderLogin();

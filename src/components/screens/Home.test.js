@@ -80,6 +80,14 @@ describe('Home', () => {
     expect(date).not.toContainElement(place);
   });
 
+  it('keeps the header wordmark small', async () => {
+    installFakeApi().logIn();
+    renderHome();
+
+    const title = await screen.findByRole('heading', { level: 1, name: 'EventBuddy' });
+    expect(title.firstChild).toHaveClass('text-[19px]');
+  });
+
   it('asks for a location in one place when none is set', async () => {
     installFakeApi().logIn();
     renderHome();
