@@ -6,7 +6,8 @@
 
 - **Phase 3 and the Going fix are on `main`**, pushed. Phase 3 landed at `ef94888a` (CI run 40251059986). The fix for Codex's phase 3 review finding (below) landed at `e5902c16` (CI run 40252460418). Both CI runs passed, for the web app and the API.
 - **Only the web Render service needs redeploying**, since the server is unchanged. The user does that.
-- **Tests:** 329 app, 301 server and 4 script tests, all passing. `CI=true npm run build` is clean.
+- **The six small fixes are built on `small-fixes`**, 12 commits, not merged or pushed. The `reviewer` agent checked it twice and every finding is fixed. Waiting on the user to merge.
+- **Tests:** 347 app, 301 server and 4 script tests, all passing. `CI=true npm run build` is clean. While an iOS Simulator is busy, the first Map test in each `describe` can time out under full parallelism; `--maxWorkers=2` passes.
 - **Not checked:** the iOS build and the haptics on a device. The sheets also haven't been tried with a real phone keyboard, enlarged text or VoiceOver on a device.
 
 ## What was done today (phase 3)
@@ -61,6 +62,12 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
 ## What comes next: the small fixes (chosen by the user)
+
+**Done on `small-fixes`.** Where it differs from the plan below:
+- **Map tiles (3):** keyless CARTO tiles now show an "API KEY REQUIRED" watermark, so the user chose OpenFreeMap's `fiord` vector style instead. It's drawn by `maplibre-gl` 5.x (6.x is ESM-only, and the Leaflet bridge uses `require`) and tinted plum with one filter on `.leaflet-gl-layer`. Without WebGL it falls back to darkened OSM tiles. The map now sets `maxZoom` itself, because markercluster needs it.
+- **Sharing (6):** while `unstopped` names the event, `useLive` keeps the server's share off the phone and retries the stop on each poll. The map says "Couldn't stop sharing yet", and its Stop button clears that. `useLive` now uses `freshness`, so a read from before a stop, start or meetup change is dropped, and each change reads again at once.
+- **Logout (5):** `authService` also only caches a user if the login token hasn't changed since the request went out.
+- **Testing trap:** a hidden Browser pane or a background tab pauses `requestAnimationFrame`, so MapLibre draws nothing there. Bring the tab to the front before judging the map.
 
 The user asked for **all six small items below, in one batch**, before the iOS check and phase 3b. None needs a server edit. Work on a new branch (e.g. `small-fixes`) with one commit per item. Each needs tests, and both suites must pass. Show screenshots of the visual ones (1–4) at 375 and 390px. Then have the `reviewer` subagent check the branch before asking the user about merging. The pointers are from a quick read; check them before building.
 
