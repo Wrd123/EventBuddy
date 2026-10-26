@@ -4,8 +4,8 @@
 
 ## State
 
-- **Phase 3 is on `main`** at `ef94888a`, pushed. CI passed (run 40251059986: Web app and API both succeeded). Only the web Render service needs redeploying for it; the user does that.
-- **Branch `going-poll-fix`** (not merged, not pushed) fixes Codex's phase 3 review finding (below). Server unchanged.
+- **Phase 3 and the Going fix are on `main`**, pushed. Phase 3 landed at `ef94888a` (CI run 40251059986). The fix for Codex's phase 3 review finding (below) landed at `e5902c16` (CI run 40252460418). Both CI runs passed, for the web app and the API.
+- **Only the web Render service needs redeploying**, since the server is unchanged. The user does that.
 - **Tests:** 329 app, 301 server and 4 script tests, all passing. `CI=true npm run build` is clean.
 - **Not checked:** the iOS build and the haptics on a device. The sheets also haven't been tried with a real phone keyboard, enlarged text or VoiceOver on a device.
 
@@ -26,7 +26,7 @@ Planned in plan mode, built step by step by Sonnet agents, each step checked and
 - **Payments:** a pending payment stays across polls until a read contains its `clientId`. Retry ids live in a Map keyed by `from|to|amount` in `useLedger`. An entry is dropped once the server confirms that `clientId`, so a later debt of the same size gets a new id.
 - **Going:** at most one request per item is in flight. Taps meanwhile only change `wanted`, and a loop sends again until the server matches. A reply merges only that item's attendees.
 - **Error messages:** the generic "Couldn't record ..." shows only for network errors and 5xx. Other failures show the server's message.
-- **Pending Going is laid over every read** (`withPendingGoing` in `AppContext`, used by `readEvents`, `fetchEvent` and `storeEvent`). A read can start after a tap yet reach the server before it, and without the overlay it erased the tap. My own entry always comes from the queue's `wanted`, never from the copy on screen. The write's answer counts as a read started when it was sent, so its friend list is dropped if a newer read already landed (Codex's phase 3 review, fixed on `going-poll-fix`).
+- **Pending Going is laid over every read** (`withPendingGoing` in `AppContext`, used by `readEvents`, `fetchEvent` and `storeEvent`). A read can start after a tap yet reach the server before it, and without the overlay it erased the tap. My own entry always comes from the queue's `wanted`, never from the copy on screen. The write's answer counts as a read started when it was sent, so its friend list is dropped if a newer read already landed (Codex's phase 3 review, fixed in `e5902c16`).
 
 ## Decisions already made (don't reopen them)
 
@@ -62,10 +62,9 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 
 ## What comes next
 
-1. **The user decides on `going-poll-fix`:** merge to `main` (fast-forward), push, and watch CI.
-2. **iOS check:** `npm run build:ios`, then a Simulator run to see the sheets, the transitions and the haptics wiring.
-3. **Retake the README screenshots** (`docs/screenshots/*.jpg`). They still show the look from before Afterglow.
-4. **Then phase 3b** (skeletons, pull-to-refresh) or the polish below, whichever the user picks.
+1. **iOS check:** `npm run build:ios`, then a Simulator run to see the sheets, the transitions and the haptics wiring.
+2. **Retake the README screenshots** (`docs/screenshots/*.jpg`). They still show the look from before Afterglow.
+3. **Then phase 3b** (skeletons, pull-to-refresh) or the polish below, whichever the user picks.
 
 **Later polish:**
 - **D2:** the greeting repeats the event name.
