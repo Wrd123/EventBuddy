@@ -44,11 +44,16 @@ describe('Home', () => {
     expect(greeting).not.toHaveTextContent('Picnic in the Park');
   });
 
-  // Moves the hiking trip (the soonest upcoming event) to that many days from today
+  // Makes the hiking trip the next event, that many days from today. The
+  // festival moves well after it, so these tests don't depend on the date.
+  const inDays = (days) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return toISODate(date);
+  };
   const hikeInDays = (days) => {
-    const start = new Date();
-    start.setDate(start.getDate() + days);
-    changeEvent('2', (event) => { event.startDate = toISODate(start); event.endDate = toISODate(start); });
+    changeEvent('2', (event) => { event.startDate = inDays(days); event.endDate = inDays(days); });
+    changeEvent('1', (event) => { event.startDate = inDays(days + 60); event.endDate = inDays(days + 63); });
   };
 
   it('says tomorrow when the next event is tomorrow', async () => {
