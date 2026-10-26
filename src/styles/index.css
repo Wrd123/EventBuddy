@@ -137,6 +137,25 @@
   to { opacity: 0; }
 }
 
+/* Screen enter animations (RouteTransition). Opacity and transform only, and
+   no fill mode, so nothing is left on the element afterwards: a lingering
+   transform would trap position: fixed children and Leaflet's panes. */
+@keyframes eb-route-fade {
+  from { opacity: 0; }
+}
+
+@keyframes eb-route-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+}
+
+@keyframes eb-route-in-left {
+  from { opacity: 0; transform: translateX(-24px); }
+}
+
+.route-fade { animation: eb-route-fade 180ms ease-out; }
+.route-push { animation: eb-route-in-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.route-pop { animation: eb-route-in-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+
 @keyframes eb-sheet-up {
   from { transform: translateY(100%); }
 }

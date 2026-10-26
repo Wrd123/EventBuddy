@@ -16,6 +16,7 @@ import Register from '../screens/Register';
 import Profile from '../screens/Profile';
 import NotFound from '../screens/NotFound';
 import Invite from '../screens/Invite';
+import RouteTransition from './RouteTransition';
 import { AmbientGlow, ScreenLoader, SheetHostProvider } from '../common';
 
 // The map brings in Leaflet, so it loads only when the Map tab is opened
@@ -29,6 +30,7 @@ const MainLayout = () => (
     {/* The routes sit in their own stacking context, with the sheet host
         after them, so sheets always paint above screens (and the map) */}
     <SheetHostProvider>
+    <RouteTransition>
     <Routes>
       <Route element={<PublicOnly />}>
         <Route path="/login" element={<Login />} />
@@ -51,6 +53,7 @@ const MainLayout = () => (
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
+    </RouteTransition>
     </SheetHostProvider>
   </div>
 );

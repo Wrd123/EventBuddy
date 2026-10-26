@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, settle } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
@@ -131,5 +131,76 @@ describe('routing', () => {
 
     expect(await screen.findByText("New to EventBuddy?")).toBeInTheDocument();
     expect(localStorage.getItem('eventbuddy_token')).toBeNull();
+  });
+});
+
+describe('route transitions', () => {
+  // Buttons that drive navigation from inside the router
+  const Nav = () => {
+    const navigate = useNavigate();
+    return (
+      <>
+        <button onClick={() => navigate('/events/1')}>go-push</button>
+        <button onClick={() => navigate('/groups')}>go-tab</button>
+        <button onClick={() => navigate(-1)}>go-back</button>
+        <button onClick={() => navigate('/discover', { replace: true })}>go-replace</button>
+      </>
+    );
+  };
+
+  const renderWithNav = (path) =>
+    render(
+      <MemoryRouter initialEntries={[path]} future={routerFuture}>
+        <AppProvider>
+          <Nav />
+          <MainLayout />
+        </AppProvider>
+      </MemoryRouter>
+    );
+
+  const wrapper = () => document.querySelector('.h-full.isolate > div');
+  const press = (name) => fireEvent.click(screen.getByRole('button', { name }));
+
+  it('does not animate the first render', async () => {
+    fakeApi.logIn();
+    renderWithNav('/');
+    await screen.findByRole('heading', { name: /Hey John/ });
+    expect(wrapper().className).toBe('h-full');
+    await settle();
+  });
+
+  it('slides in on a push, and back out the other way on a pop', async () => {
+    fakeApi.logIn();
+    renderWithNav('/');
+    await screen.findByRole('heading', { name: /Hey John/ });
+
+    press('go-push');
+    expect(wrapper()).toHaveClass('route-push');
+    await screenTitle('Summer Music Festival');
+
+    press('go-back');
+    expect(wrapper()).toHaveClass('route-pop');
+    await screen.findByRole('heading', { name: /Hey John/ });
+    await settle();
+  });
+
+  it('fades between tabs', async () => {
+    fakeApi.logIn();
+    renderWithNav('/');
+    await screen.findByRole('heading', { name: /Hey John/ });
+
+    press('go-tab');
+    expect(wrapper()).toHaveClass('route-fade');
+    await settle();
+  });
+
+  it('does not animate a replace', async () => {
+    fakeApi.logIn();
+    renderWithNav('/');
+    await screen.findByRole('heading', { name: /Hey John/ });
+
+    press('go-replace');
+    expect(wrapper().className).toBe('h-full');
+    await settle();
   });
 });
