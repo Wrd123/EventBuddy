@@ -3,19 +3,32 @@ import L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import '@maplibre/maplibre-gl-leaflet';
 import './map.css';
 
-// Map tiles. By default, OpenStreetMap's own tiles, darkened in CSS to fit
-// the night theme: free and keyless, but OpenStreetMap's tile policy is for
-// light use, so a launched app should use a tile provider. Set
-// REACT_APP_MAP_TILE_URL (and REACT_APP_MAP_ATTRIBUTION, the provider's
-// required credit) to a dark style, e.g. Stadia's alidade_smooth_dark; those
-// tiles are shown as-is.
+// Map tiles. By default, OpenFreeMap's Fiord style, tinted plum in map.css:
+// free, keyless and with no view limit (openfreemap.org), drawn as vector
+// tiles by MapLibre inside Leaflet, so labels stay sharp at every zoom. Its
+// required credit (OpenFreeMap, OpenMapTiles, OpenStreetMap) comes with the
+// style. Their "dark" style was too close to black for roads to read.
+// CARTO's dark basemap was the first choice, but as of October 2026 it shows
+// "API key required" without a key, and the map stays keyless so a fresh
+// clone runs as it is. REACT_APP_MAP_TILE_URL (with REACT_APP_MAP_ATTRIBUTION,
+// the provider's required credit) swaps in any raster tile URL instead.
 const CUSTOM_TILES = process.env.REACT_APP_MAP_TILE_URL;
-const TILE_URL = CUSTOM_TILES || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const ATTRIBUTION = CUSTOM_TILES
-  ? process.env.REACT_APP_MAP_ATTRIBUTION || ''
-  : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const CUSTOM_ATTRIBUTION = process.env.REACT_APP_MAP_ATTRIBUTION || '';
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/fiord';
+// Street level; closer than this, raster tiles run out
+const MAX_ZOOM = 19;
+
+export const addBaseLayer = (map) => {
+  if (CUSTOM_TILES) {
+    L.tileLayer(CUSTOM_TILES, { attribution: CUSTOM_ATTRIBUTION, maxZoom: MAX_ZOOM }).addTo(map);
+  } else {
+    L.maplibreGL({ style: STYLE_URL }).addTo(map);
+  }
+};
 
 // The continental US, when there's nothing to show yet
 const DEFAULT_VIEW = { center: [39.8, -98.6], zoom: 4 };
@@ -96,12 +109,9 @@ const MapCanvas = forwardRef(({ pins, selectedId, onSelect, fitKey, fitIds, fall
   }));
 
   useEffect(() => {
-    const map = L.map(containerRef.current, { zoomControl: false }).setView(DEFAULT_VIEW.center, DEFAULT_VIEW.zoom);
-    L.tileLayer(TILE_URL, {
-      attribution: ATTRIBUTION,
-      maxZoom: 19,
-      className: CUSTOM_TILES ? '' : 'eb-tiles-darkened'
-    }).addTo(map);
+    // The marker clusters need a top zoom, which a vector base layer doesn't set
+    const map = L.map(containerRef.current, { zoomControl: false, maxZoom: MAX_ZOOM }).setView(DEFAULT_VIEW.center, DEFAULT_VIEW.zoom);
+    addBaseLayer(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     // Tapping empty map clears the selection
     map.on('click', () => onSelectRef.current(null));

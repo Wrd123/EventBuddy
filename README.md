@@ -77,7 +77,7 @@ flowchart LR
 
 | Layer | Technologies |
 |---|---|
-| App | React 18, React Router, Tailwind CSS, Leaflet |
+| App | React 18, React Router, Tailwind CSS, Leaflet with MapLibre vector tiles from OpenFreeMap (free, keyless) |
 | iPhone | Capacitor 7, background geolocation, native HTTP, haptics |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
 | Testing | Jest and Testing Library (323 tests), Node's test runner with Supertest and an in-memory MongoDB (301 tests) |
