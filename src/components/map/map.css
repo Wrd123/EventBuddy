@@ -13,6 +13,12 @@
   filter: hue-rotate(40deg) brightness(0.72);
 }
 
+/* Without WebGL: OpenStreetMap's light tiles turned dark (dark land, light
+   roads) and dimmed toward the same plum */
+.eb-tiles-fallback {
+  filter: invert(1) hue-rotate(180deg) saturate(0.4) brightness(0.8) sepia(0.3) hue-rotate(230deg);
+}
+
 /* Zoom buttons as a frosted glass pill */
 .leaflet-control-zoom.leaflet-bar {
   border: 1px solid theme('colors.line');

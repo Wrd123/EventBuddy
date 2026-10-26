@@ -22,11 +22,28 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/fiord';
 // Street level; closer than this, raster tiles run out
 const MAX_ZOOM = 19;
 
+// Vector maps need WebGL. A phone or browser without it (a blocked GPU, a
+// locked-down web view) gets OpenStreetMap's plain tiles, darkened in
+// map.css, so the screen still works.
+const FALLBACK_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const FALLBACK_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+const hasWebGL = () => {
+  try {
+    const canvas = document.createElement('canvas');
+    return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+  } catch {
+    return false;
+  }
+};
+
 export const addBaseLayer = (map) => {
   if (CUSTOM_TILES) {
     L.tileLayer(CUSTOM_TILES, { attribution: CUSTOM_ATTRIBUTION, maxZoom: MAX_ZOOM }).addTo(map);
-  } else {
+  } else if (hasWebGL()) {
     L.maplibreGL({ style: STYLE_URL }).addTo(map);
+  } else {
+    L.tileLayer(FALLBACK_TILES, { attribution: FALLBACK_ATTRIBUTION, maxZoom: MAX_ZOOM, className: 'eb-tiles-fallback' }).addTo(map);
   }
 };
 
