@@ -287,11 +287,15 @@ export const AppProvider = ({ children }) => {
     storeEvent(await eventService.deleteScheduleItem(eventId, itemId));
 
   // Going shows at once and the server catches up. Taps can come faster than
-  // answers, so each item counts its requests: only the latest one's answer
-  // is stored (an older one landing last would flip the button back), and
-  // only the latest one's failure rolls back. PUT and DELETE are idempotent,
-  // so the server ends up in the last state tapped either way.
-  const goingRequests = useRef({});
+  // answers, and the server may apply two requests in either order, so each
+  // item gets at most one request in flight. Taps meanwhile only change what
+  // is wanted; when the request in flight lands, another goes out if what is
+  // wanted has changed, so the last request always carries the last state
+  // tapped. An answer only updates that item's attendees: the event as a
+  // whole may hold newer taps on other items.
+  const goingState = useRef({});
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
 
   const withMyAttendance = (eventId, itemId, going) => (prev) =>
     prev.map(event => event._id !== eventId ? event : {
@@ -303,29 +307,62 @@ export const AppProvider = ({ children }) => {
       })
     });
 
-  const setGoing = async (eventId, itemId, going) => {
-    const key = `${eventId}:${itemId}`;
-    const request = (goingRequests.current[key] || 0) + 1;
-    goingRequests.current[key] = request;
-    const isLatest = () => goingRequests.current[key] === request;
+  const findItem = (list, eventId, itemId) =>
+    list.find(e => e._id === eventId)?.schedule.find(i => i._id === itemId);
 
-    changeEvents(withMyAttendance(eventId, itemId, going));
-    try {
-      const updated = await eventService.setGoing(eventId, itemId, going);
-      if (isLatest()) storeEvent(updated);
-    } catch (err) {
-      // A newer tap has taken over; its answer decides how things end up
-      if (!isLatest()) return;
-      // Put it back unless something else has changed it since (a refresh
-      // that already brought the truth), then check with the server
-      changeEvents(prev => {
-        const item = prev.find(e => e._id === eventId)?.schedule.find(i => i._id === itemId);
-        return item && isGoing(item, currentUser._id) === going ? withMyAttendance(eventId, itemId, !going)(prev) : prev;
-      });
-      fetchEvent(eventId).catch(() => {});
-      warning();
-      throw err;
+  const setGoing = (eventId, itemId, going) => {
+    const key = `${eventId}:${itemId}`;
+    let state = goingState.current[key];
+    if (!state) {
+      const item = findItem(eventsRef.current, eventId, itemId);
+      state = { wanted: going, confirmed: item ? isGoing(item, currentUser._id) : !going, promise: null };
+      goingState.current[key] = state;
     }
+    state.wanted = going;
+    changeEvents(withMyAttendance(eventId, itemId, going));
+    if (state.promise) return state.promise;
+
+    const run = async () => {
+      let sent;
+      try {
+        while (sent !== state.wanted) {
+          sent = state.wanted;
+          const updated = await eventService.setGoing(eventId, itemId, sent);
+          state.confirmed = sent;
+          // Friends' attendance from the answer; mine stays as last tapped
+          const fresh = findItem([updated], eventId, itemId);
+          if (fresh) {
+            changeEvents(prev => prev.map(event => event._id !== eventId ? event : {
+              ...event,
+              schedule: event.schedule.map(item => item._id !== itemId ? item : {
+                ...item,
+                attendees: [
+                  ...fresh.attendees.filter(a => a.user !== currentUser._id),
+                  ...item.attendees.filter(a => a.user === currentUser._id)
+                ]
+              })
+            }));
+          }
+        }
+      } catch (err) {
+        // Back to what the server last confirmed, unless something else has
+        // already changed it; then check with the server for the truth
+        const { wanted, confirmed } = state;
+        changeEvents(prev => {
+          const item = findItem(prev, eventId, itemId);
+          return item && wanted !== confirmed && isGoing(item, currentUser._id) === wanted
+            ? withMyAttendance(eventId, itemId, confirmed)(prev)
+            : prev;
+        });
+        fetchEvent(eventId).catch(() => {});
+        warning();
+        throw err;
+      } finally {
+        delete goingState.current[key];
+      }
+    };
+    state.promise = run();
+    return state.promise;
   };
 
   // Invites: joining adds the event to your list right away

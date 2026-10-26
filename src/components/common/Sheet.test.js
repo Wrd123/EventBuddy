@@ -157,6 +157,48 @@ describe('Sheet', () => {
     expect(screenArea.inert).toBe(false);
   });
 
+  it('puts focus on the screen title when the trigger is gone', () => {
+    const Screen = () => {
+      const [open, setOpen] = useState(false);
+      const [trigger, setTrigger] = useState(true);
+      return (
+        <SheetHostProvider>
+          <h1>Screen title</h1>
+          {trigger && <button onClick={() => setOpen(true)}>Open</button>}
+          <button onClick={() => setTrigger(false)}>Remove trigger</button>
+          {open && <Sheet title="T" onClose={() => setOpen(false)}>body</Sheet>}
+        </SheetHostProvider>
+      );
+    };
+    render(<Screen />);
+    const trigger = screen.getByRole('button', { name: 'Open' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    // The trigger leaves while the sheet is open (inert screen, so by state)
+    act(() => { trigger.remove(); });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Screen title' })).toHaveFocus();
+  });
+
+  it('closes only the top sheet on Escape when two are stacked', () => {
+    const Stack = () => {
+      const [a, setA] = useState(true);
+      const [b, setB] = useState(true);
+      return (
+        <SheetHostProvider>
+          {a && <Sheet title="A" onClose={() => setA(false)}>a</Sheet>}
+          {b && <Sheet title="B" onClose={() => setB(false)}>b</Sheet>}
+        </SheetHostProvider>
+      );
+    };
+    render(<Stack />);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'B' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'A' })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   describe('dragging', () => {
     const setup = () => {
       const onClose = jest.fn();
@@ -182,6 +224,14 @@ describe('Sheet', () => {
       pointer(handle, 'pointermove', 40, 20);
       pointer(handle, 'pointerup', 40, 25);
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("doesn't dismiss on a jittery tap that moves a couple of pixels", () => {
+      const { onClose, handle } = setup();
+      pointer(handle, 'pointerdown', 0, 1);
+      pointer(handle, 'pointermove', 2, 4);
+      pointer(handle, 'pointerup', 2, 5);
+      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('snaps back from a short, slow drag', () => {

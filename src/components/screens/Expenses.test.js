@@ -1,8 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, holdNext } from '../../testUtils/fakeApi';
+import { installFakeApi, holdNext, changeEvent } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -96,7 +96,7 @@ describe('Expenses', () => {
     const markPaid = () => fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
 
     markPaid();
-    await within(section('Settle up')).findByText("Couldn't record your $150.00 payment to Alex. Try again.");
+    await within(section('Settle up')).findByText('Something went wrong. Please try again.');
     // The payment is taken back out, so the row and the balance return
     expect(screen.getByText('You owe $150.00')).toBeInTheDocument();
     expect(screen.queryByText(/John Doe paid Alex/)).not.toBeInTheDocument();
@@ -124,6 +124,93 @@ describe('Expenses', () => {
     await waitFor(() => expect(within(section('Payments')).queryByText(/Saving/)).not.toBeInTheDocument());
     expect(within(section('Payments')).getAllByText(/John Doe paid Alex/)).toHaveLength(1);
     expect(screen.getByText('Everyone is settled up.')).toBeInTheDocument();
+  });
+
+  const postedPayments = () =>
+    global.fetch.mock.calls
+      .filter(([url, opts = {}]) => url === '/api/events/1/payments' && opts.method === 'POST')
+      .map(([, opts]) => JSON.parse(opts.body));
+  const poll = () => act(async () => {
+    fireEvent(document, new Event('visibilitychange'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  it('shows the server\'s own message when it gives a definite no', async () => {
+    installFakeApi({ paymentOutcomes: [403] }).logIn();
+    await openExpenses();
+
+    fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+
+    expect(await within(section('Settle up')).findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
+    expect(screen.queryByText(/Couldn't record/)).not.toBeInTheDocument();
+  });
+
+  it("starts a new payment for a new debt of the same size, once the first has shown up", async () => {
+    installFakeApi({ paymentOutcomes: ['lost'] }).logIn();
+    await openExpenses();
+
+    fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+    await within(section('Settle up')).findByText(/Couldn't record your \$150.00 payment to Alex/);
+    // The lost payment was saved after all, and the next read shows it
+    await poll();
+    expect(await screen.findByText('Everyone is settled up.')).toBeInTheDocument();
+
+    // Alex pays for another $300 split with John: John owes $150 again
+    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fillForm({ 'What was it for': 'Dinner', 'Amount ($)': '300', 'Paid by': 'u2' });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
+    await screen.findByText('Dinner');
+    fireEvent.click(await within(section('Settle up')).findByRole('button', { name: 'Mark paid' }));
+
+    await waitFor(() => expect(postedPayments()).toHaveLength(2));
+    expect(postedPayments()[1].clientId).not.toBe(postedPayments()[0].clientId);
+    expect(await screen.findByText('Everyone is settled up.')).toBeInTheDocument();
+    expect(within(section('Payments')).getAllByText(/John Doe paid Alex/)).toHaveLength(2);
+  });
+
+  it("keeps one row's retry when a different payment goes through", async () => {
+    installFakeApi({ paymentOutcomes: [500] }).logIn();
+    changeEvent('1', (event) => event.members.push({ _id: 'm3', user: 'u3', name: 'Taylor', color: '#10b981' }));
+    await openExpenses();
+    // Taylor paid $90 for all three: John owes Alex $120 and Taylor $60
+    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fillForm({ 'What was it for': 'Taxi', 'Amount ($)': '90', 'Paid by': 'u3' });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
+    await screen.findByText('Taxi');
+    const rowFor = (text) => within(section('Settle up')).getByText(text).closest('li');
+    const markPaid = (text) => fireEvent.click(within(rowFor(text)).getByRole('button', { name: 'Mark paid' }));
+
+    markPaid(/You pay Alex/);
+    await within(section('Settle up')).findByText(/Couldn't record your \$120.00 payment to Alex/);
+    markPaid(/You pay Taylor/);
+    await waitFor(() => expect(postedPayments()).toHaveLength(2));
+    await waitFor(() => expect(within(section('Settle up')).queryByText(/You pay Taylor/)).not.toBeInTheDocument());
+
+    markPaid(/You pay Alex/);
+    await waitFor(() => expect(postedPayments()).toHaveLength(3));
+    expect(postedPayments()[2].clientId).toBe(postedPayments()[0].clientId);
+  });
+
+  it("doesn't lose or double count a pending payment when a read lands", async () => {
+    await openExpenses();
+    // A read that started before the tap, answering without the payment
+    const releaseRead = holdNext('GET', '/events/1/expenses');
+    await poll();
+    const releasePost = holdNext('POST', '/events/1/payments');
+
+    fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+    await releaseRead();
+    expect(screen.getByText('Everyone is settled up.')).toBeInTheDocument();
+    expect(within(section('Payments')).getAllByText(/John Doe paid Alex/)).toHaveLength(1);
+
+    // A read after the tap that already includes the payment the server saved
+    await poll();
+    expect(screen.getByText('Everyone is settled up.')).toBeInTheDocument();
+    expect(within(section('Payments')).getAllByText(/John Doe paid Alex/)).toHaveLength(1);
+
+    await releasePost();
+    await waitFor(() => expect(within(section('Payments')).queryByText(/Saving/)).not.toBeInTheDocument());
+    expect(within(section('Payments')).getAllByText(/John Doe paid Alex/)).toHaveLength(1);
   });
 
   it('adds an expense split equally and updates balances', async () => {

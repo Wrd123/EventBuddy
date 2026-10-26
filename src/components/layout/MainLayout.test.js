@@ -194,6 +194,17 @@ describe('route transitions', () => {
     await settle();
   });
 
+  it("slides back when the Header's back button is used", async () => {
+    fakeApi.logIn();
+    renderWithNav('/events/1');
+    await screenTitle('Summer Music Festival');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(wrapper()).toHaveClass('route-pop');
+    await screen.findByRole('heading', { name: /Hey John/ });
+    await settle();
+  });
+
   it('does not animate a replace', async () => {
     fakeApi.logIn();
     renderWithNav('/');

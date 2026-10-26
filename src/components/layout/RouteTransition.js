@@ -18,15 +18,18 @@ export const transitionClass = (fromPath, toPath, navigationType) => {
 // plays its enter animation. Only an enter animation: an exit would keep
 // two screens mounted at once, with their polling and Leaflet maps.
 const RouteTransition = ({ children }) => {
-  const { pathname } = useLocation();
+  const { pathname, state: locationState } = useLocation();
+  // The Header's back button navigates by path, which is a push; it says
+  // so in the location state, and it should feel like going back
   const navigationType = useNavigationType();
+  const direction = navigationType === 'PUSH' && locationState?.back ? 'POP' : navigationType;
   const [state, setState] = useState({ path: pathname, className: '' });
 
   // Worked out once per path change and kept in state, so an unrelated
   // re-render can't drop the class and cut the animation short
   let { className } = state;
   if (state.path !== pathname) {
-    className = transitionClass(state.path, pathname, navigationType);
+    className = transitionClass(state.path, pathname, direction);
     setState({ path: pathname, className });
   }
 

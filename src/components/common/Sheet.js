@@ -30,8 +30,10 @@ export const SheetHostProvider = ({ children }) => {
     };
   }, []);
 
+  const getContent = useCallback(() => contentRef.current, []);
+
   return (
-    <SheetHostContext.Provider value={{ node, lockBackground }}>
+    <SheetHostContext.Provider value={{ node, lockBackground, getContent }}>
       {/* isolate keeps Leaflet's z-index 400-1000 panes inside this box,
           so the host below always paints above the map */}
       <div ref={contentRef} className="relative h-full isolate">{children}</div>
@@ -61,6 +63,10 @@ const DISMISS_SPEED = 0.6; // px per ms
 // Dragging up fights back instead of lifting the sheet off its edge
 const UP_RESISTANCE = 0.2;
 const SNAP_BACK_MS = 200;
+// A flick has to travel at least this far to dismiss. A jittery tap can
+// register a couple of pixels in a few milliseconds, which is "fast" but
+// isn't a drag.
+const MIN_FLICK_TRAVEL = 16;
 // A pause before letting go means the finger had stopped; ignore old speed
 const STALE_SPEED_MS = 100;
 
@@ -82,6 +88,7 @@ const Sheet = ({
   onCloseRef.current = onClose;
   const drag = useRef(null);
   const lockBackground = host?.lockBackground;
+  const getContent = host?.getContent;
 
   const close = useCallback(() => {
     if (closingRef.current) return;
@@ -147,9 +154,21 @@ const Sheet = ({
       openSheets.splice(openSheets.indexOf(entry), 1);
       // Unlock first: an inert element can't take focus back
       unlock?.();
-      if (previous && document.contains(previous)) previous.focus({ preventScroll: true });
+      if (previous && document.contains(previous)) {
+        previous.focus({ preventScroll: true });
+      } else {
+        // The control that opened the sheet is gone (the list it was in
+        // changed). Land on the screen's title rather than the page body, so
+        // keyboard and screen reader users keep their place.
+        const content = getContent?.();
+        const target = content?.querySelector('h1') || content?.querySelector('main');
+        if (target) {
+          if (!target.matches(FOCUSABLE)) target.tabIndex = -1;
+          target.focus({ preventScroll: true });
+        }
+      }
     };
-  }, [lockBackground, initialFocus, close]);
+  }, [lockBackground, getContent, initialFocus, close]);
 
   const onDragDismiss = () => tap();
 
@@ -190,7 +209,7 @@ const Sheet = ({
     if (!d) return;
     const speed = e.timeStamp - d.lastT > STALE_SPEED_MS ? 0 : d.speed;
     // A cancelled gesture (the system took the touch) never dismisses
-    if (e.type !== 'pointercancel' && (d.offset > d.height * DISMISS_FRACTION || speed > DISMISS_SPEED)) {
+    if (e.type !== 'pointercancel' && (d.offset > d.height * DISMISS_FRACTION || (speed > DISMISS_SPEED && d.offset > MIN_FLICK_TRAVEL))) {
       onDragDismiss();
       close();
       return;

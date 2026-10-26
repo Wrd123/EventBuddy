@@ -28,12 +28,14 @@ const useLedger = (eventId) => {
   const [freshness] = useState(createFreshness);
   // Payments shown before the server has confirmed them, by their pending id
   const pendingIds = useRef(new Set());
-  // The last try that might have been saved without us hearing back. Tapping
-  // again resends it as is, with the same clientId, so the server saves it
-  // at most once. Anything else (a new amount, or the last try clearly
-  // worked or clearly failed) is a new payment with a new id. It lives here
+  // Tries that might have been saved without us hearing back, one per
+  // "who pays whom how much". Tapping that row again resends the try as is,
+  // with the same clientId, so the server saves it at most once. An entry
+  // goes when its try clearly worked or failed, or when a read shows the
+  // server has it; otherwise a later debt of the same size would reuse the
+  // old id and the server would hand back the old payment. It lives here
   // rather than in the row, which disappears as soon as the payment shows.
-  const uncertain = useRef(null);
+  const uncertain = useRef(new Map());
 
   const reload = useCallback(async () => {
     const read = freshness.start();
@@ -43,6 +45,9 @@ const useLedger = (eventId) => {
         eventService.getPaymentHandles(eventId)
       ]);
       if (!freshness.accept(read)) return;
+      for (const [key, attempt] of uncertain.current) {
+        if (payments.some(p => p.clientId === attempt.clientId)) uncertain.current.delete(key);
+      }
       const handles = Object.fromEntries(handleList.map(h => [h.user, h]));
       // A poll that started after "Mark paid" can come back without the
       // payment, so ones still waiting on the server stay, unless this read
@@ -80,9 +85,8 @@ const useLedger = (eventId) => {
   // screen to explain; a 409 (already settled) also reloads to show where
   // things stand.
   const recordPayment = async ({ from, to, amountCents }) => {
-    const last = uncertain.current;
-    const isRetry = last && last.from === from.user && last.to === to.user && last.amountCents === amountCents;
-    const attempt = isRetry ? last : { clientId: newClientId(), from: from.user, to: to.user, amountCents, date: todayISO() };
+    const key = `${from.user}|${to.user}|${amountCents}`;
+    const attempt = uncertain.current.get(key) || { clientId: newClientId(), from: from.user, to: to.user, amountCents, date: todayISO() };
     const pendingId = `pending-${attempt.clientId}`;
 
     pendingIds.current.add(pendingId);
@@ -91,7 +95,7 @@ const useLedger = (eventId) => {
 
     try {
       const saved = await eventService.recordPayment(eventId, attempt);
-      uncertain.current = null;
+      uncertain.current.delete(key);
       success();
       // Swap in the server's copy right away, so no read has to catch up
       // first and a poll landing now can't flash the old balances
@@ -103,7 +107,8 @@ const useLedger = (eventId) => {
       }));
       await reload();
     } catch (err) {
-      uncertain.current = mightHaveSaved(err) ? attempt : null;
+      if (mightHaveSaved(err)) uncertain.current.set(key, attempt);
+      else uncertain.current.delete(key);
       removePayment(pendingId);
       if (err.status === 409) await reload();
       else warning();
@@ -318,6 +323,12 @@ const SettleUp = ({ event, settlements, me, handles, myHandles, recordPayment })
     } catch (err) {
       if (err.status === 409) {
         setNotice(err.message);
+        return;
+      }
+      // The server's own words (a 403, say) when it gave a definite answer;
+      // otherwise we don't know why, or whether it went through
+      if (err.status && !mightHaveSaved(err)) {
+        setError(err.message);
         return;
       }
       const { from, to, amountCents } = settlement;

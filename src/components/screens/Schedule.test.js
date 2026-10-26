@@ -80,18 +80,55 @@ describe('Schedule', () => {
     expect(within(card('Tame Impala')).getByText('No one going yet')).toBeInTheDocument();
   });
 
-  it('ends in the last state tapped even when an older answer arrives last', async () => {
+  const goingCalls = () =>
+    global.fetch.mock.calls
+      .filter(([url]) => url.endsWith('/going'))
+      .map(([url, opts]) => `${opts.method} ${url.split('/schedule/')[1]}`);
+
+  it('sends one request at a time, and the last one carries the last state tapped', async () => {
     await openSchedule();
-    const releaseJoin = holdNext('PUT', '/events/1/schedule/s2/going');
+    const release = holdNext('PUT', '/events/1/schedule/s2/going');
 
     fireEvent.click(within(card('Tame Impala')).getByRole('button', { name: 'Join' }));
     fireEvent.click(within(card('Tame Impala')).getByRole('button', { name: 'Going' }));
     expect(within(card('Tame Impala')).getByRole('button', { name: 'Join' })).toBeInTheDocument();
+    // The leave waits for the join to land rather than racing it
+    expect(goingCalls()).toEqual(['PUT s2/going']);
 
-    // The server saw Join then Leave, but Join's answer (Going) arrives last
-    await releaseJoin();
+    await release();
+    await waitFor(() => expect(goingCalls()).toEqual(['PUT s2/going', 'DELETE s2/going']));
     expect(within(card('Tame Impala')).getByRole('button', { name: 'Join' })).toBeInTheDocument();
     expect(within(card('Tame Impala')).getByText('No one going yet')).toBeInTheDocument();
+  });
+
+  it('sends nothing extra for join, leave, join: it ends Going with one request', async () => {
+    await openSchedule();
+    const release = holdNext('PUT', '/events/1/schedule/s2/going');
+    const tameImpala = () => card('Tame Impala');
+
+    fireEvent.click(within(tameImpala()).getByRole('button', { name: 'Join' }));
+    fireEvent.click(within(tameImpala()).getByRole('button', { name: 'Going' }));
+    fireEvent.click(within(tameImpala()).getByRole('button', { name: 'Join' }));
+    await release();
+
+    expect(within(tameImpala()).getByRole('button', { name: 'Going' })).toBeInTheDocument();
+    expect(goingCalls()).toEqual(['PUT s2/going']);
+  });
+
+  it("doesn't let one item's answer undo a tap on another", async () => {
+    await openSchedule();
+    const releaseA = holdNext('PUT', '/events/1/schedule/s2/going');
+    const releaseB = holdNext('PUT', '/events/1/schedule/s1/going');
+
+    fireEvent.click(within(card('Tame Impala')).getByRole('button', { name: 'Join' }));
+    fireEvent.click(within(card('Arctic Monkeys')).getByRole('button', { name: 'Join' }));
+    // Tame Impala's answer was sent before the second tap, so it has no sign of it
+    await releaseA();
+
+    expect(within(card('Arctic Monkeys')).getByRole('button', { name: 'Going' })).toBeInTheDocument();
+    expect(within(card('Tame Impala')).getByRole('button', { name: 'Going' })).toBeInTheDocument();
+    await releaseB();
+    expect(within(card('Arctic Monkeys')).getByText('2 going')).toBeInTheDocument();
   });
 
   it('adds an item in start-time order', async () => {

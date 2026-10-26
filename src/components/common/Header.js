@@ -37,7 +37,8 @@ const Header = ({
   // Back goes to a fixed parent screen rather than browser history, so it
   // still works when the app was opened straight to this URL
   const handleBack = () => {
-    navigate(backTo);
+    // Marked as a way back so the screen slides in from the left
+    navigate(backTo, { state: { back: true } });
   };
 
   return (
