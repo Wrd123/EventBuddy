@@ -15,7 +15,7 @@ import { formatDay, todayISO } from '../../utils/dates';
 import { payOptions } from '../../utils/payLinks';
 import { newClientId, mightHaveSaved } from '../../utils/clientId';
 import { createFreshness } from '../../utils/freshness';
-import { success } from '../../services/haptics';
+import { success, warning } from '../../services/haptics';
 
 // The event's expenses and payments, reloaded after every change so the
 // balances are always computed from what the server has, and every so often
@@ -26,6 +26,14 @@ const useLedger = (eventId) => {
   // Every change here is followed by a reload, so a reload that started
   // earlier and lands later is the only stale case (see utils/freshness.js)
   const [freshness] = useState(createFreshness);
+  // Payments shown before the server has confirmed them, by their pending id
+  const pendingIds = useRef(new Set());
+  // The last try that might have been saved without us hearing back. Tapping
+  // again resends it as is, with the same clientId, so the server saves it
+  // at most once. Anything else (a new amount, or the last try clearly
+  // worked or clearly failed) is a new payment with a new id. It lives here
+  // rather than in the row, which disappears as soon as the payment shows.
+  const uncertain = useRef(null);
 
   const reload = useCallback(async () => {
     const read = freshness.start();
@@ -36,7 +44,19 @@ const useLedger = (eventId) => {
       ]);
       if (!freshness.accept(read)) return;
       const handles = Object.fromEntries(handleList.map(h => [h.user, h]));
-      setLedger({ status: 'ready', expenses, payments, handles, error: '' });
+      // A poll that started after "Mark paid" can come back without the
+      // payment, so ones still waiting on the server stay, unless this read
+      // already has them (matched by clientId) so they aren't counted twice
+      setLedger(prev => ({
+        status: 'ready',
+        expenses,
+        payments: [
+          ...prev.payments.filter(p => pendingIds.current.has(p._id) && !payments.some(q => q.clientId === p.clientId)),
+          ...payments
+        ],
+        handles,
+        error: ''
+      }));
     } catch (err) {
       if (!freshness.accept(read)) return;
       // A failed background check keeps the ledger on screen
@@ -49,7 +69,49 @@ const useLedger = (eventId) => {
   }, [reload]);
   usePolling(reload, EVENT_POLL_MS);
 
-  return { ...ledger, reload };
+  const removePayment = (id) => {
+    pendingIds.current.delete(id);
+    freshness.changed();
+    setLedger(prev => ({ ...prev, payments: prev.payments.filter(p => p._id !== id) }));
+  };
+
+  // Shows the payment (and the balances it changes) at once, then asks the
+  // server. On failure it's taken back out and the error is thrown for the
+  // screen to explain; a 409 (already settled) also reloads to show where
+  // things stand.
+  const recordPayment = async ({ from, to, amountCents }) => {
+    const last = uncertain.current;
+    const isRetry = last && last.from === from.user && last.to === to.user && last.amountCents === amountCents;
+    const attempt = isRetry ? last : { clientId: newClientId(), from: from.user, to: to.user, amountCents, date: todayISO() };
+    const pendingId = `pending-${attempt.clientId}`;
+
+    pendingIds.current.add(pendingId);
+    freshness.changed();
+    setLedger(prev => ({ ...prev, payments: [{ ...attempt, _id: pendingId, pending: true, from, to }, ...prev.payments] }));
+
+    try {
+      const saved = await eventService.recordPayment(eventId, attempt);
+      uncertain.current = null;
+      success();
+      // Swap in the server's copy right away, so no read has to catch up
+      // first and a poll landing now can't flash the old balances
+      pendingIds.current.delete(pendingId);
+      freshness.changed();
+      setLedger(prev => ({
+        ...prev,
+        payments: [saved, ...prev.payments.filter(p => p._id !== pendingId && p._id !== saved._id)]
+      }));
+      await reload();
+    } catch (err) {
+      uncertain.current = mightHaveSaved(err) ? attempt : null;
+      removePayment(pendingId);
+      if (err.status === 409) await reload();
+      else warning();
+      throw err;
+    }
+  };
+
+  return { ...ledger, reload, recordPayment };
 };
 
 const Expenses = () => {
@@ -96,7 +158,7 @@ const Expenses = () => {
           me={me}
           handles={ledger.handles}
           myHandles={currentUser?.paymentHandles}
-          onRecorded={ledger.reload}
+          recordPayment={ledger.recordPayment}
         />
 
         {ledger.expenses.length > 0 && <Balances balances={balances} me={me} />}
@@ -240,19 +302,35 @@ const BudgetEditor = ({ event }) => {
 const hasAnyHandle = (handles) =>
   Boolean(handles && (handles.venmo || handles.cashapp || handles.paypal || handles.zelle));
 
-const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) => {
+const SettleUp = ({ event, settlements, me, handles, myHandles, recordPayment }) => {
   // Someone owes me, but I haven't said how to pay me
   const needsMyHandles = settlements.some(s => s.to.user === me) && !hasAnyHandle(myHandles);
   const [notice, setNotice] = useState('');
-  const settledElsewhere = async (message) => {
-    setNotice(message);
-    await onRecorded();
+  const [error, setError] = useState('');
+
+  // The row is gone as soon as the payment shows, so what happened next is
+  // told here, where it stays put
+  const markPaid = async (settlement) => {
+    setNotice('');
+    setError('');
+    try {
+      await recordPayment(settlement);
+    } catch (err) {
+      if (err.status === 409) {
+        setNotice(err.message);
+        return;
+      }
+      const { from, to, amountCents } = settlement;
+      const whose = from.user === me ? 'your' : `${from.name}'s`;
+      setError(`Couldn't record ${whose} ${formatCents(amountCents)} payment to ${to.user === me ? 'you' : to.name}. Try again.`);
+    }
   };
 
   return (
     <section className="card p-4">
       <h3 className="font-medium mb-2">Settle up</h3>
       {notice && <p className="text-sm text-muted mb-2" role="status">{notice}</p>}
+      {error && <p className="text-sm text-red-400 mb-2" role="alert">{error}</p>}
       {settlements.length === 0 ? (
         <p className="text-sm text-muted">Everyone is settled up.</p>
       ) : (
@@ -264,9 +342,7 @@ const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) =>
               settlement={s}
               me={me}
               recipientHandles={handles[s.to.user]}
-              onRecorded={onRecorded}
-              onSettledElsewhere={settledElsewhere}
-              onMarkPaid={() => setNotice('')}
+              onMarkPaid={() => markPaid(s)}
             />
           ))}
         </ul>
@@ -281,45 +357,12 @@ const SettleUp = ({ event, settlements, me, handles, myHandles, onRecorded }) =>
   );
 };
 
-const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded, onSettledElsewhere, onMarkPaid }) => {
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
+const SettlementRow = ({ event, settlement, me, recipientHandles, onMarkPaid }) => {
   // Set once a pay link is opened, to nudge recording the payment
   const [openedPayLink, setOpenedPayLink] = useState(false);
   const { from, to, amountCents } = settlement;
   const involvesMe = from.user === me || to.user === me;
   const iOwe = from.user === me;
-
-  // The last try that might have been saved without us hearing back. Tapping
-  // again resends it as is, with the same clientId, so the server saves it
-  // at most once. Anything else (a new amount, or the last try clearly
-  // worked or clearly failed) is a new payment with a new id.
-  const uncertain = useRef(null);
-
-  const markPaid = async () => {
-    setError('');
-    onMarkPaid();
-    setIsSaving(true);
-    const last = uncertain.current;
-    const isRetry = last && last.from === from.user && last.to === to.user && last.amountCents === amountCents;
-    const attempt = isRetry ? last : { clientId: newClientId(), from: from.user, to: to.user, amountCents, date: todayISO() };
-    try {
-      await eventService.recordPayment(event._id, attempt);
-      uncertain.current = null;
-      success();
-      await onRecorded();
-    } catch (err) {
-      uncertain.current = mightHaveSaved(err) ? attempt : null;
-      // Someone else already recorded it: show where things stand now. The
-      // section says so, since this row may be gone once it reloads.
-      if (err.status === 409) await onSettledElsewhere(err.message);
-      else setError(err.message);
-    } finally {
-      // The row is keyed by who pays whom, so it can stay on screen with a
-      // new amount and needs its button back
-      setIsSaving(false);
-    }
-  };
 
   const fromLabel = from.user === me ? 'You' : from.name;
   const toLabel = to.user === me ? 'you' : to.name;
@@ -332,11 +375,10 @@ const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded, on
         </span>
         {involvesMe && (
           <button
-            onClick={markPaid}
-            disabled={isSaving}
-            className="tap shrink-0 h-10 px-4 text-sm font-medium text-accent-soft border border-accent rounded-full disabled:opacity-50"
+            onClick={onMarkPaid}
+            className="tap shrink-0 h-10 px-4 text-sm font-medium text-accent-soft border border-accent rounded-full"
           >
-            {isSaving ? 'Saving...' : 'Mark paid'}
+            Mark paid
           </button>
         )}
       </div>
@@ -352,7 +394,6 @@ const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded, on
       {openedPayLink && (
         <p className="text-xs text-accent-soft mt-1">Sent it? Tap Mark paid so everyone's balances update.</p>
       )}
-      {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
     </li>
   );
 };
@@ -498,9 +539,9 @@ const Payments = ({ event, payments, canChange, onDeleted }) => {
           <li key={p._id} className="card px-4 py-3 flex justify-between items-center text-sm">
             <span>
               {p.from.name} paid {p.to.name} <span className="font-medium">{formatCents(p.amountCents)}</span>
-              <span className="text-muted"> · {formatDay(p.date)}</span>
+              <span className="text-muted"> · {p.pending ? 'Saving...' : formatDay(p.date)}</span>
             </span>
-            {canChange(p) && (
+            {canChange(p) && !p.pending && (
               <button onClick={() => remove(p)} className="tap text-faint p-1" aria-label={`Delete payment from ${p.from.name} to ${p.to.name}`}>
                 <X size={16} />
               </button>

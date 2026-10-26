@@ -119,7 +119,6 @@ const ScheduleItems = ({ event, items, onEdit }) => {
 
 const ScheduleItem = ({ event, item, onEdit }) => {
   const { currentUser, setGoing } = useAppContext();
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
   const going = isGoing(item, currentUser?._id);
@@ -129,13 +128,10 @@ const ScheduleItem = ({ event, item, onEdit }) => {
   const toggleGoing = async () => {
     tap();
     setError('');
-    setIsSaving(true);
     try {
       await setGoing(event._id, item._id, !going);
     } catch (err) {
       setError(err.message);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -157,9 +153,8 @@ const ScheduleItem = ({ event, item, onEdit }) => {
 
         <button
           onClick={toggleGoing}
-          disabled={isSaving}
           aria-pressed={going}
-          className={`tap text-xs font-medium flex items-center px-3 py-1 rounded-full disabled:opacity-50 ${
+          className={`tap text-xs font-medium flex items-center px-3 py-1 rounded-full ${
             going ? 'bg-fg text-night' : 'text-accent-soft border border-accent/60'
           }`}
         >

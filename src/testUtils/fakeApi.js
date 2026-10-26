@@ -217,6 +217,8 @@ const scheduleRoute = (event, method, itemId, action, body) => {
 
   if (!itemId && method === 'POST') {
     event.schedule.push({ ...body, _id: `s${nextItemId++}`, attendees: [] });
+  } else if (action === 'going' && fakeOptions.goingError) {
+    return respond(500, { message: fakeOptions.goingError });
   } else if (action === 'going' && method === 'PUT') {
     if (!item.attendees.some((a) => a.user === demoUser._id)) {
       item.attendees.push({ user: demoUser._id, name: demoUser.name });
@@ -600,6 +602,7 @@ const route = (method, path, body, authed, params) => {
 // options.chatSendError makes sending a message fail with that message;
 // options.chatSendsLost saves that many sends but loses their responses;
 // options.paymentOutcomes lists what each payment meets ('lost', or a status);
+// options.goingError makes toggling Going fail with that message;
 // options.memberRemovalError makes leaving or removing fail with that message;
 // options.stopShareFails makes that many stop-sharing requests fail;
 // options.liveEvent adds an event happening today with live locations;

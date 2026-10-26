@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, holdNext } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -78,7 +78,7 @@ describe('Expenses', () => {
     const markPaid = () => fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
 
     markPaid();
-    await within(section('Settle up')).findByText(/Can't reach EventBuddy/);
+    await within(section('Settle up')).findByText("Couldn't record your $150.00 payment to Alex. Try again.");
     markPaid();
 
     expect(await screen.findByText('Everyone is settled up.')).toBeInTheDocument();
@@ -96,8 +96,10 @@ describe('Expenses', () => {
     const markPaid = () => fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
 
     markPaid();
-    await within(section('Settle up')).findByText('Something went wrong. Please try again.');
-    // The button is usable again
+    await within(section('Settle up')).findByText("Couldn't record your $150.00 payment to Alex. Try again.");
+    // The payment is taken back out, so the row and the balance return
+    expect(screen.getByText('You owe $150.00')).toBeInTheDocument();
+    expect(screen.queryByText(/John Doe paid Alex/)).not.toBeInTheDocument();
     markPaid();
 
     expect(await screen.findByText('Everyone is settled up.')).toBeInTheDocument();
@@ -105,6 +107,23 @@ describe('Expenses', () => {
       .filter(([url, opts = {}]) => url === '/api/events/1/payments' && opts.method === 'POST')
       .map(([, opts]) => JSON.parse(opts.body).clientId);
     expect(ids[1]).not.toBe(ids[0]);
+  });
+
+  it('updates the balance before the server answers, and shows the payment as saving', async () => {
+    await openExpenses();
+    const release = holdNext('POST', '/events/1/payments');
+
+    fireEvent.click(within(section('Settle up')).getByRole('button', { name: 'Mark paid' }));
+
+    expect(screen.getByText('Everyone is settled up.')).toBeInTheDocument();
+    expect(screen.getByText("You're all even")).toBeInTheDocument();
+    expect(within(section('Payments')).getByText(/John Doe paid Alex/)).toHaveTextContent('Saving...');
+    expect(within(section('Payments')).queryByRole('button')).not.toBeInTheDocument();
+
+    await release();
+    await waitFor(() => expect(within(section('Payments')).queryByText(/Saving/)).not.toBeInTheDocument());
+    expect(within(section('Payments')).getAllByText(/John Doe paid Alex/)).toHaveLength(1);
+    expect(screen.getByText('Everyone is settled up.')).toBeInTheDocument();
   });
 
   it('adds an expense split equally and updates balances', async () => {

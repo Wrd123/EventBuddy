@@ -6,6 +6,8 @@ import { setUnauthorizedHandler } from '../services/api';
 import { SharingProvider } from './SharingContext';
 import { usePolling } from '../hooks/usePolling';
 import { createFreshness } from '../utils/freshness';
+import { isGoing } from '../utils/schedule';
+import { warning } from '../services/haptics';
 
 // While the app is open, your events are checked this often for changes
 // friends made (a new schedule item, someone joining, an event deleted)
@@ -284,8 +286,47 @@ export const AppProvider = ({ children }) => {
   const deleteScheduleItem = async (eventId, itemId) =>
     storeEvent(await eventService.deleteScheduleItem(eventId, itemId));
 
-  const setGoing = async (eventId, itemId, going) =>
-    storeEvent(await eventService.setGoing(eventId, itemId, going));
+  // Going shows at once and the server catches up. Taps can come faster than
+  // answers, so each item counts its requests: only the latest one's answer
+  // is stored (an older one landing last would flip the button back), and
+  // only the latest one's failure rolls back. PUT and DELETE are idempotent,
+  // so the server ends up in the last state tapped either way.
+  const goingRequests = useRef({});
+
+  const withMyAttendance = (eventId, itemId, going) => (prev) =>
+    prev.map(event => event._id !== eventId ? event : {
+      ...event,
+      schedule: event.schedule.map(item => {
+        if (item._id !== itemId) return item;
+        const others = item.attendees.filter(a => a.user !== currentUser._id);
+        return { ...item, attendees: going ? [...others, { user: currentUser._id, name: currentUser.name }] : others };
+      })
+    });
+
+  const setGoing = async (eventId, itemId, going) => {
+    const key = `${eventId}:${itemId}`;
+    const request = (goingRequests.current[key] || 0) + 1;
+    goingRequests.current[key] = request;
+    const isLatest = () => goingRequests.current[key] === request;
+
+    changeEvents(withMyAttendance(eventId, itemId, going));
+    try {
+      const updated = await eventService.setGoing(eventId, itemId, going);
+      if (isLatest()) storeEvent(updated);
+    } catch (err) {
+      // A newer tap has taken over; its answer decides how things end up
+      if (!isLatest()) return;
+      // Put it back unless something else has changed it since (a refresh
+      // that already brought the truth), then check with the server
+      changeEvents(prev => {
+        const item = prev.find(e => e._id === eventId)?.schedule.find(i => i._id === itemId);
+        return item && isGoing(item, currentUser._id) === going ? withMyAttendance(eventId, itemId, !going)(prev) : prev;
+      });
+      fetchEvent(eventId).catch(() => {});
+      warning();
+      throw err;
+    }
+  };
 
   // Invites: joining adds the event to your list right away
   const joinEvent = async (inviteCode) =>

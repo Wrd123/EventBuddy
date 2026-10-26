@@ -57,6 +57,43 @@ describe('Schedule', () => {
     expect(within(tameImpala()).getByText('No one going yet')).toBeInTheDocument();
   });
 
+  it('flips Going before the server answers', async () => {
+    await openSchedule();
+    const release = holdNext('PUT', '/events/1/schedule/s2/going');
+
+    fireEvent.click(within(card('Tame Impala')).getByRole('button', { name: 'Join' }));
+
+    expect(within(card('Tame Impala')).getByRole('button', { name: 'Going' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(card('Tame Impala')).getByText('1 going')).toBeInTheDocument();
+    await release();
+    expect(within(card('Tame Impala')).getByRole('button', { name: 'Going' })).toBeInTheDocument();
+  });
+
+  it('puts Going back and says so when the server refuses', async () => {
+    installFakeApi({ goingError: "Couldn't update that." }).logIn();
+    await openSchedule();
+
+    fireEvent.click(within(card('Tame Impala')).getByRole('button', { name: 'Join' }));
+
+    expect(await within(card('Tame Impala')).findByText("Couldn't update that.")).toBeInTheDocument();
+    expect(within(card('Tame Impala')).getByRole('button', { name: 'Join' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(card('Tame Impala')).getByText('No one going yet')).toBeInTheDocument();
+  });
+
+  it('ends in the last state tapped even when an older answer arrives last', async () => {
+    await openSchedule();
+    const releaseJoin = holdNext('PUT', '/events/1/schedule/s2/going');
+
+    fireEvent.click(within(card('Tame Impala')).getByRole('button', { name: 'Join' }));
+    fireEvent.click(within(card('Tame Impala')).getByRole('button', { name: 'Going' }));
+    expect(within(card('Tame Impala')).getByRole('button', { name: 'Join' })).toBeInTheDocument();
+
+    // The server saw Join then Leave, but Join's answer (Going) arrives last
+    await releaseJoin();
+    expect(within(card('Tame Impala')).getByRole('button', { name: 'Join' })).toBeInTheDocument();
+    expect(within(card('Tame Impala')).getByText('No one going yet')).toBeInTheDocument();
+  });
+
   it('adds an item in start-time order', async () => {
     await openSchedule();
 
