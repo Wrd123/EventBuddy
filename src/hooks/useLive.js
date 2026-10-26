@@ -25,7 +25,9 @@ export const useLive = (eventId) => {
   unstoppedRef.current = unstopped;
   const retryingStop = useRef(false);
   // A read sent before a stop (or any change made here) still has the old
-  // state, and would turn sharing back on if it landed after it
+  // state, and would turn sharing back on if it landed after it. So such a
+  // read is dropped, and each change reads again at once rather than leave
+  // friends' positions waiting for the next poll.
   const [freshness] = useState(createFreshness);
 
   // Tries that stop again in the background, once per refresh. The warning
@@ -95,7 +97,8 @@ export const useLive = (eventId) => {
     freshness.changed();
     setState(prev => ({ ...prev, sharing }));
     setShare({ eventId, until: new Date(sharing.until).toISOString() });
-  }, [eventId, setShare, freshness]);
+    load();
+  }, [eventId, setShare, freshness, load]);
 
   const stopSharing = useCallback(async () => {
     await endShareOnServer(eventId);
@@ -103,19 +106,22 @@ export const useLive = (eventId) => {
     setState(prev => ({ ...prev, sharing: null }));
     if (shareRef.current?.eventId === eventId) setShare(null);
     if (unstoppedRef.current?.eventId === eventId) setUnstopped(null);
-  }, [eventId, setShare, setUnstopped, freshness]);
+    load();
+  }, [eventId, setShare, setUnstopped, freshness, load]);
 
   const setMeetup = useCallback(async (meetup) => {
     const saved = await liveService.setMeetup(eventId, meetup);
     freshness.changed();
     setState(prev => ({ ...prev, meetup: saved }));
-  }, [eventId, freshness]);
+    load();
+  }, [eventId, freshness, load]);
 
   const clearMeetup = useCallback(async () => {
     await liveService.clearMeetup(eventId);
     freshness.changed();
     setState(prev => ({ ...prev, meetup: null }));
-  }, [eventId, freshness]);
+    load();
+  }, [eventId, freshness, load]);
 
   // This phone stopped, but friends may still see its last spot here
   const stopPending = Boolean(state.sharing) && unstopped?.eventId === eventId;

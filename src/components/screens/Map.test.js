@@ -506,9 +506,12 @@ describe('Sharing across the app', () => {
     await settle();
 
     expect(screen.getByText(/Couldn't stop sharing yet. Friends can still see your last spot until/)).toBeInTheDocument();
+    const readsBefore = requests('GET', '/api/events/5/live').length;
     fireEvent.click(screen.getByRole('button', { name: 'Stop sharing' }));
 
     expect(await screen.findByRole('button', { name: 'Share my location' })).toBeInTheDocument();
+    // Friends' positions are read again at once, not on the next poll
+    await waitFor(() => expect(requests('GET', '/api/events/5/live').length).toBe(readsBefore + 1));
     expect(JSON.parse(localStorage.getItem('eventbuddy_unstopped_share'))).toBeNull();
     expect(storedShare()).toBeNull();
   });
