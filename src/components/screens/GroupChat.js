@@ -96,7 +96,7 @@ const Conversation = ({ event, chat }) => {
     <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-3" role="log" aria-label="Messages">
       {chat.hasMore && (
         <div className="text-center mb-3">
-          <button onClick={loadEarlier} disabled={chat.loadingEarlier} className="chip text-sm">
+          <button onClick={loadEarlier} disabled={chat.loadingEarlier} className="chip tap text-sm">
             {chat.loadingEarlier ? 'Loading...' : 'Load earlier messages'}
           </button>
         </div>
@@ -172,10 +172,10 @@ const PendingRow = ({ pending, onRetry, onDiscard }) => (
       {pending.text}
     </div>
     {pending.failed ? (
-      <div className="text-xs mt-1 mr-1 flex items-center space-x-3" role="alert">
+      <div className="text-xs mt-1 mr-1 flex items-center gap-4" role="alert">
         <span className="text-red-300">Not sent</span>
-        <button onClick={onRetry} className="font-semibold text-accent-soft">Retry</button>
-        <button onClick={onDiscard} className="text-muted">Delete</button>
+        <button onClick={onRetry} className="tap font-semibold text-accent-soft">Retry</button>
+        <button onClick={onDiscard} className="tap text-muted">Delete</button>
       </div>
     ) : (
       <span className="text-[11px] text-faint mt-1 mr-1">Sending...</span>

@@ -45,7 +45,7 @@ const Discover = () => {
                 <MapPin size={20} className="mr-2 text-accent-soft shrink-0" aria-hidden="true" />
                 <span className="truncate">Near {place.label}</span>
               </span>
-              <button onClick={() => setChoosingPlace(true)} className="text-sm font-semibold text-accent-soft shrink-0">
+              <button onClick={() => setChoosingPlace(true)} className="tap text-sm font-semibold text-accent-soft shrink-0">
                 Change
               </button>
             </div>
@@ -123,7 +123,7 @@ const Chip = ({ active, onClick, children }) => (
   <button
     onClick={onClick}
     aria-pressed={active}
-    className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold border ${
+    className={`shrink-0 h-11 flex items-center px-4 rounded-full text-sm font-semibold border ${
       active ? 'bg-fg text-night border-fg' : 'bg-white/[0.06] text-fg/80 border-line'
     }`}
   >

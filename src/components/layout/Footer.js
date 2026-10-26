@@ -37,7 +37,7 @@ const NavItem = ({ Icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
     aria-current={isActive ? 'page' : undefined}
-    className={`flex flex-col items-center gap-0.5 w-14 transition-colors ${isActive ? 'text-fg' : 'text-fg/55'}`}
+    className={`tap flex flex-col items-center gap-0.5 w-14 transition-colors ${isActive ? 'text-fg' : 'text-fg/55'}`}
   >
     <Icon size={22} strokeWidth={isActive ? 2.2 : 1.9} />
     <span className={`text-[11px] ${isActive ? 'font-semibold' : 'font-medium'}`}>{label}</span>

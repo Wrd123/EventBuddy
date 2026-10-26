@@ -104,6 +104,25 @@
     @apply border-accent-soft outline-none;
   }
 
+  /* Grows a small control's hit area to 44x44 (the smallest size a thumb
+     hits reliably) without moving anything: an invisible box centered on the
+     control, never smaller than the control itself. The control must not clip
+     it (overflow-hidden on the control itself would) and nothing else may use
+     its ::before. */
+  .tap {
+    position: relative;
+  }
+
+  .tap::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
   /* Small rounded label, e.g. "Split equally (4)" */
   .chip {
     @apply text-xs px-2 py-1 rounded-full bg-accent/15 text-accent-soft;

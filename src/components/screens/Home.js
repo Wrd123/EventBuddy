@@ -153,7 +153,7 @@ const NoEvents = ({ status, onRetry }) => {
       <div className="card p-5 text-center" role="alert">
         <p className="font-semibold mb-1">Couldn't load your events</p>
         <p className="text-sm text-muted mb-3">Check your connection and try again.</p>
-        <button onClick={onRetry} className="text-sm font-semibold text-accent-soft">Try again</button>
+        <button onClick={onRetry} className="tap text-sm font-semibold text-accent-soft">Try again</button>
       </div>
     );
   }
@@ -214,7 +214,7 @@ const PastEvents = ({ items, onOpen }) => {
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold tracking-[-0.01em]">Past events</h2>
         {items.length > PREVIEW_COUNT && (
-          <button onClick={() => setShowAll(prev => !prev)} className="flex items-center text-sm font-medium text-fg/70">
+          <button onClick={() => setShowAll(prev => !prev)} className="tap flex items-center text-sm font-medium text-fg/70">
             {showAll ? 'Show less' : 'View all'} <ChevronRight size={16} aria-hidden="true" />
           </button>
         )}
@@ -243,7 +243,7 @@ const Suggestions = ({ place, locating, nearby, onChoosePlace, onOpen }) => {
           <button
             onClick={onChoosePlace}
             aria-label={`Change location, now near ${place.label}`}
-            className="glass flex items-center gap-1.5 max-w-[55%] pl-2.5 pr-3 py-1.5 rounded-full text-[13px] font-medium"
+            className="tap glass flex items-center gap-1.5 max-w-[55%] pl-2.5 pr-3 py-1.5 rounded-full text-[13px] font-medium"
           >
             {place.source === 'device'
               ? <Navigation size={13} className="text-go shrink-0" aria-hidden="true" />

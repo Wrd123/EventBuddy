@@ -161,7 +161,7 @@ const Map = () => {
           {oneEvent && (
             <button
               onClick={() => navigate(`/events/${focusId}`)}
-              className="glass pointer-events-auto inline-flex items-center max-w-full h-10 rounded-full px-4 text-sm font-semibold transition-transform active:scale-95"
+              className="tap glass pointer-events-auto inline-flex items-center max-w-full h-10 rounded-full px-4 text-sm font-semibold transition-transform active:scale-95"
               aria-label={`Back to ${focusEvent?.name || 'the event'}`}
             >
               <ArrowLeft size={16} className="mr-1.5 shrink-0" aria-hidden="true" />
@@ -183,7 +183,7 @@ const Map = () => {
           {!oneEvent && (
             <button
               onClick={() => setChoosingPlace(true)}
-              className="glass pointer-events-auto inline-flex items-center max-w-full h-9 rounded-full px-3.5 text-sm"
+              className="tap glass pointer-events-auto inline-flex items-center max-w-full h-9 rounded-full px-3.5 text-sm"
               aria-label={place ? `Change location, now near ${place.label}` : 'Choose a location for nearby events'}
             >
               <MapPin size={16} className="mr-1.5 text-accent-soft shrink-0" aria-hidden="true" />
@@ -267,7 +267,7 @@ const LayerChip = ({ active, dotClass, onClick, children }) => (
   <button
     onClick={onClick}
     aria-pressed={active}
-    className={`glass flex items-center h-9 px-3.5 rounded-full text-sm font-semibold transition-all active:scale-95 ${
+    className={`tap glass flex items-center h-9 px-3.5 rounded-full text-sm font-semibold transition-all active:scale-95 ${
       active ? 'text-fg' : 'text-fg/45'
     }`}
   >
@@ -313,7 +313,7 @@ const Summary = ({ mine, mappedCount, unmapped, place, nearby, venueCount, onCho
     {mine.status === 'error' ? (
       <div className="flex items-center justify-between">
         <span className="text-muted">Couldn't load your events.</span>
-        <button onClick={mine.reload} className="font-semibold text-accent-soft">Try again</button>
+        <button onClick={mine.reload} className="tap font-semibold text-accent-soft">Try again</button>
       </div>
     ) : (
       <Line dotClass="bg-accent">
@@ -326,7 +326,7 @@ const Summary = ({ mine, mappedCount, unmapped, place, nearby, venueCount, onCho
     {!place ? (
       <div className="flex items-center justify-between">
         <span className="text-muted">See concerts, games and shows nearby.</span>
-        <button onClick={onChoosePlace} className="font-semibold text-accent-soft shrink-0 ml-2">Choose a location</button>
+        <button onClick={onChoosePlace} className="tap font-semibold text-accent-soft shrink-0 ml-2">Choose a location</button>
       </div>
     ) : (
       <Line dotClass="bg-[#a78bfa]">
@@ -362,7 +362,7 @@ const EventPlan = ({ event, status, meetup, nearby, venueCount, liveBar, onPlanM
             Location sharing opens {formatDay(event.startDate)}. Friends who choose to share will show up here.
           </Line>
           {meetup && (
-            <button onClick={onShowMeetup} className="flex items-center text-left text-fg/90">
+            <button onClick={onShowMeetup} className="tap flex items-center text-left text-fg/90">
               <Flag size={14} className="mr-2 text-amber-400 shrink-0" aria-hidden="true" />
               <span className="truncate">
                 Meetup: {meetup.note || 'Meetup point'}{meetup.time && `, ${formatTime(meetup.time)}`} on the first day

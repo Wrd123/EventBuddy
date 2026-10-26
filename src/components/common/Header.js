@@ -47,7 +47,7 @@ const Header = ({
           {showBack && (
             <button
               onClick={handleBack}
-              className="glass mr-3 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-fg transition-transform active:scale-90"
+              className="glass mr-3 w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-fg transition-transform active:scale-90"
               aria-label="Back"
             >
               <ArrowLeft size={20} />
@@ -68,7 +68,7 @@ const Header = ({
         {showProfile && (
           <button
             onClick={() => navigate('/profile')}
-            className="glass w-10 h-10 shrink-0 rounded-full text-fg text-[13px] font-semibold flex items-center justify-center transition-transform active:scale-90"
+            className="glass w-11 h-11 shrink-0 rounded-full text-fg text-[13px] font-semibold flex items-center justify-center transition-transform active:scale-90"
             aria-label="Open profile"
           >
             {getInitials(currentUser?.name) || '?'}

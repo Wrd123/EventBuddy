@@ -88,7 +88,7 @@ const DaySelector = ({ days, activeDay, setActiveDay }) => {
         <button
           key={day}
           ref={activeDay === day ? activeRef : null}
-          className={`flex-shrink-0 px-4 py-2 rounded-full ${
+          className={`flex-shrink-0 px-4 py-2.5 rounded-full ${
             activeDay === day
               ? 'bg-fg text-night'
               : 'bg-white/[0.06] text-fg/80 border border-line'
@@ -145,7 +145,7 @@ const ScheduleItem = ({ event, item, onEdit }) => {
           <div className="font-medium mb-1">{item.activity}</div>
           {item.location && <div className="text-sm mb-2">{item.location}</div>}
         </div>
-        <button onClick={onEdit} className="text-faint p-1 -mr-1" aria-label={`Edit ${item.activity}`}>
+        <button onClick={onEdit} className="tap text-faint p-1 -mr-1" aria-label={`Edit ${item.activity}`}>
           <Pencil size={16} />
         </button>
       </div>
@@ -157,7 +157,7 @@ const ScheduleItem = ({ event, item, onEdit }) => {
           onClick={toggleGoing}
           disabled={isSaving}
           aria-pressed={going}
-          className={`text-xs font-medium flex items-center px-3 py-1 rounded-full disabled:opacity-50 ${
+          className={`tap text-xs font-medium flex items-center px-3 py-1 rounded-full disabled:opacity-50 ${
             going ? 'bg-fg text-night' : 'text-accent-soft border border-accent/60'
           }`}
         >

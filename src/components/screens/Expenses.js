@@ -103,7 +103,7 @@ const Expenses = () => {
         <section>
           <div className="flex justify-between items-center mb-3">
             <h3 className="font-medium">Expenses</h3>
-            <button onClick={() => setEditing('new')} className="text-accent-soft text-sm font-medium flex items-center">
+            <button onClick={() => setEditing('new')} className="tap text-accent-soft text-sm font-medium flex items-center">
               <Plus size={16} className="mr-1" />
               Add expense
             </button>
@@ -217,7 +217,7 @@ const BudgetEditor = ({ event }) => {
 
   if (!isEditing) {
     return (
-      <button onClick={open} className="text-sm text-accent-soft font-medium">
+      <button onClick={open} className="tap text-sm text-accent-soft font-medium">
         {event.budgetCents !== null && event.budgetCents !== undefined ? 'Edit budget' : 'Set a budget'}
       </button>
     );
@@ -324,15 +324,15 @@ const SettlementRow = ({ event, settlement, me, recipientHandles, onRecorded, on
 
   return (
     <li>
-      <div className="flex items-center justify-between">
-        <span className="text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm min-w-0">
           {fromLabel} {from.user === me ? 'pay' : 'pays'} {toLabel} <span className="font-medium">{formatCents(amountCents)}</span>
         </span>
         {involvesMe && (
           <button
             onClick={markPaid}
             disabled={isSaving}
-            className="text-xs font-medium text-accent-soft border border-accent px-3 py-1 rounded-full disabled:opacity-50"
+            className="tap shrink-0 h-10 px-4 text-sm font-medium text-accent-soft border border-accent rounded-full disabled:opacity-50"
           >
             {isSaving ? 'Saving...' : 'Mark paid'}
           </button>
@@ -387,7 +387,7 @@ const PayWith = ({ recipient, handles, amountCents, note, onOpened }) => {
               onOpened();
             }}
             aria-expanded={showZelle}
-            className="text-xs font-medium bg-raised text-fg px-3 py-1.5 rounded-full"
+            className="tap text-xs font-medium bg-raised text-fg px-3 py-1.5 rounded-full"
           >
             Zelle
           </button>
@@ -401,7 +401,7 @@ const PayWith = ({ recipient, handles, amountCents, note, onOpened }) => {
             rel="noopener noreferrer"
             onClick={onOpened}
             aria-label={`Pay ${recipient.name} ${formatCents(amountCents)} with ${option.label} (${option.handle})`}
-            className="text-xs font-medium bg-fg text-night px-3 py-1.5 rounded-full"
+            className="tap text-xs font-medium bg-fg text-night px-3 py-1.5 rounded-full"
           >
             {option.label}
           </a>
@@ -412,7 +412,7 @@ const PayWith = ({ recipient, handles, amountCents, note, onOpened }) => {
         <div className="mt-2 bg-raised rounded-xl p-2 text-xs text-fg/80">
           <div className="flex items-center justify-between">
             <span className="font-medium break-all">{zelle.handle}</span>
-            <button onClick={copyZelle} className="ml-2 flex items-center text-accent-soft font-medium shrink-0">
+            <button onClick={copyZelle} className="tap ml-2 flex items-center text-accent-soft font-medium shrink-0">
               <Copy size={14} className="mr-1" />
               {copied ? 'Copied' : 'Copy'}
             </button>
@@ -458,7 +458,7 @@ const ExpenseCard = ({ expense, me, onEdit }) => {
         <div className="text-right shrink-0 ml-2">
           <div className="font-medium">{formatCents(expense.amountCents)}</div>
           {onEdit && (
-            <button onClick={onEdit} className="text-faint p-1 -mr-1" aria-label={`Edit ${expense.description}`}>
+            <button onClick={onEdit} className="tap text-faint p-1 -mr-1" aria-label={`Edit ${expense.description}`}>
               <Pencil size={16} />
             </button>
           )}
@@ -499,7 +499,7 @@ const Payments = ({ event, payments, canChange, onDeleted }) => {
               <span className="text-muted"> · {formatDay(p.date)}</span>
             </span>
             {canChange(p) && (
-              <button onClick={() => remove(p)} className="text-faint p-1" aria-label={`Delete payment from ${p.from.name} to ${p.to.name}`}>
+              <button onClick={() => remove(p)} className="tap text-faint p-1" aria-label={`Delete payment from ${p.from.name} to ${p.to.name}`}>
                 <X size={16} />
               </button>
             )}
