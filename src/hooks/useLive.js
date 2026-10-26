@@ -3,6 +3,7 @@ import * as liveService from '../services/liveService';
 import { usePolling } from './usePolling';
 import { useSharing, endShareOnServer } from '../context/SharingContext';
 import { ApiError } from '../services/api';
+import { createFreshness } from '../utils/freshness';
 
 // Friends' positions arrive about this often while the map is open
 export const LIVE_POLL_MS = 10000;
@@ -23,6 +24,9 @@ export const useLive = (eventId) => {
   const unstoppedRef = useRef(unstopped);
   unstoppedRef.current = unstopped;
   const retryingStop = useRef(false);
+  // A read sent before a stop (or any change made here) still has the old
+  // state, and would turn sharing back on if it landed after it
+  const [freshness] = useState(createFreshness);
 
   // Tries that stop again in the background, once per refresh. The warning
   // stays until it gets through.
@@ -31,6 +35,7 @@ export const useLive = (eventId) => {
     retryingStop.current = true;
     try {
       await endShareOnServer(eventId);
+      freshness.changed();
       if (unstoppedRef.current?.eventId === eventId) setUnstopped(null);
       if (current.current === eventId) setState(prev => ({ ...prev, sharing: null }));
     } catch {
@@ -38,13 +43,14 @@ export const useLive = (eventId) => {
     } finally {
       retryingStop.current = false;
     }
-  }, [eventId, setUnstopped]);
+  }, [eventId, setUnstopped, freshness]);
 
   const load = useCallback(async () => {
     if (!eventId) return;
+    const read = freshness.start();
     try {
       const { sharing, people, meetup } = await liveService.getLive(eventId);
-      if (current.current !== eventId) return;
+      if (current.current !== eventId || !freshness.accept(read)) return;
       setState({ status: 'ready', sharing, people, meetup, error: '' });
       const mine = shareRef.current;
       if (unstoppedRef.current?.eventId === eventId) {
@@ -65,7 +71,7 @@ export const useLive = (eventId) => {
         setState(prev => (prev.status === 'ready' ? prev : { ...prev, status: 'error', error: err.message }));
       }
     }
-  }, [eventId, setShare, setUnstopped, retryStop]);
+  }, [eventId, setShare, setUnstopped, retryStop, freshness]);
 
   useEffect(() => {
     setState({ status: eventId ? 'loading' : 'idle', sharing: null, people: [], meetup: null, error: '' });
@@ -86,26 +92,30 @@ export const useLive = (eventId) => {
       }
     }
     const sharing = await liveService.startSharing(eventId, until);
+    freshness.changed();
     setState(prev => ({ ...prev, sharing }));
     setShare({ eventId, until: new Date(sharing.until).toISOString() });
-  }, [eventId, setShare]);
+  }, [eventId, setShare, freshness]);
 
   const stopSharing = useCallback(async () => {
     await endShareOnServer(eventId);
+    freshness.changed();
     setState(prev => ({ ...prev, sharing: null }));
     if (shareRef.current?.eventId === eventId) setShare(null);
     if (unstoppedRef.current?.eventId === eventId) setUnstopped(null);
-  }, [eventId, setShare, setUnstopped]);
+  }, [eventId, setShare, setUnstopped, freshness]);
 
   const setMeetup = useCallback(async (meetup) => {
     const saved = await liveService.setMeetup(eventId, meetup);
+    freshness.changed();
     setState(prev => ({ ...prev, meetup: saved }));
-  }, [eventId]);
+  }, [eventId, freshness]);
 
   const clearMeetup = useCallback(async () => {
     await liveService.clearMeetup(eventId);
+    freshness.changed();
     setState(prev => ({ ...prev, meetup: null }));
-  }, [eventId]);
+  }, [eventId, freshness]);
 
   // This phone stopped, but friends may still see its last spot here
   const stopPending = Boolean(state.sharing) && unstopped?.eventId === eventId;

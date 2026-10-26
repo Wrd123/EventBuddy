@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, settle, removeEvent } from '../../testUtils/fakeApi';
+import { installFakeApi, settle, removeEvent, holdNext } from '../../testUtils/fakeApi';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 import { eventDays } from './Map';
@@ -511,6 +511,29 @@ describe('Sharing across the app', () => {
     expect(await screen.findByRole('button', { name: 'Share my location' })).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('eventbuddy_unstopped_share'))).toBeNull();
     expect(storedShare()).toBeNull();
+  });
+
+  it("doesn't let a read from before your stop turn sharing back on", async () => {
+    installFakeApi({ liveEvent: true, stopShareFails: 2 }).logIn();
+    await alreadySharing();
+    renderAt('/profile');
+    fireEvent.click(await screen.findByRole('button', { name: /Log out/ }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+    await pin('Friend: Alex');
+    await settle();
+
+    // A refresh still sees the share, and is slow to come back
+    const release = holdNext('GET', '/events/5/live');
+    fireEvent(document, new Event('visibilitychange'));
+    fireEvent.click(screen.getByRole('button', { name: 'Stop sharing' }));
+    await screen.findByRole('button', { name: 'Share my location' });
+    await release();
+    await settle();
+
+    expect(storedShare()).toBeNull();
+    expect(screen.getByRole('button', { name: 'Share my location' })).toBeInTheDocument();
   });
 
   it('lets you log out anyway when the server still has your share', async () => {
