@@ -24,14 +24,15 @@ const dayPart = (now = new Date()) => {
   return `${weekday} ${part}`;
 };
 
-// One line on what's next: "Picnic in the Park is on." or "19 days until
-// Hiking Trip."
+// One line on what's next. The card right under it already shows the
+// event's name, so this says when instead: "something's on right now." or
+// "your next plan is in 19 days."
 const headline = (nextUp, today) => {
   if (!nextUp) return "what's the plan?";
   const { event, status } = nextUp;
-  if (status === 'ongoing') return `${event.name} is on.`;
+  if (status === 'ongoing') return "something's on right now.";
   const away = daysAwayLabel(event.startDate, today);
-  return away === 'Tomorrow' ? `${event.name} is tomorrow.` : `${away} until ${event.name}.`;
+  return away === 'Tomorrow' ? "tomorrow's the day." : `your next plan is in ${away}.`;
 };
 
 // Home is a timeline: what's on now (or next) as a big photo card, then

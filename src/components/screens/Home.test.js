@@ -35,6 +35,22 @@ describe('Home', () => {
     expect(comingUp.getByText('Summer Music Festival')).toBeInTheDocument();
   });
 
+  it("says when the next event is without repeating its name", async () => {
+    installFakeApi({ liveEvent: true }).logIn();
+    renderHome();
+
+    const greeting = await screen.findByRole('heading', { name: "Hey John, something's on right now." });
+    expect(greeting).not.toHaveTextContent('Picnic in the Park');
+  });
+
+  it('counts the days to an upcoming event in the greeting', async () => {
+    installFakeApi().logIn();
+    renderHome();
+
+    expect(await screen.findByRole('heading', { name: /^Hey John, (tomorrow's the day|your next plan is in \d+ days)\.$/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /^Hey John/ })).not.toHaveTextContent('Hiking Trip');
+  });
+
   it('keeps the full distance as the marker text, and lets long titles wrap', async () => {
     installFakeApi({ liveEvent: true }).logIn();
     renderHome();
