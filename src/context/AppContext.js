@@ -147,13 +147,17 @@ export const AppProvider = ({ children }) => {
       setIsAuthenticated(true);
       setIsLoading(false);
 
+      // The answer only counts for the login that asked: by the time it
+      // lands, someone may have logged out and in as someone else
+      const askedIn = session.current;
       try {
         // Refresh from the server, which also confirms the token is valid
-        setCurrentUser(await authService.getProfile());
+        const profile = await authService.getProfile();
+        if (session.current === askedIn) setCurrentUser(profile);
       } catch (error) {
         // Only an explicit rejection ends the session. Offline or a server
         // hiccup keeps the cached user, as phone apps do.
-        if (error.status === 401) clearSession();
+        if (error.status === 401 && session.current === askedIn) clearSession();
       }
     };
 

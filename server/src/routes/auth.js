@@ -7,6 +7,7 @@ const { HttpError } = require('../errors');
 const { validateRegistration, validatePassword, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
 const config = require('../config');
 const { createDemoWorld, pruneDemoWorlds, dayIn } = require('../seed/demoData');
+const { createConcurrencyLimit } = require('../concurrencyLimit');
 
 const { isTest, bcryptRounds } = config;
 
@@ -80,6 +81,12 @@ router.post('/login', attemptLimiter, async (req, res) => {
 const DEMO_WORLD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_DEMO_WORLDS = 300;
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Far more than people tapping "Try the demo" at the same moment
+const MAX_DEMO_BUILDS_AT_ONCE = 5;
+const demoBuilds = createConcurrencyLimit(
+  MAX_DEMO_BUILDS_AT_ONCE,
+  () => new HttpError(503, 'The demo is busy right now. Try again in a moment.')
+);
 
 // The visitor's own date, if it's a real calendar day within one of ours
 // (time zones span about a day either side of UTC)
@@ -94,11 +101,14 @@ const visitorToday = (value) => {
 // mode; elsewhere it doesn't exist. body.today puts the picnic on the
 // visitor's today. No IP attempt limit (there's no password to guess, and
 // where client IPs can't be read reliably a shared limit would lock everyone
-// out); pruning bounds how many worlds exist instead.
+// out). Pruning bounds how many worlds exist, and demoBuilds how many are
+// being made at once, so a burst of taps can't swamp a small free server.
 router.post('/demo', async (req, res) => {
   if (!config.demoMode) throw new HttpError(404, 'Not found.');
-  await pruneDemoWorlds({ maxAgeMs: DEMO_WORLD_MAX_AGE_MS, maxWorlds: MAX_DEMO_WORLDS });
-  const user = await createDemoWorld({ today: visitorToday(req.body?.today) });
+  const user = await demoBuilds(async () => {
+    await pruneDemoWorlds({ maxAgeMs: DEMO_WORLD_MAX_AGE_MS, maxWorlds: MAX_DEMO_WORLDS });
+    return createDemoWorld({ today: visitorToday(req.body?.today) });
+  });
   res.status(201).json({ token: signToken(user), user });
 });
 

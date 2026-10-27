@@ -31,6 +31,10 @@ const errorHandler = (err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ message: 'Invalid JSON.' });
   }
+  // Body over the size limit (app.js): the client's to fix, not a crash
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ message: "That's too much to send at once." });
+  }
 
   if (!isTest) console.error(err);
   // Don't leak internals to clients

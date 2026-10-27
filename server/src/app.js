@@ -16,6 +16,12 @@ const createApp = () => {
   app.set('trust proxy', trustProxy);
 
   app.use(helmet());
+  // Answers are about one person (their plans, chats, money, where friends
+  // are), so no browser, proxy or CDN may keep a copy to show again
+  app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
   app.use(cors({ origin: clientOrigin }));
   app.use(express.json({ limit: '100kb' }));
 

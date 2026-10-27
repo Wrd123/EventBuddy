@@ -111,6 +111,60 @@ describe('keeping events fresh', () => {
   });
 });
 
+describe('the profile check when the app opens', () => {
+  // Who the app thinks is logged in, and a way to switch accounts
+  const Who = () => {
+    const { currentUser, isAuthenticated, logout, login } = useAppContext();
+    return (
+      <div>
+        <p>{isAuthenticated ? `Signed in as ${currentUser?.name}` : 'Signed out'}</p>
+        <button onClick={logout}>Log out</button>
+        <button onClick={() => login({ email: demoUser.email, password: 'password' })}>Log in</button>
+      </div>
+    );
+  };
+
+  const switchAccounts = async (newName) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await screen.findByText('Signed out');
+    const originalName = demoUser.name;
+    demoUser.name = newName;
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+      await screen.findByText(`Signed in as ${newName}`);
+    } finally {
+      demoUser.name = originalName;
+    }
+  };
+
+  it("doesn't show the previous account when its answer lands after switching", async () => {
+    const release = holdNext('GET', '/auth/me'); // answered as John, held up
+    render(<AppProvider><Who /></AppProvider>);
+    await screen.findByText('Signed in as John Doe');
+
+    await switchAccounts('Sam Rivera');
+    await release();
+    await settle();
+
+    expect(screen.getByText('Signed in as Sam Rivera')).toBeInTheDocument();
+  });
+
+  it("doesn't log out the new account when the old login's rejection lands late", async () => {
+    // A saved login the server no longer accepts; its check is held up
+    localStorage.setItem('eventbuddy_token', 'expired-token');
+    const release = holdNext('GET', '/auth/me');
+    render(<AppProvider><Who /></AppProvider>);
+    await screen.findByText('Signed in as John Doe');
+
+    await switchAccounts('Sam Rivera');
+    await release();
+    await settle();
+
+    expect(screen.getByText('Signed in as Sam Rivera')).toBeInTheDocument();
+    expect(localStorage.getItem('eventbuddy_token')).toBe('fake-token');
+  });
+});
+
 describe('changes that land after the session ends', () => {
   it("doesn't add an event whose answer lands after logging out", async () => {
     await renderProbe();

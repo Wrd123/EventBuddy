@@ -27,11 +27,11 @@ The serious finding was on the client: **a member's display name could run as co
 | S2 | Logging out didn't invalidate a login token that was already copied | Medium | **Fixed** on branch `fix-map-tooltip-xss` |
 | S3 | Six-character and common passwords were accepted, and there was no way to change a password | Medium | **Fixed** on branch `fix-map-tooltip-xss` |
 | F-1 | `TRUST_PROXY=3` can let the login rate limit be sidestepped | Medium if the host has fewer than 3 proxies | Open; the deployment wasn't checked |
-| R1 | At startup, a late profile reply can show the previous account after switching accounts | Medium (correctness and privacy) | Open |
-| R2 | A late "session expired" reply for an old login logs out the new one | Low | Partly fixed: `api.js` fixed, the startup refresh in `AppContext.js` still open |
-| R3 | A request body over 100 kB returns 500 instead of 413 | Low | Open |
-| C2 | The one-tap demo sign-in has no rate limit and no cap on concurrent world creation | Hardening | Open; not load-tested |
-| H1 | No `Cache-Control: no-store` on signed-in API responses, and no Content Security Policy on the web page | Hardening | Open |
+| R1 | At startup, a late profile reply could show the previous account after switching accounts | Medium (correctness and privacy) | **Fixed** on branch `review-fixes-2` |
+| R2 | A late "session expired" reply for an old login logged out the new one | Low | **Fixed** on branch `review-fixes-2` |
+| R3 | A request body over 100 kB returned 500 instead of 413 | Low | **Fixed** on branch `review-fixes-2` |
+| C2 | The one-tap demo sign-in has no rate limit and had no cap on concurrent world creation | Hardening | Cap added on `review-fixes-2`; a per-address limit waits on F-1 |
+| H1 | No `Cache-Control: no-store` on API responses, and no Content Security Policy on the web page | Hardening | `no-store` added on `review-fixes-2`; the page's policy is still open |
 | D1 | Dependency advisories in the shipped bundle have no reachable path in this app | Hardening | Triaged |
 
 ### S1: names on the live map (High, fixed)
@@ -93,26 +93,32 @@ The serious finding was on the client: **a member's display name could run as co
 
 **Tests:** the test suite turns rate limits off, so it should gain one test that runs the limiter with a fixed proxy setting.
 
-### R1 and R2: account switching (client)
+### R1 and R2: account switching (client, fixed)
 
-- **R1:** in `src/context/AppContext.js`, the startup profile refresh isn't tied to the session that sent it. If someone logs out and logs in as someone else before it answers, the app shows the previous account's profile. That profile includes the email address and payment handles. The stored token stays the new account's, so no requests are made as the wrong person.
-- **R2:** `src/services/api.js` treated any 401 on a request that carried a token as "this session expired", even when the token was an older one. That part is fixed (see S3). The startup refresh's own 401 handling in `AppContext.js` still has the gap.
+- **R1:** when the app opened, its profile check in `src/context/AppContext.js` wasn't tied to the login that sent it. If someone logged out and back in as someone else before it answered, the app showed the previous account's profile, including the email address and payment handles. The stored token stayed the new account's, so no requests were made as the wrong person.
+- **R2:** a late 401 for an older token logged out the newer session. That came from two places: `src/services/api.js`, fixed with S3, and that same startup check's own error handling.
 
-**Fix:** ignore a reply, success or failure, unless it belongs to the session that's current now. The app already does this for its other session-sensitive requests.
+**The fix:** the startup check notes which login it belongs to. An answer that lands after a logout or a new login is ignored, whether it succeeded or failed. This uses the same session counter the app already uses for its other session-sensitive requests.
 
-### R3: oversized body (Low)
+**Checked by:** two app tests, each holding up the startup check, switching accounts, then letting it answer. One answers with the old profile and the other with a 401. The new account stays shown and logged in. Both tests fail on the old code.
 
-Request bodies over 100 kB are rejected, but the error handler in `server/src/middleware/errorHandler.js` doesn't recognise body-parser's `entity.too.large` error, so the client gets a generic 500 instead of a 413. Nothing internal is revealed.
+### R3: oversized body (Low, fixed)
 
-**Fix:** return 413 with a short message for that error type.
+Bodies over 100 kB were already turned away, but the error handler didn't recognise body-parser's `entity.too.large` error, so the client got a generic 500. It now gets 413 with a short message (`server/src/middleware/errorHandler.js`). This is checked by `server/tests/app.test.js` and against a running API.
 
 ### C2: the demo sign-in
 
-`POST /api/auth/demo` deliberately has no rate limit. Pruning keeps at most 300 worlds, but nothing limits how fast or how many at once new worlds can be created. This wasn't load-tested. Once F-1 is fixed, so that client addresses can be trusted, add a modest limit per address and cap concurrent world creation.
+`POST /api/auth/demo` deliberately has no rate limit. Pruning keeps at most 300 worlds.
+
+**Added:** at most 5 worlds can be built at once. Further taps get a 503 straight away with "The demo is busy right now. Try again in a moment.", which the login screen shows as it is. They aren't queued, because queued work can pile up and keep running after visitors give up. The limit lives in `server/src/concurrencyLimit.js` and has its own tests. It counts within one process, like the ledger lock.
+
+**Still open:** a limit per address waits on F-1, so that client addresses can be trusted. This wasn't load-tested.
 
 ### H1: headers
 
-API responses get Helmet's headers, but signed-in responses carry no `Cache-Control: no-store`. The static web page has no Content Security Policy, so the policy has to be set on the static host.
+**Added:** every API response now carries `Cache-Control: no-store` (`server/src/app.js`), so no browser, proxy or CDN keeps a copy of someone's plans, chats, money or friends' locations. This is checked by `server/tests/app.test.js` and against a running API.
+
+**Still open:** the static web page has no Content Security Policy. It has to be set on the static host (Render's `headers` in `render.yaml`) and must allow the map tiles, MapLibre's workers, the API's address and the cover photos. A wrong policy breaks the map, so it needs testing against a real build before it ships.
 
 ### D1: dependencies
 
