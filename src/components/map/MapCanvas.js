@@ -65,6 +65,11 @@ const escapeHtml = (text) =>
   String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const safeColor = (color) => (/^#[0-9a-f]{6}$/i.test(color || '') ? color : '#64748b');
 
+// Captions carry people's names, which are whatever they typed. Leaflet
+// puts string tooltip content in as HTML, so a caption goes in as a text
+// node and a name like "<img onerror=…>" shows as those characters.
+const captionNode = (caption) => document.createTextNode(caption);
+
 const iconHtml = (pin, selected) => {
   const classes = ['eb-pin', `eb-pin-${pin.kind}`, selected && 'eb-pin-selected', pin.stale && 'eb-pin-stale']
     .filter(Boolean)
@@ -179,8 +184,9 @@ const MapCanvas = forwardRef(({ pins, selectedId, onSelect, fitKey, fitIds, fall
           entry.html = html;
         }
         entry.marker.setZIndexOffset(zIndexOffset);
-        if (pin.caption && entry.marker.getTooltip()?.getContent() !== pin.caption) {
-          entry.marker.setTooltipContent(pin.caption);
+        if (pin.caption && entry.caption !== pin.caption) {
+          entry.marker.setTooltipContent(captionNode(pin.caption));
+          entry.caption = pin.caption;
         }
         return;
       }
@@ -198,11 +204,11 @@ const MapCanvas = forwardRef(({ pins, selectedId, onSelect, fitKey, fitIds, fall
       });
       // Friends are labeled with who and how recent, without tapping
       if (pin.caption) {
-        marker.bindTooltip(pin.caption, { permanent: true, direction: 'bottom', offset: [0, 16], className: 'eb-tip' });
+        marker.bindTooltip(captionNode(pin.caption), { permanent: true, direction: 'bottom', offset: [0, 16], className: 'eb-tip' });
       }
       const group = pin.kind === 'nearby' ? clusterRef.current : layerRef.current;
       group.addLayer(marker);
-      placed.set(pin.id, { marker, html, group });
+      placed.set(pin.id, { marker, html, group, caption: pin.caption });
     });
   }, [pins, selectedId]);
 
