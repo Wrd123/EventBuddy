@@ -31,7 +31,7 @@ The serious finding was on the client: **a member's display name could run as co
 | R2 | A late "session expired" reply for an old login logged out the new one | Low | **Fixed** on branch `review-fixes-2` |
 | R3 | A request body over 100 kB returned 500 instead of 413 | Low | **Fixed** on branch `review-fixes-2` |
 | C2 | The one-tap demo sign-in has no rate limit and had no cap on concurrent world creation | Hardening | Cap added on `review-fixes-2`; a per-address limit waits on F-1 |
-| H1 | No `Cache-Control: no-store` on API responses, and no Content Security Policy on the web page | Hardening | **Fixed** on branch `review-fixes-2` |
+| H1 | No `Cache-Control: no-store` on API responses, and no Content Security Policy on the web page | Hardening | **Fixed** on branch `review-fixes-2`; the policy is live on the deployed site (27 Oct 2026) |
 | D1 | Dependency advisories in the shipped bundle have no reachable path in this app | Hardening | React Router upgraded on branch `handoff-deps-screenshots`; MapLibre stays on 5.x (see D1) |
 
 ### S1: names on the live map (High, fixed)
@@ -129,7 +129,9 @@ Bodies over 100 kB were already turned away, but the error handler didn't recogn
 - An injected `<img onerror=…>`, the kind of payload S1 used, was refused and didn't run, so the policy would also have stopped S1.
 - `scripts/serve-build.test.js`, run in CI, fails if the policy is loosened, if the build would inline its startup script, or if app code adds anything the policy refuses (inline styles, inline handlers, `<script>` in markup, `dangerouslySetInnerHTML`).
 
-**Not checked:** the no-WebGL fallback map (OpenStreetMap's raster tiles, allowed by `img-src https:`), and Discover's Ticketmaster images (no key in the test setup), though both fall under the same `https:` image rule. The live site needs a look after deploying.
+**On the deployed site (27 Oct 2026):** the user confirmed the page's response carries the policy exactly as written, plus `nosniff` and the referrer policy. After a fresh reload the app started normally, which it couldn't if the build still had an inline startup script. The map (Liberty vector tiles, friends' pins, the meetup flag) and the Ticketmaster venues worked under it. Render only applied the headers after a Blueprint sync; a plain redeploy doesn't re-read `render.yaml`.
+
+**Not checked:** the no-WebGL fallback map (OpenStreetMap's raster tiles, allowed by `img-src https:`), and Discover's Ticketmaster images in the browser, though both fall under the same `https:` image rule.
 
 ### D1: dependencies
 

@@ -6,9 +6,8 @@
 
 - **Everything below is on GitHub's `main`** (`96fa8e54` when this note was written): the security work, the Content Security Policy, React Router 7, the Afterglow README screenshots, and the map's detail fix. Later commits may not be pushed yet, so check `git status`.
 - **The map** uses OpenFreeMap's Liberty style, darkened, and the map screen's bottom sheet no longer gets covered by the map (see Decisions).
-- **Render needs a redeploy** of both services after each push.
-  - The static site must pick up the new `headers` and `INLINE_RUNTIME_CHUNK` from `render.yaml`. If it was set up by hand in the dashboard, add them there.
-  - After deploying, open the live site and its map once, to check the policy refuses nothing.
+- **The Content Security Policy is live** on the deployed site, checked by the user on 27 Oct 2026: the headers are there and the app and map work under them.
+- **Render needs a redeploy** of both services after each push. **A change to `render.yaml` itself (headers, environment) also needs a Blueprint sync** in the Render dashboard (Blueprints → Manual Sync). A redeploy alone doesn't re-read it, which is why the policy first went out missing.
 - **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps).
 - **Tests:** 329 server tests, 436 app tests and 12 script tests pass, and `CI=true npm run build` is clean. Run the app suite with `--maxWorkers=2`.
 - **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1). `react-scripts` is a dev dependency, so CRA's dev-server advisories (`webpack-dev-server`, `proxy-addr`, `websocket-driver` and the rest) only show in the full `npm audit`. None of it ships in the built site.
