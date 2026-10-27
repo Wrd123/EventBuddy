@@ -1,19 +1,58 @@
 # Handoff: where EventBuddy stands (27 Oct 2026)
 
-`CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what was just finished, what comes next, and the traps to avoid.
+`CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what was just finished, what's waiting on the user, what comes next, and the traps to avoid. The next big piece, Phase 4, has its own plan in `docs/PHASE_4_PLAN.md`.
 
 ## State
 
-- **Everything below is on GitHub's `main`** (`96fa8e54` when this note was written): the security work, the Content Security Policy, React Router 7, the Afterglow README screenshots, and the map's detail fix. Later commits may not be pushed yet, so check `git status`.
-- **The map** uses OpenFreeMap's Liberty style, darkened, and the map screen's bottom sheet no longer gets covered by the map (see Decisions).
-- **The Content Security Policy is live** on the deployed site, checked by the user on 27 Oct 2026: the headers are there and the app and map work under them.
-- **Render needs a redeploy** of both services after each push. **A change to `render.yaml` itself (headers, environment) also needs a Blueprint sync** in the Render dashboard (Blueprints → Manual Sync). A redeploy alone doesn't re-read it, which is why the policy first went out missing.
-- **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps).
-- **Tests:** 329 server tests, 436 app tests and 12 script tests pass, and `CI=true npm run build` is clean. Run the app suite with `--maxWorkers=2`.
-- **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1). `react-scripts` is a dev dependency, so CRA's dev-server advisories (`webpack-dev-server`, `proxy-addr`, `websocket-driver` and the rest) only show in the full `npm audit`. None of it ships in the built site.
-- **Not checked on a device:** the iOS build, haptics, pull-to-refresh in WKWebView, the sheets with a real keyboard, enlarged text or VoiceOver, the Profile password form, and the darkened Liberty map in WKWebView.
-- **Merged branches that can be deleted (ask first):** `small-fixes`, `phase-3-feel`, `phase-3b`, `going-poll-fix`, `fix-map-tooltip-xss`, `review-fixes-2`, `handoff-deps-screenshots`, `map-detail`.
-- **No test servers are left running.** Start a fresh isolated API as described under Traps when one is needed.
+- **Git, when this note was written:**
+  - GitHub's `main` is at `acae73de`. It holds everything up to the live Content Security Policy:
+    - the security work and the CSP,
+    - React Router 7,
+    - the Afterglow README screenshots,
+    - the Liberty map and the sheet fix,
+    - the dev-dependency audit fix.
+  - Local `main` is at `5eb6af72`, **one commit ahead and not pushed**: the switched-off address check for F-1 (see Waiting on the user).
+  - This note itself is on the branch `phase-4-handoff`.
+  - Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting any of this.
+- **Deployed on Render:**
+  - The live site matches `acae73de`.
+  - **The Content Security Policy is live**, checked by the user on 27 Oct 2026: the headers are there, and the app and map work under them.
+- **Render needs a redeploy** of both services after each push.
+  - **A change to `render.yaml` itself (headers, environment) also needs a Blueprint sync** in the Render dashboard: Blueprints → Manual Sync.
+  - A redeploy alone doesn't re-read `render.yaml`, which is why the policy first went out missing.
+- **The map** uses OpenFreeMap's Liberty style, darkened. The map screen's bottom sheet no longer gets covered by the map (see Decisions).
+- **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps), so ask the user to look at the Actions tab.
+- **Tests:** 331 server tests, 436 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+  - Run the app suite with `--maxWorkers=2`.
+  - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
+- **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1).
+  - `react-scripts` is a dev dependency, so CRA's dev-server advisories (`webpack-dev-server`, `proxy-addr`, `websocket-driver` and the rest) only show in the full `npm audit`.
+  - None of it ships in the built site.
+- **Not checked on a device:**
+  - the iOS build, haptics and pull-to-refresh in WKWebView
+  - the sheets with a real keyboard, enlarged text or VoiceOver
+  - the Profile password form
+  - the darkened Liberty map in WKWebView
+- **Branches:**
+  - All merged local branches are deleted.
+  - `origin/phase-3b` still exists on GitHub. Deleting it would be a push, so leave it to the user.
+  - `.git/config` has three harmless stale `vscode-merge-base` lines for deleted branches. The sandbox can't edit that file.
+- **No test servers are running**, and the `build-csp` and `web-3999-pentest` launch entries are removed. Start a fresh isolated API as described under Traps when one is needed.
+
+## Waiting on the user
+
+- **F-1, measuring the proxy count.** The API now has `GET /api/debug/request-ip`, which exists only while `SHOW_REQUEST_IP=true`. It returns the caller's own `ip`, `forwardedFor`, `connectedFrom` and the current `trustProxy`. The user was asked to:
+  1. Push `main`, and wait for the API's deploy.
+  2. Set `SHOW_REQUEST_IP=true` on the API service in Render.
+  3. Open `https://<api>.onrender.com/api/debug/request-ip` and send back the three values. They may write `ME` in place of their own IP.
+  4. Remove `SHOW_REQUEST_IP` again.
+
+  To find the right `TRUST_PROXY`, count positions:
+  - `connectedFrom` is position 0.
+  - The addresses in `forwardedFor` are positions 1, 2, … counting from the right.
+
+  `TRUST_PROXY` is the position of their real IP. For example, `forwardedFor: "ME, 104.x"` gives 2. Set it in `render.yaml`; the user then needs a **Blueprint sync**. Also add the limiter test that F-1 in `docs/SECURITY_REVIEW.md` asks for. Removing the debug route afterwards is optional, since it's off by default.
+- **CI:** the user hasn't reported the Actions tab yet.
 
 ## What was done: the security review
 
@@ -30,7 +69,7 @@ Claude and Codex each reviewed the app independently. Findings were checked agai
 
 ## Still open
 
-- **F-1:** `TRUST_PROXY=3` in `render.yaml`. If fewer proxies sit in front of the API, a forged `X-Forwarded-For` escapes the login rate limit. The user needs to compare `req.ip` on the deployed API with their real IP, then set the right count. A per-address demo limit (the rest of C2) waits on this.
+- **F-1:** `TRUST_PROXY=3` in `render.yaml`. If fewer proxies sit in front of the API, a forged `X-Forwarded-For` escapes the login rate limit. The measurement is under way (see Waiting on the user). A per-address demo limit (the rest of C2) waits on this.
 - **D1:** React Router is upgraded to 7, and the audit reports it clean. `maplibre-gl` stays on 5.x, whose advisory isn't reachable here, because 6.x can't be bundled by CRA (see `docs/SECURITY_REVIEW.md`). Upgrade it along with moving off CRA, for example to Vite in phase 5.
 - **Known limit:** a logged-out demo token works again if the hosted demo restarts empty and rebuilds that world. Accepted, and documented in `User.js`.
 
@@ -43,7 +82,8 @@ Claude and Codex each reviewed the app independently. Findings were checked agai
 - leaving or removal needs an even balance ("Settle up first")
 - removal sticks until the organizer taps "Let back in"
 - the organizer can't leave; they delete the event
-- freshness uses polling, with WebSockets possibly added in phase 4 and polling kept as the fallback
+- freshness uses polling. Phase 4 adds WebSockets that only *poke* the app to read again, with polling kept as the fallback (see `docs/PHASE_4_PLAN.md`)
+- **Phase 4 includes scripted demo friends**, so a reviewer alone in a demo world sees real time happen. The user chose this on 27 Oct 2026.
 - no React Query; the small `freshness.js` rule is deliberate
 - the map's bottom panel is not a Sheet
 - expense and schedule forms close instantly after saving
@@ -64,14 +104,20 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done |
 | 3b | Loading skeletons and pull-to-refresh | Done |
 | — | Security review and fixes | Done, except F-1 |
-| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now | Planned |
+| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now, and scripted demo friends | Planned, see `docs/PHASE_4_PLAN.md` |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
 ## What comes next
 
-1. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics and the Profile password form. `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox. Open the Simulator panel (`attach`) before building.
-2. **Phase 4**, only when the user asks. WebSockets need their own security pass: authorize on connect and on every subscription, and drop a socket when its user is removed or its session version changes.
+1. **Finish F-1** as soon as the user sends the measured values (see Waiting on the user).
+2. **Phase 4**, which the user wants started in this new session. Follow `docs/PHASE_4_PLAN.md`:
+   - Build 4a (sockets and pokes), 4b (who's here now), 4c (the activity feed) and 4d (scripted demo friends), each on its own branch.
+   - Each gets tests, the strict build and the `reviewer` subagent before it's committed, plus screenshots for the user before any UI commit.
+   - Plan the first part in plan mode, per `CLAUDE.md`.
+3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.
+   - `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox.
+   - Open the Simulator panel (`attach`) before building.
 
 **Later:**
 - Optimistic creates for expenses and schedule items, once there's a server `clientId` for both.
@@ -83,7 +129,9 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
   - Writes are limited to the project, `$TMPDIR` and `~/.cache/mongodb-binaries`.
   - **`gh` fails with a TLS error and `git push` can't read credentials.** Give the user the command to run themselves.
   - What else fails inside it: `ps`, `open`, writing to `/tmp`, and most websites. macOS has no `timeout` command either.
-  - Never `pkill -f index.js`: it matches the user's :4000 API too, and the classifier blocks it anyway.
+  - Never `pkill -f index.js`: it matches the user's :4000 API too, and the classifier blocks it anyway. Stop your own background servers with `TaskStop`.
+  - **Bash can't write `.claude/` or `.git/config`.** Edit `.claude/launch.json` with the Edit tool. `git branch -d` still works but warns that it couldn't tidy `.git/config`.
+  - npm's cache in `~/.npm` isn't writable. Prefix npm commands with `npm_config_cache=$TMPDIR/npm-cache`. `npm audit` also needs `registry.npmjs.org` allowed for the command.
   - If a command hits the sandbox, tell the user which restriction it hit. Changing the settings is their call.
 - **Editing `server/` restarts the user's :4000 API** (`node --watch`, in-memory MongoDB) and erases their local demo world. In this session the user said that's fine because it isn't production. Still say when it happens.
 - **The Content Security Policy is strict.** Anything new the web app loads from another host needs adding to the policy in `render.yaml`, or production will block it: fonts, images from a new non-https host, a new API host, WebSockets in phase 4 (`connect-src` needs the `wss://` address). So does any inline `style="…"`, `on…=` or `<script>` in markup. `scripts/serve-build.test.js` catches the inline cases in CI. To check a real build:
@@ -112,7 +160,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 
 - They want whole features built and the reasoning explained, with no TODOs left for them.
 - **Git:**
-  - Commit on a new branch. When asked, fast-forward `main` locally.
+  - Commit on a new branch. Fast-forward `main` locally **only when they ask**. In the last session Claude once fast-forwarded without asking, and owned it.
   - Push only when they say so. They run the push themselves, since the sandbox can't.
 - **Commit messages:** one sentence on what the user gets, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Asking permission:** follow "Explain permission requests in plain English" in `CLAUDE.md`.
