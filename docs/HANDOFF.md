@@ -4,9 +4,8 @@
 
 ## State
 
-- **Local `main` is at `c2da4bcd`, 10 commits ahead of `origin/main`, and not pushed.** It holds phase 3b, the sandbox fix and the new `CLAUDE.md` sections. The user pushes it, or tells you to. `phase-3b` points at the same commit.
-- **`origin/main` is at `3d2dd0f7`** (the six small fixes), and CI run 40494828677 passed for it.
-- **After the push, both Render services need a redeploy,** because `server/src/db.js` changed. The user does that.
+- **Phase 3b is pushed:** `origin/main` is at `c2da4bcd`, with phase 3b, the sandbox fix and the new `CLAUDE.md` sections. Its CI result hasn't been checked here. Only this handoff note is committed on top, and it's not pushed.
+- **Both Render services need a redeploy,** because `server/src/db.js` changed. The user does that.
 - **Tests:** 407 app tests and 301 server tests pass, and `CI=true npm run build` is clean. Run the app suite with `--maxWorkers=2`, because the machine is heavily loaded.
 - **Not checked on a device:** the iOS build, haptics, and how pull-to-refresh feels in WKWebView (rubber band, the tap at the threshold). The sheets also haven't been tried with a real keyboard, enlarged text or VoiceOver.
 - **The `small-fixes` branch is merged.** It can be deleted, but ask first.
@@ -56,14 +55,14 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. That means a d
 | 1 | Design directions: Afterglow chosen, with Signal's timeline on Home | Done |
 | 2 | The design system, and every screen rebuilt on it | Done |
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done, pushed |
-| 3b | Loading skeletons and pull-to-refresh | Done, on local `main`, not pushed |
+| 3b | Loading skeletons and pull-to-refresh | Done, pushed |
 | 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now | Planned |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
 ## What comes next
 
-1. **Push `main`** when the user says so (`git push origin main`). Then watch CI in the background with `gh`, matching the full SHA, and report the result.
+1. **Check CI for `c2da4bcd`** with `gh`, matching the full SHA, and report the result.
 2. **iOS check:** run `npm run build:ios`, then use the Simulator to look at the sheets, transitions, skeletons and pull-to-refresh, plus the haptics wiring. `xcodebuild`, `xcrun` and `npx cap` are excluded from the sandbox for this. Open the Simulator panel (`attach`) before building.
 3. **Retake the README screenshots** (`docs/screenshots/*.jpg`). They still show the look from before Afterglow.
 4. **Phase 4**, only when the user asks.
