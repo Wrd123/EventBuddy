@@ -33,3 +33,66 @@ Phone app for planning group events: schedule, group chat, split costs, live loc
 ## Working style
 - The user wants whole features implemented, not TODOs left for them.
 - For a big feature: plan it in plan mode (Opus), build it (Sonnet), then ask the `reviewer` subagent to check the diff before committing.
+
+## Autonomous development boundaries
+These rules guide behavior. `.claude/settings.json` (permissions and the sandbox) is what enforces them.
+
+Go ahead without asking: edit project files, run local tests and builds, install dependencies the manifests declare into the project, and make local commits on task branches.
+
+Never:
+- Use `sudo`, `su`, `doas`, or ask for administrator rights.
+- Format disks or change the operating system's security protections.
+- Read, print, upload or commit credentials or production secrets.
+- Get around a restriction with another language, tool or subprocess.
+- Change permission rules, sandbox settings or these boundaries without the user's approval.
+
+Ask the user first before you:
+- Delete directories recursively or throw away uncommitted work.
+- Rewrite git history, force-push, push, publish, deploy or merge a PR.
+- Install global software or change files outside the project and the session's temp directories.
+- Change ownership, broad file permissions, shell profiles, launch agents or system settings.
+- Reset a database, delete persistent data or Docker volumes, or run a destructive migration.
+- Stop or restart a running service, or edit files it watches, when that could erase in-memory data. For EventBuddy, editing anything in `server/` restarts the dev API (`node --watch`) and wipes the local demo world.
+
+Before a destructive action, name the exact target and how to recover it. Run experiments against throwaway test databases in a separate checkout.
+
+## Explain permission requests in plain English
+Keep routine work that is already authorized moving without asking again.
+
+Before asking to do a restricted action, explain:
+1. What you want to do, in everyday language.
+2. Why the task needs it.
+3. Exactly which project, files, service, account or data it affects.
+4. Whether it could delete work, expose information, publish something, spend money or interrupt a running app.
+5. Whether it can be undone, and what recovering would involve.
+6. A safer alternative, when there is a practical one.
+
+Keep it short and specific. Put any technical commands after the plain-English explanation, so the user can decide without having to read the command.
+
+Use this format:
+
+**Action:** What you want to do.
+**Reason:** Why it helps.
+**Impact:** What changes, and what could be lost or exposed.
+**Recovery:** How to undo it, or a clear statement that it can't be undone.
+**Alternative:** A safer option, if there is one.
+**Permission:** One clear question that names the action and its target.
+
+For example:
+
+**Action:** Restart EventBuddy's local backend, the program that saves and loads your events.
+**Reason:** It needs to load the updated server code.
+**Impact:** This server keeps the demo data in memory only, so restarting it erases the events you added this session.
+**Recovery:** Those events can't be brought back unless we save a copy first.
+**Alternative:** Start a separate test server and leave your current one running.
+**Permission:** May I restart your current EventBuddy backend, or should I use a separate test server?
+
+Don't:
+- Ask vague questions such as "Proceed?" or "Allow access?"
+- Call an action safe without checking what it actually targets.
+- Hide a destructive action inside "cleanup", "setup" or "fix permissions".
+- Treat approval for one action as permission for unrelated later actions.
+- Treat silence as approval.
+- Change security settings, or get around a blocked command, to finish the task.
+
+If a permission rule blocks an action, explain the restriction and offer an alternative that is allowed. A "yes" in the conversation doesn't authorize changing the permission rules themselves.
