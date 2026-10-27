@@ -52,6 +52,9 @@ module.exports = {
   // be listed, comma-separated
   clientOrigin: (process.env.CLIENT_ORIGIN || 'http://localhost:3000').split(',').map((o) => o.trim()).filter(Boolean),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  // Off unless set: a page showing a visitor the addresses the API sees for
+  // their own request, to set TRUST_PROXY from fact. Turn it off afterwards.
+  showRequestIp: process.env.SHOW_REQUEST_IP === 'true',
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS) || 10,
   // Local events for Discover; unset means Discover explains it's not set up
   ticketmasterApiKey: process.env.TICKETMASTER_API_KEY || '',

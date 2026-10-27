@@ -8,10 +8,13 @@ const discoverRoutes = require('./routes/discover');
 const chatRoutes = require('./routes/chats');
 const mapRoutes = require('./routes/map');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
-const { clientOrigin, trustProxy, demoMode } = require('./config');
+const config = require('./config');
 
-// Builds the Express app without starting it, so tests can call it directly
-const createApp = () => {
+const { clientOrigin, demoMode } = config;
+
+// Builds the Express app without starting it, so tests can call it directly.
+// Tests can also set the proxy settings, which otherwise come from config.
+const createApp = ({ trustProxy = config.trustProxy, showRequestIp = config.showRequestIp } = {}) => {
   const app = express();
   app.set('trust proxy', trustProxy);
 
@@ -27,6 +30,16 @@ const createApp = () => {
 
   // demo: whether the one-tap demo sign-in is available
   app.get('/api/health', (req, res) => res.json({ status: 'ok', demo: demoMode }));
+  // Only the caller's own addresses: what reached the API, and which one the
+  // current TRUST_PROXY picks as theirs
+  if (showRequestIp) {
+    app.get('/api/debug/request-ip', (req, res) => res.json({
+      ip: req.ip,
+      forwardedFor: req.get('X-Forwarded-For') || null,
+      connectedFrom: req.socket.remoteAddress,
+      trustProxy
+    }));
+  }
   app.use('/api/auth', authRoutes);
   app.use('/api/events', eventRoutes);
   app.use('/api/invites', inviteRoutes);

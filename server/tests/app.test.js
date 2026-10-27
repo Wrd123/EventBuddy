@@ -1,4 +1,6 @@
 const { useTestDatabase, api, registerUser } = require('./helpers');
+const request = require('supertest');
+const { createApp } = require('../src/app');
 const assert = require('node:assert/strict');
 const { describe, it } = require('node:test');
 
@@ -30,5 +32,24 @@ describe('request bodies', () => {
   it('still answers malformed JSON with 400', async () => {
     const res = await api().post('/api/auth/login').set('Content-Type', 'application/json').send('{not json').expect(400);
     assert.equal(res.body.message, 'Invalid JSON.');
+  });
+});
+
+describe('the request address check', () => {
+  it("isn't there unless it's switched on", async () => {
+    await api().get('/api/debug/request-ip').expect(404);
+  });
+
+  it("shows the caller's address chain and the one the proxy setting picks", async () => {
+    const app = createApp({ trustProxy: 2, showRequestIp: true });
+
+    const res = await request(app).get('/api/debug/request-ip').set('X-Forwarded-For', '203.0.113.7, 198.51.100.2').expect(200);
+
+    // Two trusted hops: the connection and the proxy before it, so the
+    // address before those is the visitor's
+    assert.equal(res.body.ip, '203.0.113.7');
+    assert.equal(res.body.forwardedFor, '203.0.113.7, 198.51.100.2');
+    assert.equal(res.body.trustProxy, 2);
+    assert.ok(res.body.connectedFrom);
   });
 });
