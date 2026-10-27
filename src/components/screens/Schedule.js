@@ -5,6 +5,7 @@ import Header from '../common/Header';
 import { Button, Sheet, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useAppContext } from '../../context/AppContext';
 import { eachDay, formatDay, defaultScheduleDay } from '../../utils/dates';
 import { formatTimeRange, sortSchedule, isGoing, validateScheduleItem } from '../../utils/schedule';
@@ -12,7 +13,8 @@ import { tap } from '../../services/haptics';
 
 const Schedule = () => {
   const { eventId } = useParams();
-  const { event, status, error } = useEvent(eventId);
+  const { event, status, error, refresh } = useEvent(eventId);
+  const { bind, indicator } = usePullToRefresh(refresh);
   // null until the user picks a tab; until then show the default day.
   // Derived rather than initial state, since the event may still be loading.
   const [chosenDay, setChosenDay] = useState(null);
@@ -42,18 +44,21 @@ const Schedule = () => {
         backTo={`/events/${eventId}`}
       />
 
-      <div className="p-4 flex-1 overflow-y-auto">
-        <DaySelector
-          days={days}
-          activeDay={activeDay}
-          setActiveDay={setChosenDay}
-        />
+      <div className="relative flex-1 overflow-hidden">
+        {indicator}
+        <div ref={bind} className="h-full overflow-y-auto overscroll-y-contain p-4">
+          <DaySelector
+            days={days}
+            activeDay={activeDay}
+            setActiveDay={setChosenDay}
+          />
 
-        <ScheduleItems event={event} items={items} onEdit={setEditing} />
+          <ScheduleItems event={event} items={items} onEdit={setEditing} />
 
-        <Button variant="outline" fullWidth className="mt-4" icon={<Plus size={16} />} onClick={() => setEditing('new')}>
-          Add to {formatDay(activeDay)}
-        </Button>
+          <Button variant="outline" fullWidth className="mt-4" icon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            Add to {formatDay(activeDay)}
+          </Button>
+        </div>
       </div>
 
       {editing && (

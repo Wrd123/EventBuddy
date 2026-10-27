@@ -7,6 +7,7 @@ import NotFound from './NotFound';
 import ExpenseForm from './ExpenseForm';
 import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
 import { usePolling } from '../../hooks/usePolling';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useAppContext } from '../../context/AppContext';
 import * as eventService from '../../services/eventService';
 import { computeBalances, settleUp } from '../../utils/ledger';
@@ -124,8 +125,9 @@ export const useLedger = (eventId) => {
 
 const Expenses = () => {
   const { eventId } = useParams();
-  const { event, status, error } = useEvent(eventId);
+  const { event, status, error, refresh } = useEvent(eventId);
   const ledger = useLedger(eventId);
+  const { bind, indicator } = usePullToRefresh(() => Promise.all([refresh(), ledger.reload({ rethrow: true })]));
   const { currentUser } = useAppContext();
   // null (no form), 'new', or the expense being edited
   const [editing, setEditing] = useState(null);
@@ -157,47 +159,50 @@ const Expenses = () => {
         backTo={`/events/${eventId}`}
       />
 
-      <div className="p-4 flex-1 overflow-y-auto space-y-4">
-        <Summary event={event} totalCents={totalCents} myBalance={myBalance} isOrganizer={isOrganizer} />
+      <div className="relative flex-1 overflow-hidden">
+        {indicator}
+        <div ref={bind} className="h-full overflow-y-auto overscroll-y-contain p-4 space-y-4">
+          <Summary event={event} totalCents={totalCents} myBalance={myBalance} isOrganizer={isOrganizer} />
 
-        <SettleUp
-          event={event}
-          settlements={settlements}
-          me={me}
-          handles={ledger.handles}
-          myHandles={currentUser?.paymentHandles}
-          recordPayment={ledger.recordPayment}
-        />
+          <SettleUp
+            event={event}
+            settlements={settlements}
+            me={me}
+            handles={ledger.handles}
+            myHandles={currentUser?.paymentHandles}
+            recordPayment={ledger.recordPayment}
+          />
 
-        {ledger.expenses.length > 0 && <Balances balances={balances} me={me} />}
+          {ledger.expenses.length > 0 && <Balances balances={balances} me={me} />}
 
-        <section>
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-medium">Expenses</h3>
-            <button onClick={() => setEditing('new')} className="tap text-accent-soft text-sm font-medium flex items-center">
-              <Plus size={16} className="mr-1" />
-              Add expense
-            </button>
-          </div>
-          {ledger.expenses.length === 0 ? (
-            <p className="text-sm text-muted">No expenses yet. Add the first one to start splitting costs.</p>
-          ) : (
-            <div className="flex flex-col space-y-3">
-              {ledger.expenses.map(expense => (
-                <ExpenseCard
-                  key={expense._id}
-                  expense={expense}
-                  me={me}
-                  onEdit={canChange(expense) ? () => setEditing(expense) : null}
-                />
-              ))}
+          <section>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-medium">Expenses</h3>
+              <button onClick={() => setEditing('new')} className="tap text-accent-soft text-sm font-medium flex items-center">
+                <Plus size={16} className="mr-1" />
+                Add expense
+              </button>
             </div>
-          )}
-        </section>
+            {ledger.expenses.length === 0 ? (
+              <p className="text-sm text-muted">No expenses yet. Add the first one to start splitting costs.</p>
+            ) : (
+              <div className="flex flex-col space-y-3">
+                {ledger.expenses.map(expense => (
+                  <ExpenseCard
+                    key={expense._id}
+                    expense={expense}
+                    me={me}
+                    onEdit={canChange(expense) ? () => setEditing(expense) : null}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
-        {ledger.payments.length > 0 && (
-          <Payments event={event} payments={ledger.payments} canChange={canChange} onDeleted={ledger.reload} />
-        )}
+          {ledger.payments.length > 0 && (
+            <Payments event={event} payments={ledger.payments} canChange={canChange} onDeleted={ledger.reload} />
+          )}
+        </div>
       </div>
 
       {editing && (

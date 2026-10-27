@@ -5,6 +5,7 @@ import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
 import { Button, CitySearch, LocalEventCard, LocalEventSheet, PlaceSheet, Skeleton, SkeletonScreen } from '../common';
 import { usePlace } from '../../hooks/usePlace';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 
 const CATEGORIES = [
   ['all', 'All'],
@@ -25,6 +26,7 @@ const Discover = () => {
   const [choosingPlace, setChoosingPlace] = useState(false);
   const [openEvent, setOpenEvent] = useState(null);
   const nearby = useNearbyEvents(place, { radius, category });
+  const { bind, indicator } = usePullToRefresh(nearby.refresh);
 
   const needle = filter.trim().toLowerCase();
   const shown = needle
@@ -35,53 +37,56 @@ const Discover = () => {
     <div className="flex flex-col h-full relative">
       <Header title="Discover" />
 
-      <div className={`flex-1 overflow-y-auto px-4 ${TAB_BAR_CLEARANCE}`}>
-        {!place ? (
-          <FirstRun locationError={locationError} />
-        ) : (
-          <>
-            <div className="flex items-center justify-between card rounded-full px-4 py-2.5 mb-3">
-              <span className="flex items-center font-semibold min-w-0">
-                <MapPin size={20} className="mr-2 text-accent-soft shrink-0" aria-hidden="true" />
-                <span className="truncate">Near {place.label}</span>
-              </span>
-              <button onClick={() => setChoosingPlace(true)} className="tap text-sm font-semibold text-accent-soft shrink-0">
-                Change
-              </button>
-            </div>
-
-            <ChipRow label="Category">
-              {CATEGORIES.map(([value, label]) => (
-                <Chip key={value} active={category === value} onClick={() => setCategory(value)}>{label}</Chip>
-              ))}
-            </ChipRow>
-            <ChipRow label="Distance">
-              {RADII.map(r => (
-                <Chip key={r} active={radius === r} onClick={() => setRadius(r)}>{r} mi</Chip>
-              ))}
-            </ChipRow>
-
-            {nearby.events.length > 0 && (
-              <div className="relative mb-3">
-                <Search size={18} className="absolute left-3.5 top-3 text-faint" aria-hidden="true" />
-                <input
-                  type="search"
-                  aria-label="Filter these events"
-                  className="field rounded-full pl-10"
-                  placeholder="Filter by artist, team or venue"
-                  value={filter}
-                  onChange={e => setFilter(e.target.value)}
-                />
+      <div className="relative flex-1 overflow-hidden">
+        {indicator}
+        <div ref={bind} className={`h-full overflow-y-auto overscroll-y-contain px-4 ${TAB_BAR_CLEARANCE}`}>
+          {!place ? (
+            <FirstRun locationError={locationError} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between card rounded-full px-4 py-2.5 mb-3">
+                <span className="flex items-center font-semibold min-w-0">
+                  <MapPin size={20} className="mr-2 text-accent-soft shrink-0" aria-hidden="true" />
+                  <span className="truncate">Near {place.label}</span>
+                </span>
+                <button onClick={() => setChoosingPlace(true)} className="tap text-sm font-semibold text-accent-soft shrink-0">
+                  Change
+                </button>
               </div>
-            )}
 
-            <Results nearby={nearby} shown={shown} radius={radius} filter={needle} onOpen={setOpenEvent} onWiden={() => setRadius(r => RADII[RADII.indexOf(r) + 1] || r)} />
+              <ChipRow label="Category">
+                {CATEGORIES.map(([value, label]) => (
+                  <Chip key={value} active={category === value} onClick={() => setCategory(value)}>{label}</Chip>
+                ))}
+              </ChipRow>
+              <ChipRow label="Distance">
+                {RADII.map(r => (
+                  <Chip key={r} active={radius === r} onClick={() => setRadius(r)}>{r} mi</Chip>
+                ))}
+              </ChipRow>
 
-            {nearby.status === 'ready' && nearby.events.length > 0 && (
-              <p className="text-xs text-faint text-center mt-4">Event data from Ticketmaster</p>
-            )}
-          </>
-        )}
+              {nearby.events.length > 0 && (
+                <div className="relative mb-3">
+                  <Search size={18} className="absolute left-3.5 top-3 text-faint" aria-hidden="true" />
+                  <input
+                    type="search"
+                    aria-label="Filter these events"
+                    className="field rounded-full pl-10"
+                    placeholder="Filter by artist, team or venue"
+                    value={filter}
+                    onChange={e => setFilter(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <Results nearby={nearby} shown={shown} radius={radius} filter={needle} onOpen={setOpenEvent} onWiden={() => setRadius(r => RADII[RADII.indexOf(r) + 1] || r)} />
+
+              {nearby.status === 'ready' && nearby.events.length > 0 && (
+                <p className="text-xs text-faint text-center mt-4">Event data from Ticketmaster</p>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {choosingPlace && <PlaceSheet onClose={() => setChoosingPlace(false)} />}

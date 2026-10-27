@@ -9,6 +9,7 @@ import MemberSheet from '../common/MemberSheet';
 import { useAppContext } from '../../context/AppContext';
 import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
 import { usePolling } from '../../hooks/usePolling';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { createFreshness } from '../../utils/freshness';
 import { formatDateRange, formatDay, getEventStatus, defaultScheduleDay, daysUntil } from '../../utils/dates';
 import { formatTimeRange, sortSchedule } from '../../utils/schedule';
@@ -44,7 +45,8 @@ const useEventSummary = (eventId) => {
   }, [load]);
   usePolling(load, EVENT_POLL_MS);
 
-  return summary.eventId === eventId ? summary : { eventId, unread: 0, ledger: null };
+  // refresh is for a pull to refresh; load already keeps quiet when a check fails
+  return { ...(summary.eventId === eventId ? summary : { eventId, unread: 0, ledger: null }), refresh: load };
 };
 
 // "You owe $12.50" style hint for the Expenses button, or '' if there's
@@ -58,9 +60,10 @@ const balanceHint = (event, ledger, me) => {
 
 const EventDetails = () => {
   const { eventId } = useParams();
-  const { event, status, error } = useEvent(eventId);
+  const { event, status, error, refresh } = useEvent(eventId);
   const { currentUser } = useAppContext();
   const summary = useEventSummary(eventId);
+  const { bind, indicator } = usePullToRefresh(() => Promise.all([refresh(), summary.refresh()]));
   // Create Event sends new organizers here with the invite sheet open
   const location = useLocation();
   const [showInvite, setShowInvite] = useState(Boolean(location.state?.showInvite));
@@ -97,28 +100,31 @@ const EventDetails = () => {
         )}
       />
 
-      <div className="relative flex-1 overflow-y-auto pb-16">
-        <EventHero event={event} />
-        {event.description && (
-          <p className="px-5 pt-4 text-fg/85 leading-relaxed whitespace-pre-wrap break-words">{event.description}</p>
-        )}
-        <EventActions
-          eventId={eventId}
-          unread={summary.unread}
-          balance={balanceHint(event, summary.ledger, currentUser?._id)}
-        />
-        {event.ticketUrl && (
-          // Events planned from Discover keep their ticket page
-          <a
-            href={event.ticketUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="card mx-4 mt-3 flex items-center justify-center h-12 rounded-full text-fg font-semibold transition-transform active:scale-[0.98]"
-          >
-            Get tickets <ExternalLink size={16} className="ml-2" aria-hidden="true" />
-          </a>
-        )}
-        <EventContent event={event} onInvite={() => setShowInvite(true)} onMember={setOpenMember} />
+      <div className="relative flex-1 overflow-hidden">
+        {indicator}
+        <div ref={bind} className="relative h-full overflow-y-auto overscroll-y-contain pb-16">
+          <EventHero event={event} />
+          {event.description && (
+            <p className="px-5 pt-4 text-fg/85 leading-relaxed whitespace-pre-wrap break-words">{event.description}</p>
+          )}
+          <EventActions
+            eventId={eventId}
+            unread={summary.unread}
+            balance={balanceHint(event, summary.ledger, currentUser?._id)}
+          />
+          {event.ticketUrl && (
+            // Events planned from Discover keep their ticket page
+            <a
+              href={event.ticketUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="card mx-4 mt-3 flex items-center justify-center h-12 rounded-full text-fg font-semibold transition-transform active:scale-[0.98]"
+            >
+              Get tickets <ExternalLink size={16} className="ml-2" aria-hidden="true" />
+            </a>
+          )}
+          <EventContent event={event} onInvite={() => setShowInvite(true)} onMember={setOpenMember} />
+        </div>
       </div>
 
       {showInvite && (

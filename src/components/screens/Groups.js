@@ -5,6 +5,7 @@ import Header from '../common/Header';
 import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
 import { Button, EventCover, Skeleton, SkeletonScreen } from '../common';
 import { useChats } from '../../hooks/useChats';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useAppContext } from '../../context/AppContext';
 import { getEventStatus } from '../../utils/dates';
 import { shortTime } from '../../utils/chat';
@@ -12,7 +13,8 @@ import { shortTime } from '../../utils/chat';
 // Every event you plan or join is a group with its own chat. Upcoming and
 // ongoing events first, past ones below, each by latest activity.
 const Groups = () => {
-  const { status, chats, error, reload } = useChats();
+  const { status, chats, error, reload, refresh } = useChats();
+  const { bind, indicator } = usePullToRefresh(refresh);
 
   if (status === 'loading') return <GroupsSkeleton />;
 
@@ -23,26 +25,29 @@ const Groups = () => {
     <div className="flex flex-col h-full relative">
       <Header title="Chats" />
 
-      <div className={`flex-1 overflow-y-auto px-4 ${TAB_BAR_CLEARANCE}`}>
-        {status === 'error' ? (
-          <div className="card p-5 text-center">
-            <p className="font-semibold mb-1">Couldn't load your groups</p>
-            <p className="text-sm text-muted mb-3">{error}</p>
-            <Button variant="secondary" onClick={reload} className="mx-auto">Try again</Button>
-          </div>
-        ) : chats.length === 0 ? (
-          <NoGroups />
-        ) : (
-          <>
-            <ChatList chats={current} />
-            {past.length > 0 && (
-              <>
-                <h2 className="text-sm font-semibold text-muted mt-6 mb-2">Past events</h2>
-                <ChatList chats={past} />
-              </>
-            )}
-          </>
-        )}
+      <div className="relative flex-1 overflow-hidden">
+        {indicator}
+        <div ref={bind} className={`h-full overflow-y-auto overscroll-y-contain px-4 ${TAB_BAR_CLEARANCE}`}>
+          {status === 'error' ? (
+            <div className="card p-5 text-center">
+              <p className="font-semibold mb-1">Couldn't load your groups</p>
+              <p className="text-sm text-muted mb-3">{error}</p>
+              <Button variant="secondary" onClick={reload} className="mx-auto">Try again</Button>
+            </div>
+          ) : chats.length === 0 ? (
+            <NoGroups />
+          ) : (
+            <>
+              <ChatList chats={current} />
+              {past.length > 0 && (
+                <>
+                  <h2 className="text-sm font-semibold text-muted mt-6 mb-2">Past events</h2>
+                  <ChatList chats={past} />
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       <Footer />

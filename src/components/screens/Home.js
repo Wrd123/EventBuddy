@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { usePlace } from '../../hooks/usePlace';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 import Header from '../common/Header';
 import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
 import { AvatarStack, EventCard, EventCover, LocalEventSheet, PhotoBackdrop, PlaceSheet, Skeleton, SkeletonScreen, SuggestedEventCard } from '../common';
@@ -39,11 +40,16 @@ const headline = (nextUp, today) => {
 // everything after it, each marked with how far off it is. The screen is
 // lit by that first event's photo.
 const Home = () => {
-  const { events, eventsStatus, reloadEvents, currentUser } = useAppContext();
+  const { events, eventsStatus, reloadEvents, refreshEvents, currentUser } = useAppContext();
   const navigate = useNavigate();
   const openEvent = (event) => navigate(`/events/${event._id}`);
   const { place, locationError } = usePlace();
   const nearby = useNearbyEvents(place);
+  // The pull reports on your events. Suggestions are a bonus (Home stays
+  // quiet when they can't load), so they don't fail the pull.
+  const { bind, indicator } = usePullToRefresh(() =>
+    Promise.all([refreshEvents(), nearby.refresh().catch(() => {})])
+  );
   const [choosingPlace, setChoosingPlace] = useState(false);
   const [openSuggestion, setOpenSuggestion] = useState(null);
 
@@ -64,32 +70,35 @@ const Home = () => {
     <div className="flex flex-col h-full relative">
       <PhotoBackdrop event={nextUp?.event} />
 
-      <div className={`relative flex-1 overflow-y-auto ${TAB_BAR_CLEARANCE}`}>
-        <Header title="EventBuddy" />
-        <div className="px-4">
-          <section className="pt-1 pb-5">
-            <p className="text-[15px] text-fg/70">{dayPart()}</p>
-            <h2 className="text-[30px] leading-[1.08] font-bold tracking-[-0.035em] mt-1">
-              {firstName ? `Hey ${firstName}` : 'Hey there'}
-              {eventsStatus === 'ready' ? `, ${headline(nextUp, today)}` : '.'}
-            </h2>
-          </section>
+      <div className="relative flex-1 overflow-hidden">
+        {indicator}
+        <div ref={bind} className={`relative h-full overflow-y-auto overscroll-y-contain ${TAB_BAR_CLEARANCE}`}>
+          <Header title="EventBuddy" />
+          <div className="px-4">
+            <section className="pt-1 pb-5">
+              <p className="text-[15px] text-fg/70">{dayPart()}</p>
+              <h2 className="text-[30px] leading-[1.08] font-bold tracking-[-0.035em] mt-1">
+                {firstName ? `Hey ${firstName}` : 'Hey there'}
+                {eventsStatus === 'ready' ? `, ${headline(nextUp, today)}` : '.'}
+              </h2>
+            </section>
 
-          {nextUp ? (
-            <Timeline nextUp={nextUp} later={laterEvents} today={today} onOpen={openEvent} />
-          ) : (
-            <NoEvents status={eventsStatus} onRetry={reloadEvents} />
-          )}
+            {nextUp ? (
+              <Timeline nextUp={nextUp} later={laterEvents} today={today} onOpen={openEvent} />
+            ) : (
+              <NoEvents status={eventsStatus} onRetry={reloadEvents} />
+            )}
 
-          {pastEvents.length > 0 && <PastEvents items={pastEvents} onOpen={openEvent} />}
+            {pastEvents.length > 0 && <PastEvents items={pastEvents} onOpen={openEvent} />}
 
-          <Suggestions
-            place={place}
-            locating={!place && !locationError}
-            nearby={nearby}
-            onChoosePlace={() => setChoosingPlace(true)}
-            onOpen={setOpenSuggestion}
-          />
+            <Suggestions
+              place={place}
+              locating={!place && !locationError}
+              nearby={nearby}
+              onChoosePlace={() => setChoosingPlace(true)}
+              onOpen={setOpenSuggestion}
+            />
+          </div>
         </div>
       </div>
 
