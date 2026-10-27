@@ -93,6 +93,11 @@ describe('Map', () => {
     expect(within(layers).getByRole('button', { name: 'Nearby' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('button', { name: 'Venue: Fox Theatre' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Your event: Summer Music Festival' })).toBeInTheDocument();
+    // The count goes with the pins it counts
+    expect(screen.queryByText('3 nearby events at 2 venues')).not.toBeInTheDocument();
+
+    fireEvent.click(within(layers).getByRole('button', { name: 'Nearby' }));
+    expect(screen.getByText('3 nearby events at 2 venues')).toBeInTheDocument();
 
     fireEvent.click(within(layers).getByRole('button', { name: 'Your events' }));
     expect(screen.queryByRole('button', { name: /^Your event:/ })).not.toBeInTheDocument();
@@ -124,6 +129,17 @@ describe('Map', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to Summer Music Festival' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Summer Music Festival' })).toBeInTheDocument();
+    await settle();
+  });
+
+  it("opened from an event, drops what's on nearby when that layer is off", async () => {
+    renderAt('/events/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
+    expect(await screen.findByText('3 other events nearby during the event, at 2 venues')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+    expect(screen.queryByText(/nearby during the event/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Location sharing opens Thu, Apr 15/)).toBeInTheDocument();
     await settle();
   });
 });

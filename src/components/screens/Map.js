@@ -213,7 +213,7 @@ const Map = () => {
               event={focusEvent}
               status={focusStatus}
               meetup={live.meetup}
-              nearby={nearby}
+              nearby={show.nearby && nearby}
               venueCount={venues.length}
               liveBar={liveEvent && (
                 <LiveBar
@@ -246,7 +246,7 @@ const Map = () => {
               mappedCount={mapped.length}
               unmapped={unmapped}
               place={place}
-              nearby={nearby}
+              nearby={show.nearby && nearby}
               venueCount={venues.length}
               onChoosePlace={() => setChoosingPlace(true)}
             />
@@ -310,6 +310,8 @@ const VenuePanel = ({ venue, onOpen }) => (
   </div>
 );
 
+// The nearby lines take `nearby` as false while that layer is off: with its
+// pins hidden, a count or a setup note about them would describe nothing.
 const Summary = ({ mine, mappedCount, unmapped, place, nearby, venueCount, onChoosePlace }) => (
   <div className="space-y-2 text-sm">
     {mine.status === 'error' ? (
@@ -325,7 +327,7 @@ const Summary = ({ mine, mappedCount, unmapped, place, nearby, venueCount, onCho
       </Line>
     )}
 
-    {!place ? (
+    {!nearby ? null : !place ? (
       <div className="flex items-center justify-between">
         <span className="text-muted">See concerts, games and shows nearby.</span>
         <button onClick={onChoosePlace} className="tap font-semibold text-accent-soft shrink-0 ml-2">Choose a location</button>
@@ -380,7 +382,7 @@ const EventPlan = ({ event, status, meetup, nearby, venueCount, liveBar, onPlanM
         </>
       )}
       {status === 'past' && <Line dotClass="bg-faint">This event is over, so location sharing has ended.</Line>}
-      {status !== 'past' && hasPosition(event) && (
+      {nearby && status !== 'past' && hasPosition(event) && (
         <Line dotClass="bg-[#a78bfa]">
           {nearby.status === 'error'
             ? nearby.error
