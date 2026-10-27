@@ -20,6 +20,9 @@ import { PULL_THRESHOLD, pullDistance, pullProgress } from '../utils/pull';
 //   the strip above it empty for the ring to sit in. Inside the container, the
 //   ring would be dragged down along with the content.
 // - onRefresh may return a promise. The latest one is always used.
+// - messageTop (px) moves the failure message down, for a screen whose header
+//   floats over the top of the list (the event page), so it doesn't cover the
+//   header's buttons.
 
 // Where the content rests while the refresh runs
 const HOLD_DISTANCE = 56;
@@ -33,7 +36,7 @@ const RING_SIZE = 32;
 // How much of the ring is drawn while it spins
 const SPIN_ARC = 0.7;
 
-export default function usePullToRefresh(onRefresh) {
+export default function usePullToRefresh(onRefresh, { messageTop = 0 } = {}) {
   const onRefreshRef = useRef(onRefresh);
   onRefreshRef.current = onRefresh;
 
@@ -191,7 +194,7 @@ export default function usePullToRefresh(onRefresh) {
   }, []);
 
   const indicator = (
-    <PullIndicator ringRef={ringRef} arcRef={arcRef} refreshing={refreshing} failed={failed} spin={!prefersReducedMotion()} />
+    <PullIndicator ringRef={ringRef} arcRef={arcRef} refreshing={refreshing} failed={failed} spin={!prefersReducedMotion()} messageTop={messageTop} />
   );
 
   return { bind, indicator };

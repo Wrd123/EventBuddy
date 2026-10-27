@@ -18,6 +18,9 @@ import { formatCents } from '../../utils/money';
 import * as chatService from '../../services/chatService';
 import * as eventService from '../../services/eventService';
 
+// The header floating over the photo: its padding plus a 40px button
+const FLOATING_HEADER_HEIGHT = 68;
+
 // What's waiting behind the Chat and Expenses buttons: unread messages and
 // your balance in cents (null until known, or if there are no expenses).
 // Checked as often as the event itself, so a friend paying you back shows
@@ -63,7 +66,8 @@ const EventDetails = () => {
   const { event, status, error, refresh } = useEvent(eventId);
   const { currentUser } = useAppContext();
   const summary = useEventSummary(eventId);
-  const { bind, indicator } = usePullToRefresh(() => Promise.all([refresh(), summary.refresh()]));
+  // A failure message goes below the floating header, clear of its buttons
+  const { bind, indicator } = usePullToRefresh(() => Promise.all([refresh(), summary.refresh()]), { messageTop: FLOATING_HEADER_HEIGHT });
   // Create Event sends new organizers here with the invite sheet open
   const location = useLocation();
   const [showInvite, setShowInvite] = useState(Boolean(location.state?.showInvite));

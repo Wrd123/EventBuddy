@@ -5,8 +5,8 @@ import * as haptics from '../services/haptics';
 
 jest.mock('../services/haptics', () => ({ tap: jest.fn(), warning: jest.fn(), success: jest.fn() }));
 
-const Harness = ({ onRefresh }) => {
-  const { bind, indicator } = usePullToRefresh(onRefresh);
+const Harness = ({ onRefresh, options }) => {
+  const { bind, indicator } = usePullToRefresh(onRefresh, options);
   return (
     <div style={{ position: 'relative' }}>
       {indicator}
@@ -122,6 +122,13 @@ describe('usePullToRefresh', () => {
 
     await advance(2600);
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('moves the failure message below a floating header', async () => {
+    render(<Harness onRefresh={() => Promise.reject(new Error('offline'))} options={{ messageTop: 68 }} />);
+    pull(screen.getByTestId('scroller'), { dy: 160 });
+    await settle();
+    expect(screen.getByRole('status')).toHaveStyle({ marginTop: '76px' });
   });
 
   it('ignores a second pull while a refresh is running', async () => {

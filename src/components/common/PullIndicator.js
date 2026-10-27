@@ -9,7 +9,7 @@ export const RING_CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 // fills the ring straight on the DOM through ringRef and arcRef: re-rendering
 // the whole screen on every touchmove would be wasteful. React only decides
 // whether it spins and which message shows.
-const PullIndicator = ({ ringRef, arcRef, refreshing, failed, spin }) => (
+const PullIndicator = ({ ringRef, arcRef, refreshing, failed, spin, messageTop = 0 }) => (
   <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center">
     <div
       ref={ringRef}
@@ -45,7 +45,7 @@ const PullIndicator = ({ ringRef, arcRef, refreshing, failed, spin }) => (
       </span>
     )}
     {failed && (
-      <p role="status" className="mt-2 rounded-full border border-line bg-raised px-3 py-1.5 text-sm text-fg shadow-lg">
+      <p role="status" style={{ marginTop: 8 + messageTop }} className="rounded-full border border-line bg-raised px-3 py-1.5 text-sm text-fg shadow-lg">
         Couldn't refresh. Check your connection.
       </p>
     )}
