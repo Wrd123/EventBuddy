@@ -69,9 +69,8 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 
 ## What comes next
 
-1. **The README screenshots.** They still show the look from before Afterglow. This was in progress as this note was written.
-2. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics and the Profile password form. `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox. Open the Simulator panel (`attach`) before building.
-3. **Phase 4**, only when the user asks. WebSockets need their own security pass: authorize on connect and on every subscription, and drop a socket when its user is removed or its session version changes.
+1. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics and the Profile password form. `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox. Open the Simulator panel (`attach`) before building.
+2. **Phase 4**, only when the user asks. WebSockets need their own security pass: authorize on connect and on every subscription, and drop a socket when its user is removed or its session version changes.
 
 **Later:**
 - Optimistic creates for expenses and schedule items, once there's a server `clientId` for both.
