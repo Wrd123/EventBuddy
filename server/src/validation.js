@@ -7,7 +7,9 @@ const { MAX_CENTS } = require('./models/Expense');
 
 const MAX_NAME_LENGTH = 60;
 const MAX_ACTIVITY_LENGTH = 80;
-const MIN_PASSWORD_LENGTH = 6;
+const COMMON_PASSWORDS = require('./commonPasswords');
+
+const MIN_PASSWORD_LENGTH = 8;
 // bcrypt only uses the first 72 bytes of a password; longer ones would
 // silently match on just their prefix
 const MAX_PASSWORD_BYTES = 72;
@@ -177,16 +179,28 @@ const cleanPaymentHandles = (input) => {
   return { handles };
 };
 
+// A new password, for signing up or changing it. Length matters most, so
+// there's no rule about mixing in digits or symbols; long passphrases are
+// welcome. account: { email, username }, which a password mustn't just be.
+const validatePassword = (password, { email = '', username = '' } = {}) => {
+  if (!password || password.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+  }
+  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) return 'Password is too long.';
+  const lower = password.toLowerCase();
+  if (COMMON_PASSWORDS.has(lower)) return 'That password is too common. Please choose another.';
+  if (lower === email.toLowerCase() || lower === username.toLowerCase() || lower === email.split('@')[0].toLowerCase()) {
+    return "Your password can't be your email or username.";
+  }
+  return '';
+};
+
 const validateRegistration = ({ email, username, password }) => {
   if (!email || !EMAIL.test(email)) return 'Please enter a valid email address.';
   if (!username || !USERNAME.test(username)) {
     return 'Username must be 3-30 letters, numbers, dots or underscores.';
   }
-  if (!password || password.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
-  }
-  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) return 'Password is too long.';
-  return '';
+  return validatePassword(password, { email, username });
 };
 
 // Trimmed string, or '' for anything that isn't a string
@@ -203,6 +217,7 @@ module.exports = {
   validatePayment,
   isMember,
   cleanPaymentHandles,
+  validatePassword,
   validateRegistration,
   text
 };

@@ -14,6 +14,13 @@ const userSchema = new mongoose.Schema(
     // share an event with them (see GET /api/events/:id/payment-handles).
     // Set on accounts in a private demo world (see seed/demoData.js)
     demoWorld: { type: String, index: true },
+    // Goes up on logout and password change. Every login token carries the
+    // number it was issued with, and a token with an older one is refused,
+    // so ending a session ends it on the server, not just on the phone.
+    // A demo world rebuilt from its token after the server restarts empty
+    // starts over at 0, so a logged-out demo token works again then. Demo
+    // worlds hold only sample data and have no password, so that's accepted.
+    sessionVersion: { type: Number, default: 0 },
     paymentHandles: {
       venmo: { type: String, default: '' },
       cashapp: { type: String, default: '' },
@@ -34,7 +41,10 @@ userSchema.methods.checkPassword = function (password) {
 userSchema.set('toJSON', {
   transform: (doc, ret) => {
     delete ret.passwordHash;
+    // The app only needs to know it's a demo account (no password to change)
+    ret.isDemo = Boolean(ret.demoWorld);
     delete ret.demoWorld;
+    delete ret.sessionVersion;
     delete ret.__v;
     return ret;
   }

@@ -53,6 +53,27 @@ export const logout = () => {
   localStorage.removeItem(USER_KEY);
 };
 
+// Ends this login on the server, so the token stops working everywhere,
+// not just on this phone. Call before logout(), which forgets the token.
+// A 401 means it had ended already, which is what we wanted. Anything else
+// (offline, say) is thrown, so the person hears it didn't reach the server.
+export const endSession = async () => {
+  try {
+    await apiRequest('/auth/logout', { method: 'POST' });
+  } catch (err) {
+    if (err.status !== 401) throw err;
+  }
+};
+
+// { currentPassword, newPassword }. Every other login ends; the server sends
+// a new token for this one, kept only if this is still the login it was for.
+export const changePassword = async (passwords) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const data = await apiRequest('/auth/password', { method: 'POST', body: passwords, replacesToken: true });
+  if (localStorage.getItem(TOKEN_KEY) === token) saveSession(data);
+  return data;
+};
+
 // The cached user, for an instant start before the server answers.
 // Without a token the cached user is meaningless.
 export const getCurrentUser = () => {

@@ -84,6 +84,58 @@ describe('apiRequest', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
+  it('leaves a newer login alone when an older one is rejected', async () => {
+    const handler = jest.fn();
+    setUnauthorizedHandler(handler);
+    localStorage.setItem(TOKEN_KEY, 'old');
+    let answer;
+    global.fetch.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+
+    const request = apiRequest('/events');
+    // Meanwhile the password was changed, or someone else logged in
+    localStorage.setItem(TOKEN_KEY, 'new');
+    answer(respond(401, { message: 'Your session has expired.' }));
+
+    await expect(request).rejects.toThrow('Your session has expired.');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  describe('while a password change replaces the token', () => {
+    // The change is held open; a background read with the old token gets
+    // refused meanwhile, as when the change has landed but its answer hasn't
+    const raceAChange = async () => {
+      const handler = jest.fn();
+      setUnauthorizedHandler(handler);
+      localStorage.setItem(TOKEN_KEY, 'old');
+      let answerChange;
+      global.fetch
+        .mockReturnValueOnce(new Promise((resolve) => { answerChange = resolve; }))
+        .mockResolvedValueOnce(respond(401, { message: 'Your session has expired.' }));
+
+      const change = apiRequest('/auth/password', { method: 'POST', body: {}, replacesToken: true });
+      const read = apiRequest('/events');
+      return { handler, change, read, answerChange };
+    };
+
+    it("doesn't log out when the change works", async () => {
+      const { handler, change, read, answerChange } = await raceAChange();
+
+      answerChange(respond(200, { token: 'new', user: {} }));
+      await change;
+      await expect(read).rejects.toThrow('Your session has expired.');
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('logs out when the change fails, since the session really ended', async () => {
+      const { handler, change, read, answerChange } = await raceAChange();
+
+      answerChange(respond(400, { message: "Your current password isn't right." }));
+      await expect(change).rejects.toThrow();
+      await expect(read).rejects.toThrow('Your session has expired.');
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('does not treat a failed login as an expired session', async () => {
     const handler = jest.fn();
     setUnauthorizedHandler(handler);

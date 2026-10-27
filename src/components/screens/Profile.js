@@ -2,47 +2,65 @@ import React, { useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useSharing, endShareOnServer } from '../../context/SharingContext';
+import * as authService from '../../services/authService';
 import { untilText } from '../../utils/live';
+import { MIN_PASSWORD_LENGTH, newPasswordProblem } from '../../utils/password';
 import Header, { getInitials } from '../common/Header';
-import { Button } from '../common';
+import { Button, Field } from '../common';
 
-// Logging out ends any location share first, while the login token still
-// works. This phone stops tracking straight away either way. If the server
-// can't be told, logging out waits for a decision, since friends would
-// still see your last spot until the share runs out.
+// Logging out ends any location share first, then the login itself on the
+// server, both while the login token still works. This phone stops
+// tracking straight away either way. If the server can't be told, logging
+// out waits for a decision: friends would still see your last spot until
+// the share runs out, and the login would keep working until it expires.
 const useLogOut = () => {
   const { logout } = useAppContext();
   // unstopped: the share the server may still have, kept app-wide so the
   // warning is still here after leaving this screen
   const { share, setShare, unstopped, setUnstopped } = useSharing();
   const [busy, setBusy] = useState(false);
+  // The server couldn't be told to end the login
+  const [loginLeft, setLoginLeft] = useState(false);
 
   const logOut = async () => {
-    const pending = unstopped || share;
-    if (!pending) {
-      logout();
-      return;
-    }
-    // Remembered before tracking stops, so it's never lost in between
-    setUnstopped(pending);
-    setShare(null);
     setBusy(true);
+    setLoginLeft(false);
+    const pending = unstopped || share;
+    if (pending) {
+      // Remembered before tracking stops, so it's never lost in between
+      setUnstopped(pending);
+      setShare(null);
+      try {
+        await endShareOnServer(pending.eventId);
+        setUnstopped(null);
+      } catch {
+        setBusy(false);
+        return;
+      }
+    }
     try {
-      await endShareOnServer(pending.eventId);
-      setUnstopped(null);
-      logout();
+      await authService.endSession();
     } catch {
       setBusy(false);
+      setLoginLeft(true);
+      return;
     }
+    logout();
   };
 
-  return { logOut, logOutAnyway: logout, unstopped: busy ? null : unstopped, busy };
+  return {
+    logOut,
+    logOutAnyway: logout,
+    unstopped: busy ? null : unstopped,
+    loginLeft: !busy && loginLeft,
+    busy
+  };
 };
 
 const Profile = () => {
   // Logging out sends you to /login via the login guard (MainLayout)
   const { currentUser } = useAppContext();
-  const { logOut, logOutAnyway, unstopped, busy } = useLogOut();
+  const { logOut, logOutAnyway, unstopped, loginLeft, busy } = useLogOut();
 
   return (
     <div className="flex flex-col h-full">
@@ -64,13 +82,18 @@ const Profile = () => {
 
         <GetPaid handles={currentUser?.paymentHandles} />
 
+        {/* A demo account has no password; it signs in with one tap */}
+        {currentUser && !currentUser.isDemo && <ChangePassword />}
+
         {/* Logging out is rare on a phone, so it sits at the bottom, out of
             the way, rather than as a prominent primary button */}
         <div className="mt-auto">
-          {unstopped ? (
-            <div className="card p-4" role="alert">
+          {unstopped || loginLeft ? (
+            <div className="card p-4 mt-4" role="alert">
               <p className="text-sm mb-3">
-                Couldn't stop sharing your location on the server. Friends can still see your last spot {untilText(unstopped.until)}.
+                {unstopped
+                  ? `Couldn't stop sharing your location on the server. Friends can still see your last spot ${untilText(unstopped.until)}.`
+                  : "Couldn't reach EventBuddy to end this login. Logging out anyway only ends it on this phone."}
               </p>
               <div className="flex gap-2">
                 <Button onClick={logOut} disabled={busy} className="flex-1">{busy ? 'Trying...' : 'Try again'}</Button>
@@ -81,7 +104,7 @@ const Profile = () => {
             <button
               onClick={logOut}
               disabled={busy}
-              className="w-full flex items-center justify-center py-3 text-red-400 font-medium disabled:opacity-50"
+              className="w-full flex items-center justify-center py-3 mt-4 text-red-400 font-medium disabled:opacity-50"
             >
               <LogOut size={18} className="mr-2" />
               {busy ? 'Logging out...' : 'Log out'}
@@ -161,6 +184,72 @@ const GetPaid = ({ handles = {} }) => {
         <span className="text-sm text-go" role="status">{status.message}</span>
         <Button type="submit" size="sm" disabled={status.saving || !changed}>
           {status.saving ? 'Saving...' : 'Save'}
+        </Button>
+      </div>
+    </form>
+  );
+};
+
+const EMPTY_PASSWORDS = { currentPassword: '', newPassword: '', confirmation: '' };
+
+// Changing your password logs you out everywhere else, which is also how
+// to end a login you think someone else has. This phone stays logged in.
+const ChangePassword = () => {
+  const { changePassword } = useAppContext();
+  const [values, setValues] = useState(EMPTY_PASSWORDS);
+  const [status, setStatus] = useState({ saving: false, message: '', error: '' });
+
+  const set = (key) => (e) => {
+    const value = e.target.value;
+    setValues(prev => ({ ...prev, [key]: value }));
+    setStatus(prev => ({ ...prev, message: '' }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const problem = newPasswordProblem(values.newPassword, values.confirmation);
+    if (problem) {
+      setStatus({ saving: false, message: '', error: problem });
+      return;
+    }
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await changePassword({ currentPassword: values.currentPassword, newPassword: values.newPassword });
+      setValues(EMPTY_PASSWORDS);
+      setStatus({ saving: false, message: 'Password changed. Other devices are logged out.', error: '' });
+    } catch (err) {
+      setStatus({ saving: false, message: '', error: err.message });
+    }
+  };
+
+  const complete = values.currentPassword && values.newPassword && values.confirmation;
+
+  return (
+    <form onSubmit={handleSubmit} className="card p-4 mt-4">
+      <h2 className="text-lg font-semibold mb-3">Password</h2>
+
+      {status.error && (
+        <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-3 py-2 rounded mb-3 text-sm" role="alert">{status.error}</div>
+      )}
+
+      <div className="space-y-3 mb-3">
+        <Field id="password-current" label="Current password" type="password" autoComplete="current-password" value={values.currentPassword} onChange={set('currentPassword')} />
+        <Field
+          id="password-new"
+          label="New password"
+          type="password"
+          autoComplete="new-password"
+          hint={`At least ${MIN_PASSWORD_LENGTH} characters. A few words together works well.`}
+          value={values.newPassword}
+          onChange={set('newPassword')}
+        />
+        <Field id="password-confirm" label="Confirm new password" type="password" autoComplete="new-password" value={values.confirmation} onChange={set('confirmation')} />
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-go" role="status">{status.message}</span>
+        <Button type="submit" size="sm" disabled={status.saving || !complete} className="shrink-0">
+          {status.saving ? 'Changing...' : 'Change'}
         </Button>
       </div>
     </form>

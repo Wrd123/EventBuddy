@@ -276,6 +276,14 @@ export const AppProvider = ({ children }) => {
     setLoggedOutByUser(true);
   };
 
+  // Other devices are logged out; this one carries on with a new token
+  const changePassword = async (passwords) => {
+    const askedIn = session.current;
+    const response = await authService.changePassword(passwords);
+    if (session.current === askedIn) setCurrentUser(response.user);
+    return response;
+  };
+
   const updateProfile = async (profileData) => {
     const askedIn = session.current;
     const response = await authService.updateProfile(profileData);
@@ -452,6 +460,7 @@ export const AppProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
+    changePassword,
     createEvent: createNewEvent,
     updateEvent: updateEventData,
     deleteEvent: deleteEventData,

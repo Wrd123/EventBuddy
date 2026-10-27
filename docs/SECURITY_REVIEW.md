@@ -17,18 +17,18 @@ The server's access control held up under direct testing:
 - Removing someone revokes their access at once, and an old invite link doesn't let them back in.
 - The money and location rules were enforced in every case tried.
 
-The serious finding was on the client: **a member's display name could run as code on another member's map (S1).** That is now fixed. Two account weaknesses (S2, S3) matter more than they otherwise would, because S1 showed a realistic way for a login token to be stolen. They are the next priority.
+The serious finding was on the client: **a member's display name could run as code on another member's map (S1).** That is now fixed. Two account weaknesses (S2, S3) mattered more because S1 showed a realistic way for a login token to be stolen. Both are now fixed too.
 
 ## Findings
 
 | ID | Finding | Severity | Status |
 |----|---------|----------|--------|
 | S1 | A member's name could run as HTML in the live map's caption | High | **Fixed** on branch `fix-map-tooltip-xss` |
-| S2 | Logging out doesn't invalidate a login token that was already copied | Medium | Open |
-| S3 | Six-character and common passwords are accepted, and there's no way to change a password | Medium | Open |
+| S2 | Logging out didn't invalidate a login token that was already copied | Medium | **Fixed** on branch `fix-map-tooltip-xss` |
+| S3 | Six-character and common passwords were accepted, and there was no way to change a password | Medium | **Fixed** on branch `fix-map-tooltip-xss` |
 | F-1 | `TRUST_PROXY=3` can let the login rate limit be sidestepped | Medium if the host has fewer than 3 proxies | Open; the deployment wasn't checked |
 | R1 | At startup, a late profile reply can show the previous account after switching accounts | Medium (correctness and privacy) | Open |
-| R2 | A late "session expired" reply for an old login logs out the new one | Low | Open |
+| R2 | A late "session expired" reply for an old login logs out the new one | Low | Partly fixed: `api.js` fixed, the startup refresh in `AppContext.js` still open |
 | R3 | A request body over 100 kB returns 500 instead of 413 | Low | Open |
 | C2 | The one-tap demo sign-in has no rate limit and no cap on concurrent world creation | Hardening | Open; not load-tested |
 | H1 | No `Cache-Control: no-store` on signed-in API responses, and no Content Security Policy on the web page | Hardening | Open |
@@ -49,19 +49,41 @@ The serious finding was on the client: **a member's display name could run as co
 
 **Still worth doing.** Add a Content Security Policy to the web page (H1) as a second line of defence.
 
-### S2: logout doesn't revoke sessions (Medium)
+### S2: logout didn't revoke sessions (Medium, fixed)
 
-Logging out only clears the token on the device (`src/services/authService.js`). The server accepts any correctly signed token until it expires after 7 days, and there's no logout endpoint. On its own this is the usual trade-off with stateless tokens. S1 showed how a token could be copied, though. (An earlier draft of this review called this an accepted risk "because there is no XSS sink". That premise was wrong.)
+**The problem.** Logging out only cleared the token on the phone. The server accepted any correctly signed token until it expired after 7 days, and there was no logout endpoint. On its own that's the usual trade-off with stateless tokens, but S1 showed how a token could be copied. (An earlier draft of this review called this an accepted risk "because there is no XSS sink". That premise was wrong.)
 
-**Fix:** add a session version to each user and include it in the token. `requireAuth` then rejects tokens with an old version. Logging out, or changing the password, bumps the version.
+**The fix:**
+- Each user has a `sessionVersion`, and every token carries the version it was issued with (`server/src/models/User.js`, `server/src/middleware/auth.js`). `requireAuth` refuses a token with an old version.
+- `POST /api/auth/logout` bumps the version. That ends the login on every device, which is the honest meaning of "log out" while there's one version per person.
+- Tokens issued before this change have no version and count as the first, so nobody was logged out by the upgrade.
+- The Profile screen ends the session on the server before forgetting the token. If the server can't be reached, it says so and offers Try again or Log out anyway, the same pattern as stopping a location share.
 
-### S3: password policy (Medium)
+**Checked by:**
+- Server tests: a token and a copy of it stop working after logout, other devices are logged out, logging in again works, and older tokens without a version still work.
+- App tests: logout calls the server, the offline warning appears, and Try again and Log out anyway both work.
+- In a real browser against a local test API: after Log out, a copy of the token taken just before gets 401.
 
-The minimum password length is 6 (`server/src/validation.js`), common passwords are accepted, and there's no way to change a password.
+**Known limit.** On the hosted demo, a world that is rebuilt after the server restarts empty starts again at version 0. So a demo token that was logged out before the restart works again once its world is rebuilt. Demo worlds hold only sample data and have no password, so this is accepted. Real accounts aren't rebuilt and aren't affected.
 
-**Fix:**
-- Raise the minimum to at least 8, and reject a short list of common passwords locally.
-- Add a password-change route that requires the current password and revokes other sessions (see S2).
+### S3: password policy (Medium, fixed)
+
+**The problem.** The minimum password length was 6, common passwords were accepted, and there was no way to change a password.
+
+**The fix:**
+- New passwords need at least 8 characters, and still at most 72 bytes because of bcrypt.
+- A short built-in list of common passwords is refused, and nothing is sent to an outside service. So are passwords that just repeat the email, the part before the @, or the username. There are no rules about digits or symbols, so long passphrases work well.
+- The rule applies only when a password is set. Existing accounts with shorter passwords still log in.
+- `POST /api/auth/password` takes the current password and a new one, and counts toward the login attempt limit. A wrong current password gets 400, not 401, because the app treats 401 as "your session ended".
+- A successful change bumps the session version, which logs out every other device, and returns a new token for this one. It does that in one database update, and only if the session is still current, so it can't race a logout.
+- Profile has a Change password form, which is hidden for demo accounts since they have no password. The user object now says `isDemo`.
+- A change ends the old token, so requests still in flight with it come back 401. `src/services/api.js` now ignores a 401 for a token that is no longer the stored one, so those requests can't log you out right after the change. That also fixes the `api.js` half of R2. One gap is left: a request can be refused after the change lands on the server but before its answer gets back. To cover it, a 401 for the token being replaced waits for that answer, and only logs you out if the change failed.
+
+**Checked by:**
+- Server tests for the new rules on sign-up and change, including passphrases, the email and username rules, and non-text input. Others check that a change keeps this device logged in and logs out other sessions, that a wrong current password ends nothing, and that an old short password still logs in.
+- App tests for the form: success, the server's messages, and a short or mismatched password caught before sending.
+- Concurrency: two changes sent at once with the same login let exactly one through (server test). A background read refused mid-change doesn't log you out (app test). Both tests fail when their guard is removed.
+- In a real browser: the form showed the server's "too common" message, then changed the password. The old token got 401 and this phone stayed logged in.
 
 ### F-1: proxy trust and the login rate limit (Medium, depends on the host)
 
@@ -74,7 +96,7 @@ The minimum password length is 6 (`server/src/validation.js`), common passwords 
 ### R1 and R2: account switching (client)
 
 - **R1:** in `src/context/AppContext.js`, the startup profile refresh isn't tied to the session that sent it. If someone logs out and logs in as someone else before it answers, the app shows the previous account's profile. That profile includes the email address and payment handles. The stored token stays the new account's, so no requests are made as the wrong person.
-- **R2:** `src/services/api.js` treats any 401 on a request that carried a token as "this session expired", even when the token was an older one. The startup refresh's own 401 handling in `AppContext.js` has the same gap.
+- **R2:** `src/services/api.js` treated any 401 on a request that carried a token as "this session expired", even when the token was an older one. That part is fixed (see S3). The startup refresh's own 401 handling in `AppContext.js` still has the gap.
 
 **Fix:** ignore a reply, success or failure, unless it belongs to the session that's current now. The app already does this for its other session-sensitive requests.
 

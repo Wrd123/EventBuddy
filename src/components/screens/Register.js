@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
-import { Button } from '../common';
+import { Button, Field } from '../common';
 import { Wordmark } from '../common/Header';
+import { MIN_PASSWORD_LENGTH, newPasswordProblem } from '../../utils/password';
 
 const Register = () => {
   const { register } = useAppContext();
@@ -29,15 +30,9 @@ const Register = () => {
     e.preventDefault();
     setError('');
     
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    
-    // Validate password length
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const problem = newPasswordProblem(formData.password, formData.confirmPassword);
+    if (problem) {
+      setError(problem);
       return;
     }
     
@@ -83,7 +78,7 @@ const Register = () => {
             name="password"
             type="password"
             autoComplete="new-password"
-            hint="At least 6 characters"
+            hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
             value={formData.password}
             onChange={handleChange}
             required
@@ -105,14 +100,5 @@ const Register = () => {
     </div>
   );
 };
-
-// A labeled text field; the label is tied to the input for screen readers
-const Field = ({ id, label, hint, ...input }) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-fg/80 mb-1">{label}</label>
-    <input id={id} type="text" className="field" aria-describedby={hint ? `${id}-hint` : undefined} {...input} />
-    {hint && <p id={`${id}-hint`} className="text-xs text-faint mt-1">{hint}</p>}
-  </div>
-);
 
 export default Register;

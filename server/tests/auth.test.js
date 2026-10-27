@@ -52,7 +52,10 @@ describe('POST /api/auth/register', () => {
 
   const invalid = [
     ['an invalid email', { email: 'not-an-email' }, 'Please enter a valid email address.'],
-    ['a short password', { password: '12345' }, 'Password must be at least 6 characters'],
+    ['a short password', { password: '1234567' }, 'Password must be at least 8 characters'],
+    ['a common password', { password: 'Password123' }, 'That password is too common. Please choose another.'],
+    ['a password that is the username', { password: 'valid_name' }, "Your password can't be your email or username."],
+    ['a password that is the email', { password: 'Valid@example.com' }, "Your password can't be your email or username."],
     ['a password over 72 bytes', { password: 'a'.repeat(73) }, 'Password is too long.'],
     ['an invalid username', { username: 'a b' }, 'Username must be 3-30 letters, numbers, dots or underscores.']
   ];
@@ -66,6 +69,13 @@ describe('POST /api/auth/register', () => {
       assert.equal(res.body.message, message);
     });
   }
+
+  it('accepts a long passphrase with spaces and no digits or symbols', async () => {
+    await api()
+      .post('/api/auth/register')
+      .send({ username: 'phrase', email: 'phrase@example.com', password: 'correct horse battery staple' })
+      .expect(201);
+  });
 });
 
 describe('POST /api/auth/login', () => {
@@ -141,6 +151,143 @@ describe('PATCH /api/auth/me', () => {
   it('rejects a blank name', async () => {
     const { auth } = await registerUser();
     await api().patch('/api/auth/me').set('Authorization', auth).send({ name: '   ' }).expect(400);
+  });
+});
+
+describe('sessions', () => {
+  const me = (auth) => api().get('/api/auth/me').set('Authorization', auth);
+
+  it("keeps the session version out of what's sent to the app", async () => {
+    const { user } = await registerUser();
+    assert.equal('sessionVersion' in user, false);
+    assert.equal(user.isDemo, false);
+  });
+
+  it('still accepts a token issued before session versions existed', async () => {
+    const { user } = await registerUser();
+    const older = jwt.sign({ sub: user._id }, 'test-secret', { algorithm: 'HS256', expiresIn: '1h' });
+
+    await me(`Bearer ${older}`).expect(200);
+  });
+
+  it('still lets an account with a password under the new minimum log in', async () => {
+    await User.create({
+      email: 'old@example.com', username: 'old', name: 'Old', passwordHash: await User.hashPassword('abc123')
+    });
+    await api().post('/api/auth/login').send({ email: 'old@example.com', password: 'abc123' }).expect(200);
+  });
+});
+
+describe('POST /api/auth/logout', () => {
+  const me = (auth) => api().get('/api/auth/me').set('Authorization', auth);
+
+  it('ends the session on the server, including any copy of the token', async () => {
+    const { auth } = await registerUser();
+    const copy = auth;
+
+    await api().post('/api/auth/logout').set('Authorization', auth).expect(204);
+
+    const res = await me(copy).expect(401);
+    assert.equal(res.body.message, 'Your session has expired. Please log in again.');
+  });
+
+  it('ends the login on other devices too', async () => {
+    const { auth } = await registerUser({ email: 'two@example.com', password: 'secret123' });
+    const other = await api().post('/api/auth/login').send({ email: 'two@example.com', password: 'secret123' }).expect(200);
+
+    await api().post('/api/auth/logout').set('Authorization', auth).expect(204);
+
+    await me(`Bearer ${other.body.token}`).expect(401);
+  });
+
+  it('lets you log in again afterwards', async () => {
+    const { auth } = await registerUser({ email: 'back@example.com', password: 'secret123' });
+    await api().post('/api/auth/logout').set('Authorization', auth).expect(204);
+
+    const again = await api().post('/api/auth/login').send({ email: 'back@example.com', password: 'secret123' }).expect(200);
+    await me(`Bearer ${again.body.token}`).expect(200);
+  });
+
+  it('needs a working session', async () => {
+    const { auth } = await registerUser();
+    await api().post('/api/auth/logout').set('Authorization', auth).expect(204);
+    await api().post('/api/auth/logout').set('Authorization', auth).expect(401);
+  });
+});
+
+describe('POST /api/auth/password', () => {
+  const me = (auth) => api().get('/api/auth/me').set('Authorization', auth);
+  const change = (auth, body) => api().post('/api/auth/password').set('Authorization', auth).send(body);
+  const login = (password) => api().post('/api/auth/login').send({ email: 'pat@example.com', password });
+
+  let account;
+  beforeEach(async () => {
+    account = await registerUser({ email: 'pat@example.com', username: 'pat', password: 'secret123' });
+  });
+
+  it('changes the password and keeps this device logged in', async () => {
+    const res = await change(account.auth, { currentPassword: 'secret123', newPassword: 'a much longer one' }).expect(200);
+
+    assert.equal(res.body.user.email, 'pat@example.com');
+    await me(`Bearer ${res.body.token}`).expect(200);
+    await login('a much longer one').expect(200);
+    await login('secret123').expect(401);
+  });
+
+  it('logs out every other session, including the token it was sent with', async () => {
+    const other = (await login('secret123').expect(200)).body.token;
+
+    await change(account.auth, { currentPassword: 'secret123', newPassword: 'a much longer one' }).expect(200);
+
+    await me(account.auth).expect(401);
+    await me(`Bearer ${other}`).expect(401);
+  });
+
+  it('needs the current password, without ending the session', async () => {
+    const res = await change(account.auth, { currentPassword: 'wrong-guess', newPassword: 'a much longer one' }).expect(400);
+
+    assert.equal(res.body.message, "Your current password isn't right.");
+    await me(account.auth).expect(200);
+    await login('secret123').expect(200);
+  });
+
+  const invalid = [
+    ['a short password', 'short', 'Password must be at least 8 characters'],
+    ['a common password', 'iloveyou', 'That password is too common. Please choose another.'],
+    ['the email', 'PAT@EXAMPLE.COM', "Your password can't be your email or username."],
+    ['the same password', 'secret123', 'Choose a password different from your current one.']
+  ];
+  for (const [label, newPassword, message] of invalid) {
+    it(`refuses ${label}`, async () => {
+      const res = await change(account.auth, { currentPassword: 'secret123', newPassword }).expect(400);
+
+      assert.equal(res.body.message, message);
+      await login('secret123').expect(200);
+    });
+  }
+
+  it('lets only one of two changes made at once with the same login through', async () => {
+    // Both check the current password (slow, bcrypt) before either saves,
+    // so only the "still the same session" check can turn one away
+    const [first, second] = await Promise.all([
+      change(account.auth, { currentPassword: 'secret123', newPassword: 'first new password' }),
+      change(account.auth, { currentPassword: 'secret123', newPassword: 'second new password' })
+    ]);
+
+    assert.deepEqual([first.status, second.status].sort(), [200, 401]);
+    const winner = first.status === 200 ? 'first new password' : 'second new password';
+    const loser = first.status === 200 ? 'second new password' : 'first new password';
+    await login(winner).expect(200);
+    await login(loser).expect(401);
+  });
+
+  it('ignores anything but text', async () => {
+    await change(account.auth, { currentPassword: { $ne: null }, newPassword: 'a much longer one' }).expect(400);
+    await login('secret123').expect(200);
+  });
+
+  it('needs a login', async () => {
+    await api().post('/api/auth/password').send({ currentPassword: 'secret123', newPassword: 'a much longer one' }).expect(401);
   });
 });
 
@@ -243,6 +390,21 @@ describe('POST /api/auth/demo', () => {
     await tryDemo();
     assert.equal(await pruneDemoWorlds({ maxAgeMs: -1, maxWorlds: 100 }), 1);
     assert.equal(await User.countDocuments(), 0);
+  });
+
+  it('tells the app it is a demo account', async () => {
+    const { body } = await tryDemo();
+    assert.equal(body.user.isDemo, true);
+  });
+
+  // Only while the world is there: one rebuilt after the demo restarts empty
+  // starts over at the first session version (see the User model)
+  it('can be logged out of on the server while its world exists', async () => {
+    const { body } = await tryDemo();
+    const auth = `Bearer ${body.token}`;
+
+    await api().post('/api/auth/logout').set('Authorization', auth).expect(204);
+    await api().get('/api/auth/me').set('Authorization', auth).expect(401);
   });
 
   it("doesn't exist outside demo mode", async () => {

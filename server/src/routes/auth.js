@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
-const { validateRegistration, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
+const { validateRegistration, validatePassword, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
 const config = require('../config');
 const { createDemoWorld, pruneDemoWorlds, dayIn } = require('../seed/demoData');
 
@@ -127,6 +127,47 @@ router.patch('/me', requireAuth, async (req, res) => {
 
   await req.user.save();
   res.json({ user: req.user });
+});
+
+// Matches a user whose session version is still the one this request was
+// checked against. Accounts made before versions existed have none stored,
+// which counts as the first.
+const sameSession = (user) => ({ _id: user._id, sessionVersion: user.sessionVersion || { $in: [0, null] } });
+
+// Ends the session on the server: this token, and any copy of it, stops
+// working. It ends the login on every device, which is the honest meaning
+// of "log out" while there's one session version per person.
+router.post('/logout', requireAuth, async (req, res) => {
+  await User.updateOne(sameSession(req.user), { $inc: { sessionVersion: 1 } });
+  res.status(204).end();
+});
+
+// Change your password. Body: { currentPassword, newPassword }. Logs out
+// every other device and returns a new token for this one. Counted with
+// login attempts, since it also checks a password.
+router.post('/password', requireAuth, attemptLimiter, async (req, res) => {
+  const currentPassword = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : '';
+  const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : '';
+
+  const user = await User.findById(req.user._id).select('+passwordHash');
+  // 400, not 401: the app treats a 401 as "your session ended" and logs out
+  if (!(await user.checkPassword(currentPassword))) {
+    throw new HttpError(400, "Your current password isn't right.");
+  }
+  const error = validatePassword(newPassword, user);
+  if (error) throw new HttpError(400, error);
+  if (await user.checkPassword(newPassword)) {
+    throw new HttpError(400, 'Choose a password different from your current one.');
+  }
+
+  // Only if nothing ended this session meanwhile (a logout elsewhere)
+  const updated = await User.findOneAndUpdate(
+    sameSession(req.user),
+    { $set: { passwordHash: await User.hashPassword(newPassword) }, $inc: { sessionVersion: 1 } },
+    { returnDocument: 'after' }
+  );
+  if (!updated) throw new HttpError(401, 'Your session has expired. Please log in again.');
+  res.json({ token: signToken(updated), user: updated });
 });
 
 module.exports = router;

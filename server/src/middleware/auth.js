@@ -7,12 +7,18 @@ const { createDemoWorld, demoWorldUserId } = require('../seed/demoData');
 const { jwtSecret, jwtExpiresIn } = config;
 
 // A private demo account's token also names its world, so the world can be
-// rebuilt if the server restarts with an empty database
+// rebuilt if the server restarts with an empty database. sv is the user's
+// session version when the token was issued (see the User model).
 const signToken = (user) =>
-  jwt.sign({ sub: user._id.toString(), ...(user.demoWorld && { world: user.demoWorld }) }, jwtSecret, {
-    algorithm: 'HS256',
-    expiresIn: jwtExpiresIn
-  });
+  jwt.sign(
+    { sub: user._id.toString(), sv: user.sessionVersion || 0, ...(user.demoWorld && { world: user.demoWorld }) },
+    jwtSecret,
+    { algorithm: 'HS256', expiresIn: jwtExpiresIn }
+  );
+
+// Tokens issued before session versions existed have no sv; they count as
+// the first version, so nobody was logged out by the upgrade
+const isCurrentSession = (payload, user) => (payload.sv || 0) === (user.sessionVersion || 0);
 
 // Rebuilds a demo world for a token whose account is gone: a hosted demo
 // that slept and woke with a fresh database, or a world pruned for age.
@@ -44,7 +50,9 @@ const requireAuth = async (req, res, next) => {
   }
 
   const user = (await User.findById(payload.sub)) || (await rebuildDemoWorld(payload));
-  if (!user) {
+  // A missing account, or a session that was ended by logging out or
+  // changing the password
+  if (!user || !isCurrentSession(payload, user)) {
     throw new HttpError(401, 'Your session has expired. Please log in again.');
   }
 

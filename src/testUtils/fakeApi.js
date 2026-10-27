@@ -147,7 +147,8 @@ let events = demoEvents();
 let ledgers = demoLedger();
 let handles = demoHandles();
 
-const currentUser = () => ({ ...demoUser, paymentHandles: handles.u1 });
+// options.demoAccount: signed in to a demo account, which has no password
+const currentUser = () => ({ ...demoUser, paymentHandles: handles.u1, isDemo: Boolean(fakeOptions.demoAccount) });
 let nextItemId = 100;
 let nextEventId = 100;
 
@@ -477,6 +478,16 @@ const route = (method, path, body, authed, params) => {
     return respond(200, { user: currentUser() });
   }
   if (path === '/auth/me') return respond(200, { user: currentUser() });
+  if (path === '/auth/logout' && method === 'POST') return respond(204);
+  // The demo password changes to anything 8 or more characters long, except
+  // one common password, enough to show the server's own messages arrive
+  if (path === '/auth/password' && method === 'POST') {
+    if (body.currentPassword !== 'password') return respond(400, { message: "Your current password isn't right." });
+    if (body.newPassword === 'password1') {
+      return respond(400, { message: 'That password is too common. Please choose another.' });
+    }
+    return respond(200, { token: TOKEN, user: currentUser() });
+  }
   if (path === '/events' && method === 'POST') {
     const event = {
       ...body,
@@ -630,6 +641,7 @@ const route = (method, path, body, authed, params) => {
 // options.memberRemovalError makes leaving or removing fail with that message;
 // options.stopShareFails makes that many stop-sharing requests fail;
 // options.liveEvent adds an event happening today with live locations;
+// options.demoAccount signs in to a demo account (no password to change);
 // options.eventsFailures makes loading your events fail that many times
 // Lets requests still in flight (like a screen's background counts) finish
 // inside act, for tests that end before they would otherwise land
