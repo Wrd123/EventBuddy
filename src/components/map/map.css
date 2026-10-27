@@ -6,15 +6,12 @@
   font-family: inherit;
 }
 
-/* OpenFreeMap's Fiord style is a dark slate blue. One hue turn brings it to
-   the app's plum and a little dimming lets the pins and glass chips lead.
-   Only the default vector map gets this; custom raster tiles show as-is. */
-.leaflet-gl-layer {
-  filter: hue-rotate(40deg) brightness(0.72);
-}
-
-/* Without WebGL: OpenStreetMap's light tiles turned dark (dark land, light
-   roads) and dimmed toward the same plum */
+/* OpenFreeMap's Liberty style and, without WebGL, OpenStreetMap's tiles are
+   both light maps. Inverting turns them dark (dark land, light roads and
+   labels), the hue turn puts colors back where they were, and the rest dims
+   them toward the app's plum so the pins and glass chips lead. Custom raster
+   tiles show as-is. */
+.leaflet-gl-layer,
 .eb-tiles-fallback {
   filter: invert(1) hue-rotate(180deg) saturate(0.4) brightness(0.8) sepia(0.3) hue-rotate(230deg);
 }
@@ -160,4 +157,10 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 1100;
+}
+
+/* The map screen's bottom sheet overlaps the map by 1.5rem (Map.js -mt-6),
+   so the zoom buttons and the credit sit that much higher to stay visible */
+.eb-map-under-sheet .leaflet-bottom {
+  bottom: 1.5rem;
 }

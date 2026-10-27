@@ -103,6 +103,16 @@ describe('Map', () => {
     expect(screen.queryByRole('button', { name: /^Your event:/ })).not.toBeInTheDocument();
   });
 
+  // jsdom can't lay out the page, so this checks the cause: without its own
+  // stacking context, Leaflet's layers (z-index 400-1000) paint over the top
+  // of the bottom sheet that overlaps the map
+  it('keeps the map under the bottom sheet', async () => {
+    renderAt('/map');
+    await pin('Venue: Fox Theatre');
+
+    expect(screen.getByTestId('map').parentElement).toHaveClass('isolate');
+  });
+
   it('clears a selection whose pins are turned off', async () => {
     renderAt('/map');
     fireEvent.click(await pin('Venue: Fox Theatre'));

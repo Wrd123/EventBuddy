@@ -139,7 +139,7 @@ const Map = () => {
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="relative flex-1 overflow-hidden">
+      <div className="eb-map-under-sheet relative flex-1 overflow-hidden isolate">
         <MapCanvas
           ref={canvasRef}
           pins={pins}

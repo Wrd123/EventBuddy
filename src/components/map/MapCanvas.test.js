@@ -34,7 +34,7 @@ describe('the map base layer', () => {
     const { L, addBaseLayer } = loadWith({ REACT_APP_MAP_TILE_URL: '' });
     addBaseLayer({});
 
-    expect(L.maplibreGL).toHaveBeenCalledWith({ style: 'https://tiles.openfreemap.org/styles/fiord' });
+    expect(L.maplibreGL).toHaveBeenCalledWith({ style: 'https://tiles.openfreemap.org/styles/liberty' });
     expect(L.tileLayer).not.toHaveBeenCalled();
   });
 

@@ -7,18 +7,19 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import '@maplibre/maplibre-gl-leaflet';
 import './map.css';
 
-// Map tiles. By default, OpenFreeMap's Fiord style, tinted plum in map.css:
+// Map tiles. By default, OpenFreeMap's Liberty style, turned dark in map.css:
 // free, keyless and with no view limit (openfreemap.org), drawn as vector
 // tiles by MapLibre inside Leaflet, so labels stay sharp at every zoom. Its
 // required credit (OpenFreeMap, OpenMapTiles, OpenStreetMap) comes with the
-// style. Their "dark" style was too close to black for roads to read.
+// style. Liberty draws buildings, landmarks and park names, which friends use
+// to find each other; the darker Fiord and "dark" styles leave those out.
 // CARTO's dark basemap was the first choice, but as of October 2026 it shows
 // "API key required" without a key, and the map stays keyless so a fresh
 // clone runs as it is. REACT_APP_MAP_TILE_URL (with REACT_APP_MAP_ATTRIBUTION,
 // the provider's required credit) swaps in any raster tile URL instead.
 const CUSTOM_TILES = process.env.REACT_APP_MAP_TILE_URL;
 const CUSTOM_ATTRIBUTION = process.env.REACT_APP_MAP_ATTRIBUTION || '';
-const STYLE_URL = 'https://tiles.openfreemap.org/styles/fiord';
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 // Street level; closer than this, raster tiles run out
 const MAX_ZOOM = 19;
 

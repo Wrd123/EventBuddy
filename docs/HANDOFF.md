@@ -47,7 +47,8 @@ Claude and Codex each reviewed the app independently. Findings were checked agai
 - no React Query; the small `freshness.js` rule is deliberate
 - the map's bottom panel is not a Sheet
 - expense and schedule forms close instantly after saving
-- **map tiles:** OpenFreeMap's `fiord` style, drawn by MapLibre, with OSM tiles as the fallback when there's no WebGL. Keyless CARTO tiles show a watermark.
+- **map tiles:** OpenFreeMap's `liberty` style, drawn by MapLibre and turned dark by a CSS filter, with OSM tiles (same filter) as the fallback when there's no WebGL. `fiord` looked darker but dropped buildings and landmarks, and the user missed them. Keyless CARTO tiles show a watermark.
+- **The map screen's sheet overlaps the map by 1.5rem.** The map's wrapper is `isolate` so Leaflet's layers can't paint over the sheet, and `.eb-map-under-sheet` lifts Leaflet's bottom controls clear of it.
 - **No pull to refresh on Chat, Map, the forms or Profile.**
 - **Logging out ends the login on every device.** There's one session version per person, not per device.
 - **No rules about digits or symbols in passwords.** Length and the common-password list are the rule.
