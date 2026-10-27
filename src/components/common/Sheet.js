@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useId, useRef
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { tap } from '../../services/haptics';
+import { prefersReducedMotion } from '../../utils/motion';
 
 // The one bottom sheet every dialog in the app uses: a labelled modal with
 // a scrim, focus handling, an exit animation and drag-to-dismiss.
@@ -48,12 +49,6 @@ const SheetContext = createContext({ close: () => {}, titleId: undefined });
 // For content inside a sheet: close it with the exit animation, or label
 // something by the sheet's title.
 export const useSheet = () => useContext(SheetContext);
-
-// jsdom has no matchMedia; treating that as "reduced motion" makes closes
-// happen at once in tests instead of waiting on an animationend that never
-// fires. Real browsers always have it.
-const prefersReducedMotion = () =>
-  typeof window.matchMedia !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // If animationend never arrives (a hidden tab, say), close anyway
 const EXIT_FALLBACK_MS = 450;
