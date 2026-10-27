@@ -49,9 +49,30 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    # Content Security Policy: the page runs only its own scripts, so even
+    # if some text were turned into markup, it couldn't run code. It allows
+    # what the app really loads: Google Fonts, map tiles, fonts and icons
+    # from OpenFreeMap (fetched, and drawn by MapLibre in blob: workers),
+    # photos from any https host (covers, Ticketmaster), and the API on
+    # onrender.com. With a custom API address, put it in connect-src.
+    # Checked against a real build with scripts/serve-build.js.
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.onrender.com https://tiles.openfreemap.org; worker-src 'self' blob:; child-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Keep the build's startup script in its own file rather than inline
+      # in index.html, which the policy above would refuse
+      - key: INLINE_RUNTIME_CHUNK
+        value: "false"
       - key: REACT_APP_WAKE_SCREEN
         value: "true"
       # The API's address plus /api, e.g. https://eventbuddy-api.onrender.com/api

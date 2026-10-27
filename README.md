@@ -54,6 +54,8 @@ This builds the web app, copies it into the native project and opens it in Xcode
    - `REACT_APP_API_URL`: `https://eventbuddy-api.onrender.com/api`
 3. If Render gave a service a different address because the name was taken, correct these under each service's **Environment**, then redeploy the web app so its build picks up the change.
 
+The web app is served with a strict Content Security Policy (the `headers` in `render.yaml`): it runs only its own scripts, and talks only to the API on `onrender.com` and the map's tile server. If your API lives anywhere else, add its address to `connect-src`. To try a build under exactly those headers before deploying, build it, then serve it with `node scripts/serve-build.js --api http://localhost:4000`.
+
 The free API sleeps after 15 idle minutes and takes up to a minute to start. Meanwhile, the web app shows a "Waking up the demo" screen and opens as soon as the API answers.
 
 The iPhone app can use the hosted demo too. Give it both addresses of the same deployment: the API it talks to, and the web app that invite links open (an invite joins through that web app's API, so the two have to match). The build stops if either is missing or isn't `https`:

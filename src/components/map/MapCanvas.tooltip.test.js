@@ -38,6 +38,23 @@ afterEach(() => {
   delete window.__tooltipRan;
 });
 
+describe("a friend's pin", () => {
+  // Set through the DOM, since the page's policy refuses inline style
+  // attributes; that the policy is met is checked in a real browser
+  it("takes the friend's color", () => {
+    const { container } = render(<MapCanvas pins={[friend('Alex • just now')]} onSelect={() => {}} />);
+
+    expect(container.querySelector('.eb-pin-friend').style.background).toBe('rgb(59, 130, 246)'); // #3b82f6
+  });
+
+  it('falls back to grey for a color that is not a plain hex value', () => {
+    const odd = { ...friend('Alex • just now'), color: 'red;background-image:url(x)' };
+    const { container } = render(<MapCanvas pins={[odd]} onSelect={() => {}} />);
+
+    expect(container.querySelector('.eb-pin-friend').style.background).toBe('rgb(100, 116, 139)'); // #64748b
+  });
+});
+
 describe("a friend's caption on the map", () => {
   it('shows a name as text, not HTML, when the pin first appears', () => {
     const { container } = render(<MapCanvas pins={[friend(`${NAME} • just now`)]} onSelect={() => {}} />);

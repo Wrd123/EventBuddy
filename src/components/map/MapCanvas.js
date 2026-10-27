@@ -75,15 +75,21 @@ const iconHtml = (pin, selected) => {
     .filter(Boolean)
     .join(' ');
   if (pin.kind === 'friend') {
-    return `<div class="${classes}" style="background:${safeColor(pin.color)}">${escapeHtml(pin.initial || '?')}</div>`;
+    return `<div class="${classes}" data-color="${safeColor(pin.color)}">${escapeHtml(pin.initial || '?')}</div>`;
   }
   if (pin.kind === 'meetup') return `<div class="${classes}">${FLAG_SVG}</div>`;
   return `<div class="${classes}">${pin.count > 1 ? escapeHtml(pin.count) : ''}</div>`;
 };
 
+// The web page's Content Security Policy (render.yaml) refuses inline style
+// attributes, so a friend's color goes on through the DOM instead
 const iconFor = (html, kind) => {
   const size = SIZES[kind] || 24;
-  return L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const node = holder.firstElementChild;
+  if (node.dataset.color) node.style.background = node.dataset.color;
+  return L.divIcon({ className: '', html: node, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 };
 
 // Venues close together on screen merge into one bubble showing how many
