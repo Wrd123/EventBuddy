@@ -5,6 +5,7 @@ const Event = require('../models/Event');
 const { requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
 const { colorForUser } = require('../colors');
+const realtime = require('../realtime/hub');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -47,7 +48,7 @@ router.post('/:code/join', async (req, res) => {
   // One atomic update that only matches if I'm not already a member (and
   // wasn't removed), so opening the link twice (or two taps at once) can't
   // add me twice
-  await Event.updateOne(
+  const { modifiedCount } = await Event.updateOne(
     { inviteCode: req.params.code, 'members.user': { $ne: me._id }, 'removed.user': { $ne: me._id } },
     { $push: { members: { user: me._id, name: me.name, color: colorForUser(me._id) } } }
   );
@@ -56,6 +57,11 @@ router.post('/:code/join', async (req, res) => {
   // now see. If the code is wrong, nothing matched above either.
   const event = await findByCode(req.params.code);
   if (event.removed.some((r) => r.user.equals(me._id))) throw new HttpError(403, REMOVED);
+  // Everyone sees the new member, and your other devices see the event
+  if (modifiedCount > 0) {
+    realtime.notifyEvent(event._id, 'event');
+    realtime.notifyUsers([me._id]);
+  }
   res.json({ event });
 });
 

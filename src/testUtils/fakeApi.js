@@ -385,12 +385,12 @@ const picnicEvent = () => ({
   createdBy: 'u3'
 });
 
-const demoLive = () => ({
+const demoLive = (shareEndsInMs = 3 * 60 * 60 * 1000) => ({
   '5': {
     sharing: null,
     people: [{
       user: 'u2', name: 'Alex', color: '#3b82f6', lat: 33.7866, lng: -84.3727, accuracy: 10,
-      positionAt: minutesAgo(2), until: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+      positionAt: minutesAgo(2), until: new Date(Date.now() + shareEndsInMs).toISOString()
     }],
     meetup: {
       lat: 33.7857, lng: -84.3741, note: 'By the lake', time: '',
@@ -637,10 +637,81 @@ const route = (method, path, body, authed, params) => {
 // options.chatSendError makes sending a message fail with that message;
 // options.chatSendsLost saves that many sends but loses their responses;
 // options.paymentOutcomes lists what each payment meets ('lost', or a status);
+// A stand-in for the real-time socket (services/realtime.js), installed as
+// global.WebSocket. It never connects unless options.realtime is set, like a
+// network that blocks sockets, so polling works exactly as it always has.
+let sockets = [];
+class FakeWebSocket {
+  constructor(url) {
+    this.url = url;
+    this.readyState = 0;
+    this.sent = [];
+    this.subscriptions = new Set();
+    sockets.push(this);
+    if (fakeOptions.realtime) {
+      setTimeout(() => {
+        if (this.readyState !== 0) return;
+        this.readyState = 1;
+        this.onopen?.({});
+      }, 0);
+    }
+  }
+
+  send(data) {
+    const message = JSON.parse(data);
+    this.sent.push(message);
+    if (message.type === 'auth') {
+      setTimeout(() => (message.token === TOKEN ? this.receive({ type: 'ready' }) : this.serverClose(4401)), 0);
+    }
+    if (message.type === 'subscribe') {
+      // options.deniedEvents: events the server won't poke about
+      const denied = (fakeOptions.deniedEvents || []).includes(message.eventId);
+      if (!denied) this.subscriptions.add(message.eventId);
+      setTimeout(() => this.receive({ type: denied ? 'denied' : 'subscribed', eventId: message.eventId }), 0);
+    }
+    if (message.type === 'unsubscribe') this.subscriptions.delete(message.eventId);
+  }
+
+  receive(message) {
+    if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(message) });
+  }
+
+  close() {
+    this.readyState = 3;
+  }
+
+  // The connection going away from the server's end (or the network's)
+  serverClose(code) {
+    if (this.readyState === 3) return;
+    this.readyState = 3;
+    this.onclose?.({ code });
+  }
+}
+
+export const allSockets = () => sockets;
+export const openSockets = () => sockets.filter((ws) => ws.readyState === 1);
+
+// The server saying something changed: what is 'chat', 'live' or 'event'
+// for eventId, or 'events' for your list
+export const poke = (eventId, what) => act(() => {
+  openSockets().forEach((ws) => {
+    if (what === 'events') ws.receive({ type: 'changed', what });
+    else if (ws.subscriptions.has(eventId)) ws.receive({ type: 'changed', eventId, what });
+  });
+});
+
+// The socket dropping, as when the server restarts or the signal goes
+export const dropSocket = (code = 1006) => act(() => {
+  openSockets().forEach((ws) => ws.serverClose(code));
+});
+
+// options.realtime connects the real-time socket (see FakeWebSocket), and
+// options.deniedEvents lists events it refuses to subscribe to;
 // options.goingError makes toggling Going fail with that message;
 // options.memberRemovalError makes leaving or removing fail with that message;
 // options.stopShareFails makes that many stop-sharing requests fail;
-// options.liveEvent adds an event happening today with live locations;
+// options.liveEvent adds an event happening today with live locations, and
+// options.friendShareEndsInMs sets when Alex's share there runs out;
 // options.demoAccount signs in to a demo account (no password to change);
 // options.eventsFailures makes loading your events fail that many times
 // Lets requests still in flight (like a screen's background counts) finish
@@ -650,7 +721,7 @@ export const settle = () => act(() => new Promise((resolve) => setTimeout(resolv
 export const installFakeApi = (options = {}) => {
   fakeOptions = { ...options };
   events = options.liveEvent ? [...demoEvents(), picnicEvent()] : demoEvents();
-  live = options.liveEvent ? demoLive() : {};
+  live = options.liveEvent ? demoLive(options.friendShareEndsInMs) : {};
   chats = options.chats || demoChats();
   chatReads = options.chats ? {} : { '1': 'c003' };
   ledgers = demoLedger();
@@ -658,6 +729,8 @@ export const installFakeApi = (options = {}) => {
   holds = [];
   delays = [];
   failures = [];
+  sockets = [];
+  global.WebSocket = FakeWebSocket;
   const serve = (url, method, headers, body) => {
     const [path, search = ''] = url.replace(/^\/api/, '').split('?');
     const response = route(

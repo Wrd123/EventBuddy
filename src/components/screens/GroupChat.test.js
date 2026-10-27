@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, receiveMessage, settle } from '../../testUtils/fakeApi';
+import { installFakeApi, receiveMessage, settle, poke, openSockets } from '../../testUtils/fakeApi';
 import MainLayout from '../layout/MainLayout';
 
 const renderAt = (path) =>
@@ -247,5 +247,20 @@ describe('Group chat history', () => {
 
     expect(await screen.findByText('Message 1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Load earlier messages' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Real time', () => {
+  beforeEach(() => installFakeApi({ realtime: true }).logIn());
+
+  it("shows a friend's message as soon as the server says there is one", async () => {
+    renderAt('/events/1/chat');
+    await screen.findByText('I can grab snacks too.');
+    await waitFor(() => expect(openSockets()[0]?.subscriptions.has('1')).toBe(true));
+
+    receiveMessage('1', { user: 'u3', name: 'Taylor', text: 'Running 10 minutes late!' });
+    await poke('1', 'chat');
+
+    expect(await screen.findByText('Running 10 minutes late!')).toBeInTheDocument();
   });
 });

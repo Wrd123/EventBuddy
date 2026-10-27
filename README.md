@@ -72,6 +72,8 @@ Without them, `npm run build:ios` builds against the API on your Mac, and its in
 flowchart LR
   iphone["iPhone app<br/>Capacitor + background location"] --> api
   web["Web app<br/>React + Tailwind"] --> api["API<br/>Node + Express"]
+  api -. "WebSocket pokes" .-> web
+  api -. "WebSocket pokes" .-> iphone
   api --> db[("MongoDB")]
   api --> tm["Ticketmaster<br/>Discovery API"]
   api --> osm["OpenStreetMap<br/>Nominatim"]
@@ -81,14 +83,15 @@ flowchart LR
 |---|---|
 | App | React 18, React Router, Tailwind CSS, Leaflet with MapLibre vector tiles from OpenFreeMap (free, keyless) |
 | iPhone | Capacitor 7, background geolocation, native HTTP, haptics |
-| API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt |
-| Testing | Jest and Testing Library (323 tests), Node's test runner with Supertest and an in-memory MongoDB (301 tests) |
+| API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt, `ws` for real-time pokes |
+| Testing | Jest and Testing Library (461 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (352 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
 
 - **Money is stored in whole cents.** Dollars in floating point drift (0.1 + 0.2 isn't 0.3), and an equal split of $100 between three people has to add up to exactly $100. Settling up uses a greedy match of the largest debtor with the largest creditor, which keeps the number of payments small.
-- **Chat pages by message id, not timestamp.** MongoDB ids increase over time, so "everything after this id" never skips or repeats a message, even when two arrive in the same second. The app polls every 4 seconds only while it's on screen.
+- **Chat pages by message id, not timestamp.** MongoDB ids increase over time, so "everything after this id" never skips or repeats a message, even when two arrive in the same second.
+- **Real time is a poke, not a payload.** When something changes, the server sends the event's members a WebSocket message that only says what changed (`chat`, `live`, the `event`), and the app runs the same read it would have polled with. All the work that keeps late or overlapping answers from undoing newer ones stays in one place, a slip in the socket's access checks could reveal at most that something changed, and without a socket (offline, a blocking proxy, an older app) polling carries on as before. While connected, polling slows to a once-a-minute safety net; it only runs while the app is on screen, and so does the socket. The socket logs in with its first message rather than the URL, so tokens stay out of logs. Its subscriptions are tracked in the server's memory, which suits the single free instance; a second instance would need pub/sub such as Redis to pass pokes between them.
 - **Read receipts are deliberately absent.** How far you've read is stored apart from the event's member list, which every member receives, so unread counts work without telling the group what you've read.
 - **Location sharing is built to forget.** It's opt-in per event, lasts at most 24 hours and only while the event is on. The server keeps only your latest position, and a MongoDB TTL index deletes it when sharing ends; reads also filter on the end time, since TTL cleanup runs about once a minute. A map opened from an event only ever shows that event's members, and only while it's on.
 - **Background location is one small seam.** A single tracker module uses the native background plugin in the app and the browser's geolocation on the web, and app-wide sharing state keeps it running on every screen, through a relaunch, and stops it on logout.
@@ -112,12 +115,13 @@ EventBuddy/
 │   │   └── layout/          # Routing, tab bar, laptop showcase frame
 │   ├── context/             # Auth/events state and app-wide location sharing
 │   ├── hooks/               # Data hooks (chat, live locations, map, places)
-│   ├── services/            # API calls and the location tracker
+│   ├── services/            # API calls, the real-time socket and the location tracker
 │   └── utils/               # Dates, money, ledger, chat and map helpers
 ├── server/                  # Express API
 │   ├── src/
 │   │   ├── routes/          # auth, events, schedule, expenses, messages, live, map, discover
 │   │   ├── models/          # Mongoose models
+│   │   ├── realtime/        # WebSocket hub: who's subscribed to what, and the pokes
 │   │   ├── discover/        # Ticketmaster and OpenStreetMap clients with caching
 │   │   └── seed/            # Demo data
 │   └── tests/               # API tests

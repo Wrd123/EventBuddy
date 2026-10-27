@@ -33,6 +33,7 @@ The serious finding was on the client: **a member's display name could run as co
 | C2 | The one-tap demo sign-in has no rate limit and had no cap on concurrent world creation | Hardening | Cap added on `review-fixes-2`; a per-address limit waits on F-1 |
 | H1 | No `Cache-Control: no-store` on API responses, and no Content Security Policy on the web page | Hardening | **Fixed** on branch `review-fixes-2`; the policy is live on the deployed site (27 Oct 2026) |
 | D1 | Dependency advisories in the shipped bundle have no reachable path in this app | Hardening | React Router upgraded on branch `handoff-deps-screenshots`; MapLibre stays on 5.x (see D1) |
+| WS | The real-time socket added in phase 4a | Design review | Built with the checks below on branch `phase-4a-realtime` |
 
 ### S1: names on the live map (High, fixed)
 
@@ -151,6 +152,21 @@ In the app's bundle, two flagged packages actually ship:
 
 The rest of the findings are in the Create React App build tools and never run in production. Don't run `npm audit fix --force`, because some of the replacements it suggests would break the build.
 
+### WS: the real-time socket (phase 4a)
+
+Phase 4 adds a WebSocket at `/api/socket` (`server/src/realtime/hub.js`). It was designed against this review rather than reviewed after the fact:
+
+- **Nothing but pokes.** The socket only ever says that an event's chat, live map or details changed, or that your list of events did. The app then reads through the usual REST routes and their checks. A mistake in the socket's access rules could reveal that something changed, never what.
+- **Login in the first message.** The token is sent as `{type:'auth', token}` within 5 seconds, never in the URL, so it can't end up in access logs. It's checked by the same `authenticate()` as every request: the pinned algorithm, the session version and the demo-world rebuild.
+- **Subscriptions are checked like reads.** Each one goes through `findVisibleEvent`, so outsiders and removed members are refused, and invalid ids are refused without a query.
+- **Access taken away takes effect at once.** Removing a member unsubscribes their sockets from that event, after one last poke that makes their open screens read, find the event gone and close it. Deleting an event does the same for everyone. Logging out or changing the password closes every socket of that person with code 4401. A check that was waiting on the database while access changed is run again, so it can't add back what was just taken away.
+- **Origin.** A browser page from another site is refused at the upgrade. The login isn't a cookie, so such a page couldn't act as anyone anyway; native apps send no Origin.
+- **Limits.** 1 kB messages, 5 sockets per person (the oldest is dropped at once, not when its close finishes), 20 subscriptions per socket, 20 refused subscriptions before the socket is closed (each costs a query), 500 sockets in all, unknown messages ignored, and a 30-second ping that drops dead connections.
+- **Nothing in the upgrade can throw.** It runs outside Express, so an uncaught error would stop the API. A request line Node accepts but `URL` can't parse once did exactly that; the internal reviewer found it before it shipped, and a test sends it.
+- **Production:** `connect-src` in the page's policy allows `wss://*.onrender.com`.
+
+`server/tests/realtime.test.js` covers each of these with a real WebSocket client.
+
 ### Secrets
 
 No secrets were found in tracked files or in the git history. The demo password is public on purpose, and seeding refuses to run in production. `server/.env` is ignored by git and has never been committed.
@@ -170,4 +186,4 @@ No secrets were found in tracked files or in the git history. The demo password 
 - The public deployment, its proxy chain, TLS and caching.
 - On-device iOS checks: how the token is stored on the phone, background location, deep links.
 - Running more than one server process. The lock that serializes money changes only works within one process.
-- Real-time features, which don't exist yet (phase 4) and will need their own review.
+- An independent review of the real-time socket (see WS). It was built against this review's findings, but nobody has attacked it yet.

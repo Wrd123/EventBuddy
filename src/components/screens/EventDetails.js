@@ -46,7 +46,8 @@ const useEventSummary = (eventId) => {
   useEffect(() => {
     load();
   }, [load]);
-  usePolling(load, EVENT_POLL_MS);
+  // The unread count comes from the chat, so its pokes count too
+  usePolling(load, EVENT_POLL_MS, { eventId, what: ['event', 'chat'] });
 
   // refresh is for a pull to refresh; load already keeps quiet when a check fails
   return { ...(summary.eventId === eventId ? summary : { eventId, unread: 0, ledger: null }), refresh: load };

@@ -40,11 +40,12 @@ describe("the web page's Content Security Policy", () => {
     assert.deepEqual(policy['base-uri'], ["'self'"]);
   });
 
-  it('allows what the app loads: fonts, the map and the API', () => {
+  it('allows what the app loads: fonts, the map, the API and its socket', () => {
     assert.ok(policy['style-src'].includes('https://fonts.googleapis.com'));
     assert.ok(policy['font-src'].includes('https://fonts.gstatic.com'));
     assert.ok(policy['connect-src'].includes('https://tiles.openfreemap.org'));
     assert.ok(policy['connect-src'].includes('https://*.onrender.com'));
+    assert.ok(policy['connect-src'].includes('wss://*.onrender.com'));
     assert.ok(policy['worker-src'].includes('blob:'), "MapLibre's workers");
   });
 
@@ -66,10 +67,11 @@ describe("the web page's Content Security Policy", () => {
 });
 
 describe('forLocal', () => {
-  it('lets a local build reach a local API over plain http', () => {
+  it('lets a local build reach a local API and its socket over plain http', () => {
     const local = parsePolicy(forLocal(header('Content-Security-Policy').value, 'http://localhost:4000'));
 
     assert.ok(local['connect-src'].includes('http://localhost:4000'));
+    assert.ok(local['connect-src'].includes('ws://localhost:4000'));
     assert.equal(local['upgrade-insecure-requests'], undefined);
     assert.deepEqual(local['script-src'], ["'self'"]);
   });

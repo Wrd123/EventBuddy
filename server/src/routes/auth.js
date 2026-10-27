@@ -2,12 +2,15 @@ const bcrypt = require('bcryptjs');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
+const Event = require('../models/Event');
+const { visibleTo } = require('../eventAccess');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
 const { validateRegistration, validatePassword, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
 const config = require('../config');
 const { createDemoWorld, pruneDemoWorlds, dayIn } = require('../seed/demoData');
 const { createConcurrencyLimit } = require('../concurrencyLimit');
+const realtime = require('../realtime/hub');
 
 const { isTest, bcryptRounds } = config;
 
@@ -136,6 +139,11 @@ router.patch('/me', requireAuth, async (req, res) => {
   }
 
   await req.user.save();
+  // Your payment handles show in each of your events' money screens
+  if ('paymentHandles' in req.body) {
+    const events = await Event.find(visibleTo(req.user), '_id');
+    events.forEach((event) => realtime.notifyEvent(event._id, 'event'));
+  }
   res.json({ user: req.user });
 });
 
@@ -149,6 +157,8 @@ const sameSession = (user) => ({ _id: user._id, sessionVersion: user.sessionVers
 // of "log out" while there's one session version per person.
 router.post('/logout', requireAuth, async (req, res) => {
   await User.updateOne(sameSession(req.user), { $inc: { sessionVersion: 1 } });
+  // Their real-time sockets used the login that just ended
+  realtime.closeUsers([req.user._id]);
   res.status(204).end();
 });
 
@@ -177,6 +187,8 @@ router.post('/password', requireAuth, attemptLimiter, async (req, res) => {
     { returnDocument: 'after' }
   );
   if (!updated) throw new HttpError(401, 'Your session has expired. Please log in again.');
+  // Other devices are logged out; this one reconnects with its new token
+  realtime.closeUsers([updated._id]);
   res.json({ token: signToken(updated), user: updated });
 });
 

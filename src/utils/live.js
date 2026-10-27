@@ -50,6 +50,17 @@ export const shareDurations = (now = new Date()) => {
 };
 
 // "until 9:30 PM"
+// Friends whose share hasn't run out. The server stops listing a share
+// when it ends, but the map only reads now and then, so it checks too.
+export const stillSharing = (people, now = Date.now()) =>
+  people.filter((person) => new Date(person.until).getTime() > now);
+
+// When the next of these shares runs out, or null when none will
+export const nextShareEnd = (people, now = Date.now()) => {
+  const ends = people.map((person) => new Date(person.until).getTime()).filter((end) => end > now);
+  return ends.length > 0 ? Math.min(...ends) : null;
+};
+
 export const untilText = (until) =>
   `until ${new Date(until).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 

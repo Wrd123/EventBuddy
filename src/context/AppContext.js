@@ -3,6 +3,7 @@ import * as authService from '../services/authService';
 import * as eventService from '../services/eventService';
 import { findDevicePlace, deviceHasLocation, NO_LOCATION_SUPPORT } from '../services/devicePlace';
 import { setUnauthorizedHandler } from '../services/api';
+import * as realtime from '../services/realtime';
 import { SharingProvider } from './SharingContext';
 import { usePolling } from '../hooks/usePolling';
 import { createFreshness } from '../utils/freshness';
@@ -108,6 +109,7 @@ export const AppProvider = ({ children }) => {
   // Stable identity, since the effects below depend on it.
   const clearSession = useCallback(() => {
     authService.logout();
+    realtime.stop();
     // Reads and changes still on their way belong to the old session
     session.current += 1;
     freshness.changed();
@@ -133,6 +135,9 @@ export const AppProvider = ({ children }) => {
     return () => setUnauthorizedHandler(() => {});
   }, [clearSession]);
 
+  // The socket outlives no app (tests mount many)
+  useEffect(() => () => realtime.stop(), []);
+
   // Initialize authentication state
   useEffect(() => {
     const initAuth = async () => {
@@ -146,6 +151,7 @@ export const AppProvider = ({ children }) => {
       setCurrentUser(user);
       setIsAuthenticated(true);
       setIsLoading(false);
+      realtime.start();
 
       // The answer only counts for the login that asked: by the time it
       // lands, someone may have logged out and in as someone else
@@ -209,7 +215,7 @@ export const AppProvider = ({ children }) => {
   authenticatedRef.current = isAuthenticated;
   usePolling(() => {
     if (authenticatedRef.current) readEvents().catch(() => {});
-  }, EVENTS_POLL_MS);
+  }, EVENTS_POLL_MS, { what: 'events' });
 
   // One event, fresh from the server, for a screen showing it.
   // -> { status: 'ready' | 'not-found' | 'error', error } or null when the
@@ -264,6 +270,7 @@ export const AppProvider = ({ children }) => {
     setCurrentUser(response.user);
     setIsAuthenticated(true);
     setLoggedOutByUser(false);
+    realtime.start();
     return response;
   };
 
@@ -284,7 +291,11 @@ export const AppProvider = ({ children }) => {
   const changePassword = async (passwords) => {
     const askedIn = session.current;
     const response = await authService.changePassword(passwords);
-    if (session.current === askedIn) setCurrentUser(response.user);
+    if (session.current === askedIn) {
+      setCurrentUser(response.user);
+      // The server closed this phone's socket along with the old token
+      realtime.start();
+    }
     return response;
   };
 

@@ -1,4 +1,4 @@
-import { agoText, isStale, metersBetween, shouldSend, shareDurations, untilText, directionsUrl } from './live';
+import { agoText, isStale, metersBetween, shouldSend, shareDurations, untilText, directionsUrl, stillSharing, nextShareEnd } from './live';
 
 const NOW = new Date(2026, 9, 24, 15, 0).getTime();
 const minutesBefore = (m) => new Date(NOW - m * 60 * 1000).toISOString();
@@ -56,5 +56,23 @@ describe('untilText and directionsUrl', () => {
   it('formats for people and maps apps', () => {
     expect(untilText(new Date(2026, 9, 24, 21, 30))).toBe('until 9:30 PM');
     expect(directionsUrl({ lat: 33.7857, lng: -84.3741 })).toBe('https://www.google.com/maps/dir/?api=1&destination=33.7857,-84.3741');
+  });
+});
+
+describe('stillSharing and nextShareEnd', () => {
+  const minutesAfter = (m) => new Date(NOW + m * 60 * 1000).toISOString();
+  const people = [
+    { name: 'Alex', until: minutesAfter(30) },
+    { name: 'Taylor', until: minutesBefore(1) },
+    { name: 'Jordan', until: minutesAfter(5) }
+  ];
+
+  it('leaves out shares that have run out', () => {
+    expect(stillSharing(people, NOW).map((p) => p.name)).toEqual(['Alex', 'Jordan']);
+  });
+
+  it('finds the next share to run out', () => {
+    expect(nextShareEnd(people, NOW)).toBe(new Date(minutesAfter(5)).getTime());
+    expect(nextShareEnd([people[1]], NOW)).toBeNull();
   });
 });

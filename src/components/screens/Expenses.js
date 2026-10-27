@@ -76,7 +76,7 @@ export const useLedger = (eventId) => {
   useEffect(() => {
     reload();
   }, [reload]);
-  usePolling(reload, EVENT_POLL_MS);
+  usePolling(reload, EVENT_POLL_MS, { eventId, what: 'event' });
 
   const removePayment = (id) => {
     pendingIds.current.delete(id);

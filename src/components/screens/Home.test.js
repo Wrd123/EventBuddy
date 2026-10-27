@@ -1,8 +1,8 @@
 import React from 'react';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, changeEvent } from '../../testUtils/fakeApi';
+import { installFakeApi, changeEvent, removeEvent, poke, openSockets } from '../../testUtils/fakeApi';
 import { toISODate } from '../../utils/dates';
 import MainLayout from '../layout/MainLayout';
 
@@ -136,5 +136,21 @@ describe('Home', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('button', { name: 'Open Hiking Trip' })).toBeInTheDocument();
+  });
+});
+
+describe('Home in real time', () => {
+  it('drops an event as soon as the server says your events changed', async () => {
+    installFakeApi({ liveEvent: true, realtime: true }).logIn();
+    renderHome();
+    const comingUp = () => within(section('Coming up'));
+    expect(await screen.findByText('Hiking Trip')).toBeInTheDocument();
+    await waitFor(() => expect(openSockets()).toHaveLength(1));
+
+    // The organizer removed you, on their phone
+    removeEvent('2');
+    await poke(null, 'events');
+
+    await waitFor(() => expect(comingUp().queryByText('Hiking Trip')).not.toBeInTheDocument());
   });
 });

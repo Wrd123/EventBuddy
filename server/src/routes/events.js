@@ -20,14 +20,19 @@ const LocationShare = require('../models/LocationShare');
 const { MAX_CENTS } = require('../models/Expense');
 const { withEventLock } = require('../eventLock');
 const { netCents, formatCents } = require('../ledger');
+const realtime = require('../realtime/hub');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use('/:id/schedule', scheduleRoutes);
-router.use('/:id/expenses', expenseRoutes);
-router.use('/:id/payments', paymentRoutes);
-router.use('/:id/messages', messageRoutes);
-router.use('/:id/live', liveRoutes);
+// Every change inside an event pokes the people looking at it (see
+// realtime/hub.js). Marking your own chat read concerns nobody else, and
+// the meetup point is part of the event as well as the map.
+const { pokeOnSuccess } = realtime;
+router.use('/:id/schedule', pokeOnSuccess('event'), scheduleRoutes);
+router.use('/:id/expenses', pokeOnSuccess('event'), expenseRoutes);
+router.use('/:id/payments', pokeOnSuccess('event'), paymentRoutes);
+router.use('/:id/messages', pokeOnSuccess((req) => (req.path === '/read' ? null : 'chat')), messageRoutes);
+router.use('/:id/live', pokeOnSuccess((req) => (req.path === '/meetup' ? ['live', 'event'] : 'live')), liveRoutes);
 
 router.get('/', async (req, res) => {
   const events = await Event.find(visibleTo(req.user)).sort({ startDate: 1 });
@@ -64,6 +69,8 @@ router.post('/', async (req, res) => {
   event.coverIndex = await nextCoverIndex(event);
   await event.save();
 
+  // Your other devices list it too
+  realtime.notifyUsers([req.user._id]);
   res.status(201).json({ event });
 });
 
@@ -118,6 +125,7 @@ router.patch('/:id', async (req, res) => {
   if (event.isModified('type')) event.coverIndex = await nextCoverIndex(event);
 
   await event.save();
+  realtime.notifyEvent(event._id, 'event');
   res.json({ event });
 });
 
@@ -139,6 +147,7 @@ router.post('/:id/invite/reset', async (req, res) => {
   const event = await findOwnEvent(req.params.id, req.user);
   event.inviteCode = newInviteCode();
   await event.save();
+  realtime.notifyEvent(event._id, 'event');
   res.json({ event });
 });
 
@@ -195,6 +204,12 @@ router.delete('/:id/members/:userId', (req, res) => withEventLock(req.params.id,
     LocationShare.deleteMany({ event: event._id, user: member.user }),
     ChatRead.deleteMany({ event: event._id, user: member.user })
   ]);
+  // They stop hearing about it, their own list (on every device) drops it,
+  // and the others see them gone, from the members and from the map
+  realtime.dropFromEvent(event._id, [member.user]);
+  realtime.notifyUsers([member.user]);
+  realtime.notifyEvent(event._id, 'event');
+  realtime.notifyEvent(event._id, 'live');
   res.status(204).end();
 }));
 
@@ -210,6 +225,7 @@ router.delete('/:id/removed/:userId', async (req, res) => {
   const event = await findOwnEvent(req.params.id, req.user);
   if (!mongoose.isValidObjectId(req.params.userId)) throw new HttpError(404, 'Not found.');
   await Event.updateOne({ _id: event._id }, { $pull: { removed: { user: req.params.userId } } });
+  realtime.notifyEvent(event._id, 'event');
   res.status(204).end();
 });
 
@@ -224,6 +240,10 @@ router.delete('/:id', async (req, res) => {
     LocationShare.deleteMany({ event: event._id }),
     event.deleteOne()
   ]);
+  // Anyone on one of its screens reads it and finds it gone; then nobody
+  // hears about it again
+  realtime.dropFromEvent(event._id);
+  realtime.notifyUsers(event.members.map((m) => m.user));
   res.status(204).end();
 });
 

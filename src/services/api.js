@@ -3,7 +3,7 @@
 // In development, CRA's "proxy" (package.json) forwards /api to the server on
 // port 4000, so the default base URL just works. A native build (Capacitor)
 // or a separately hosted API sets REACT_APP_API_URL to the full address.
-const API_URL = process.env.REACT_APP_API_URL || '/api';
+export const API_URL = process.env.REACT_APP_API_URL || '/api';
 const TIMEOUT_MS = 15000;
 
 export const TOKEN_KEY = 'eventbuddy_token';

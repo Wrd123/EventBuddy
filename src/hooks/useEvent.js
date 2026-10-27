@@ -45,7 +45,7 @@ export const useEvent = (eventId) => {
   useEffect(() => {
     check();
   }, [check]);
-  usePolling(() => { check(); }, EVENT_POLL_MS);
+  usePolling(() => { check(); }, EVENT_POLL_MS, { eventId, what: 'event' });
 
   // A result for a previous id doesn't count
   const latest = checked.eventId === eventId ? checked : null;

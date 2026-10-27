@@ -6,9 +6,10 @@
 //   INLINE_RUNTIME_CHUNK=false REACT_APP_API_URL=http://localhost:4100/api npm run build
 //   node scripts/serve-build.js --port 3999 --api http://localhost:4100
 //
-// --api adds a local API to connect-src, and serving over http drops
-// upgrade-insecure-requests, which would otherwise send http://localhost
-// calls to https. Everything else is exactly what Render sends.
+// --api adds a local API and its real-time socket to connect-src, and
+// serving over http drops upgrade-insecure-requests, which would otherwise
+// send http://localhost calls to https. Everything else is exactly what
+// Render sends.
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
@@ -45,11 +46,14 @@ const parsePolicy = (policy) =>
 const formatPolicy = (directives) =>
   Object.entries(directives).map(([name, sources]) => [name, ...sources].join(' ')).join('; ');
 
-// The policy as served locally: the local API allowed, and no upgrading
-// to https on a plain-http server
+// The policy as served locally: the local API and its real-time socket
+// allowed, and no upgrading to https on a plain-http server
 const forLocal = (policy, api) => {
   const directives = parsePolicy(policy);
-  if (api) directives['connect-src'] = [...(directives['connect-src'] || []), api];
+  if (api) {
+    const socket = api.replace(/^http/, 'ws');
+    directives['connect-src'] = [...(directives['connect-src'] || []), api, socket];
+  }
   delete directives['upgrade-insecure-requests'];
   return formatPolicy(directives);
 };

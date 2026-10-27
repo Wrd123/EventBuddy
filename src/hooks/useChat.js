@@ -63,7 +63,7 @@ export const useChat = (eventId) => {
     }
   }, [eventId, state.status, addMessages]);
 
-  usePolling(poll, POLL_MS);
+  usePolling(poll, POLL_MS, { eventId, what: 'chat' });
 
   // Seeing the newest message marks the chat read, so it stops counting as
   // unread on the Groups tab

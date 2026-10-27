@@ -32,15 +32,9 @@ const rebuildDemoWorld = async ({ sub, world }) => {
   return rebuilding.get(world);
 };
 
-// Requires "Authorization: Bearer <token>" and loads the user onto req.user.
-// The user comes from the token, never from the request body, so nobody can
-// act as someone else by sending a different id.
-const requireAuth = async (req, res, next) => {
-  const [scheme, token] = (req.get('Authorization') || '').split(' ');
-  if (scheme !== 'Bearer' || !token) {
-    throw new HttpError(401, 'Please log in.');
-  }
-
+// The user a login token belongs to, or a 401. Shared by every request and
+// by the real-time socket, so both accept exactly the same logins.
+const authenticate = async (token) => {
   let payload;
   try {
     // Pin the algorithm so a token can't pick a weaker one
@@ -55,9 +49,19 @@ const requireAuth = async (req, res, next) => {
   if (!user || !isCurrentSession(payload, user)) {
     throw new HttpError(401, 'Your session has expired. Please log in again.');
   }
+  return user;
+};
 
-  req.user = user;
+// Requires "Authorization: Bearer <token>" and loads the user onto req.user.
+// The user comes from the token, never from the request body, so nobody can
+// act as someone else by sending a different id.
+const requireAuth = async (req, res, next) => {
+  const [scheme, token] = (req.get('Authorization') || '').split(' ');
+  if (scheme !== 'Bearer' || !token) {
+    throw new HttpError(401, 'Please log in.');
+  }
+  req.user = await authenticate(token);
   next();
 };
 
-module.exports = { signToken, requireAuth };
+module.exports = { signToken, authenticate, requireAuth };

@@ -4,6 +4,7 @@ import { usePolling } from './usePolling';
 import { useSharing, endShareOnServer } from '../context/SharingContext';
 import { ApiError } from '../services/api';
 import { createFreshness } from '../utils/freshness';
+import { stillSharing, nextShareEnd } from '../utils/live';
 
 // Friends' positions arrive about this often while the map is open
 export const LIVE_POLL_MS = 10000;
@@ -79,7 +80,7 @@ export const useLive = (eventId) => {
     setState({ status: eventId ? 'loading' : 'idle', sharing: null, people: [], meetup: null, error: '' });
     load();
   }, [eventId, load]);
-  usePolling(load, LIVE_POLL_MS);
+  usePolling(load, LIVE_POLL_MS, { eventId, what: 'live' });
 
   // One event at a time: starting here ends sharing with any other event.
   // If that can't be confirmed, nothing changes: otherwise friends at the
@@ -126,5 +127,17 @@ export const useLive = (eventId) => {
   // This phone stopped, but friends may still see its last spot here
   const stopPending = Boolean(state.sharing) && unstopped?.eventId === eventId;
 
-  return { ...state, stopPending, reload: load, startSharing, stopSharing, setMeetup, clearMeetup };
+  // A friend's share leaves the map the moment it runs out. Reads come only
+  // once a minute while pokes are arriving, and nobody pokes when a share
+  // simply ends.
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const end = nextShareEnd(state.people, now);
+    if (end === null) return undefined;
+    const timer = setTimeout(() => setNow(Date.now()), end - now);
+    return () => clearTimeout(timer);
+  }, [state.people, now]);
+  const people = stillSharing(state.people, now);
+
+  return { ...state, people, stopPending, reload: load, startSharing, stopSharing, setMeetup, clearMeetup };
 };

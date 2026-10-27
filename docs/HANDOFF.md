@@ -5,14 +5,9 @@
 ## State
 
 - **Git, when this note was written:**
-  - GitHub's `main` is at `acae73de`. It holds everything up to the live Content Security Policy:
-    - the security work and the CSP,
-    - React Router 7,
-    - the Afterglow README screenshots,
-    - the Liberty map and the sheet fix,
-    - the dev-dependency audit fix.
-  - Local `main` is at `5eb6af72`, **one commit ahead and not pushed**: the switched-off address check for F-1 (see Waiting on the user).
-  - This note itself is on the branch `phase-4-handoff`.
+  - `main` and GitHub's `main` are both at `af53a28d`: everything up to the Phase 4 plan, including the switched-off address check for F-1.
+  - **Phase 4a (the socket and its pokes) is on the branch `phase-4a-realtime`**, not merged and not pushed.
+  - The branch `phase-4-handoff` points at the same commit as `main` and can be deleted.
   - Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting any of this.
 - **Deployed on Render:**
   - The live site matches `acae73de`.
@@ -22,7 +17,7 @@
   - A redeploy alone doesn't re-read `render.yaml`, which is why the policy first went out missing.
 - **The map** uses OpenFreeMap's Liberty style, darkened. The map screen's bottom sheet no longer gets covered by the map (see Decisions).
 - **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps), so ask the user to look at the Actions tab.
-- **Tests:** 331 server tests, 436 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests (on `phase-4a-realtime`):** 352 server tests, 461 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1).
@@ -104,15 +99,23 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done |
 | 3b | Loading skeletons and pull-to-refresh | Done |
 | — | Security review and fixes | Done, except F-1 |
-| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now, and scripted demo friends | Planned, see `docs/PHASE_4_PLAN.md` |
+| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now, and scripted demo friends | 4a built on `phase-4a-realtime`; 4b to 4d next (see `docs/PHASE_4_PLAN.md`) |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
 ## What comes next
 
 1. **Finish F-1** as soon as the user sends the measured values (see Waiting on the user).
-2. **Phase 4**, which the user wants started in this new session. Follow `docs/PHASE_4_PLAN.md`:
-   - Build 4a (sockets and pokes), 4b (who's here now), 4c (the activity feed) and 4d (scripted demo friends), each on its own branch.
+2. **Phase 4.** Follow `docs/PHASE_4_PLAN.md`:
+   - **4a is built** on `phase-4a-realtime`. Where it departs from the plan:
+     - no `setupProxy.js`, since CRA's `proxy` already forwards WebSockets;
+     - pruning a demo world doesn't close its sockets;
+     - the chats list keeps its own 15 s poll;
+     - the events list hears `events` pokes but keeps its 30 s pace;
+     - meetup changes poke both `live` and `event`.
+
+     Deploying it needs a **Blueprint sync**, for `wss://*.onrender.com` in `connect-src`. After the deploy, the user checks the live site's console for a socket blocked by the policy.
+   - Build 4b (who's here now), 4c (the activity feed) and 4d (scripted demo friends) next, each on its own branch.
    - Each gets tests, the strict build and the `reviewer` subagent before it's committed, plus screenshots for the user before any UI commit.
    - Plan the first part in plan mode, per `CLAUDE.md`.
 3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.
@@ -137,7 +140,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 - **The Content Security Policy is strict.** Anything new the web app loads from another host needs adding to the policy in `render.yaml`, or production will block it: fonts, images from a new non-https host, a new API host, WebSockets in phase 4 (`connect-src` needs the `wss://` address). So does any inline `style="…"`, `on…=` or `<script>` in markup. `scripts/serve-build.test.js` catches the inline cases in CI. To check a real build:
   - `INLINE_RUNTIME_CHUNK=false REACT_APP_API_URL=http://localhost:<api>/api npm run build`
   - then `node scripts/serve-build.js --port 3999 --api http://localhost:<api>`
-- **Isolated test APIs.** Start one from a scratchpad folder, so `server/.env` and its Ticketmaster key aren't loaded:
+- **Isolated test APIs.** Start one from a folder with no `.env` (the scratchpad from Bash; the project root from `preview_start`, which only takes a `cwd` in the project), so `server/.env` and its Ticketmaster key aren't loaded:
   - `NODE_ENV=production DEMO_MODE=true PORT=41xx JWT_SECRET=<random> CLIENT_ORIGIN=http://localhost:3999 node <repo>/server/src/index.js`
   - Rate limits are on in that mode. A different `X-Forwarded-For` per request gets a fresh bucket while `TRUST_PROXY` trusts it.
 - **Live checks:**
@@ -146,7 +149,13 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
   - **Driving a pull:** dispatch `TouchEvent`s with `new Touch(...)` on `.overscroll-y-contain`.
   - **The first screenshot after a tab change can come out blank** while the route transition runs. Take it again.
 - **A hidden Browser pane or a background tab pauses `requestAnimationFrame`.** Bring the tab to the front before judging the map or animations.
+- **The real-time socket** (`server/src/realtime/hub.js`, `src/services/realtime.js`):
+  - It only pokes. Screens pass a topic to `usePolling(fn, ms, { eventId, what })`.
+  - A topic with an event slows polling to 60 s once the server confirms that subscription (`subscribed`; a `denied` one keeps its pace). So **any new write that changes what a screen shows needs a poke**, and anything that changes with time alone (a share running out) has to be handled on the phone, as `useLive` does. Writes under `/api/events/:id/...` get one from `pokeOnSuccess` in `routes/events.js`. Anything else needs a call to `notifyEvent` or `notifyUsers`.
+  - The hub is one per process. The supertest suites never attach it, so pokes there do nothing.
 - **The fake API in app tests** (`src/testUtils/fakeApi.js`):
+  - Its `WebSocket` never connects unless `installFakeApi({ realtime: true })`, so older tests keep 4 s polling. With it: `poke(eventId, what)`, `dropSocket(code)` and `openSockets()`.
+  - Jest 27 here has no `advanceTimersByTimeAsync`, and a zero-delay timer created inside `advanceTimersByTime(0)` doesn't fire. Advance a few milliseconds instead.
   - `holdNext`, `delayNext` and `failNext(method, path, status)` for slow and failing requests.
   - `changeEvent` and `removeEvent` simulate another person's edits.
   - Options include `demoAccount` (a demo account, with no password form) and failure options such as `stopShareFails` and `paymentOutcomes`.

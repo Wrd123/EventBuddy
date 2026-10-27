@@ -204,6 +204,15 @@ describe('Map during an event', () => {
       .toHaveAttribute('aria-pressed', 'true');
   });
 
+  it("takes a friend off the map when their share runs out, without waiting for a read", async () => {
+    installFakeApi({ liveEvent: true, friendShareEndsInMs: 300 }).logIn();
+    renderAt('/map');
+
+    expect(await pin('Friend: Alex')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Friend: Alex' })).not.toBeInTheDocument());
+    await settle();
+  });
+
   it("opened from an event that hasn't started, shows nobody, even with another event on now", async () => {
     renderAt('/events/1');
     fireEvent.click(await screen.findByRole('button', { name: 'Map' }));
