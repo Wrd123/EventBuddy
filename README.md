@@ -13,7 +13,8 @@ Built end to end by me: React front end, Express and MongoDB API, and a native i
 ## What it does
 
 - **Plan together.** Single or multi-day events, a shared schedule with who's going to what, and invite links that let friends join in one tap.
-- **Talk in one place.** Every event has its own group chat, with unread counts on the Groups tab and new messages arriving while it's open.
+- **Talk in one place.** Every event has its own group chat, with unread counts on the Groups tab and new messages arriving the moment they're sent.
+- **See who's here.** A green dot on a friend's avatar, a "Here now" line in the chat and on the map mean they have EventBuddy open right now.
 - **Split costs.** Add expenses split equally or by exact amounts. EventBuddy works out balances and the fewest payments to settle up, then opens Venmo, Cash App or PayPal with the amount filled in.
 - **Find each other.** During an event, friends can share their location for an hour, a few hours or until midnight. The map shows where everyone is, how recently they updated, and a meetup point anyone can set. In the iPhone app, sharing keeps working with the screen locked. Before the trip, an event's map helps plan it instead: directions, a meetup point for the first day, and what else is on nearby during those dates.
 - **Discover things to do.** Concerts, games and shows near you (Ticketmaster), found from your phone's location without setting anything up, each one a tap away from becoming a plan with friends.
@@ -84,7 +85,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet with MapLibre vector tiles from OpenFreeMap (free, keyless) |
 | iPhone | Capacitor 7, background geolocation, native HTTP, haptics |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt, `ws` for real-time pokes |
-| Testing | Jest and Testing Library (461 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (352 tests) |
+| Testing | Jest and Testing Library (467 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (358 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
@@ -92,6 +93,7 @@ flowchart LR
 - **Money is stored in whole cents.** Dollars in floating point drift (0.1 + 0.2 isn't 0.3), and an equal split of $100 between three people has to add up to exactly $100. Settling up uses a greedy match of the largest debtor with the largest creditor, which keeps the number of payments small.
 - **Chat pages by message id, not timestamp.** MongoDB ids increase over time, so "everything after this id" never skips or repeats a message, even when two arrive in the same second.
 - **Real time is a poke, not a payload.** When something changes, the server sends the event's members a WebSocket message that only says what changed (`chat`, `live`, the `event`), and the app runs the same read it would have polled with. All the work that keeps late or overlapping answers from undoing newer ones stays in one place, a slip in the socket's access checks could reveal at most that something changed, and without a socket (offline, a blocking proxy, an older app) polling carries on as before. While connected, polling slows to a once-a-minute safety net; it only runs while the app is on screen, and so does the socket. The socket logs in with its first message rather than the URL, so tokens stay out of logs. Its subscriptions are tracked in the server's memory, which suits the single free instance; a second instance would need pub/sub such as Redis to pass pokes between them.
+- **Here now is just an open socket.** The socket only exists while the app is on screen, so having one is what being here means; there's no separate heartbeat or "last seen" to store. The server sends each event's members the ids of the others who are connected, never to anyone outside the event, and waits 5 seconds before letting someone go, so switching apps for a moment doesn't flash them away.
 - **Read receipts are deliberately absent.** How far you've read is stored apart from the event's member list, which every member receives, so unread counts work without telling the group what you've read.
 - **Location sharing is built to forget.** It's opt-in per event, lasts at most 24 hours and only while the event is on. The server keeps only your latest position, and a MongoDB TTL index deletes it when sharing ends; reads also filter on the end time, since TTL cleanup runs about once a minute. A map opened from an event only ever shows that event's members, and only while it's on.
 - **Background location is one small seam.** A single tracker module uses the native background plugin in the app and the browser's geolocation on the web, and app-wide sharing state keeps it running on every screen, through a relaunch, and stops it on logout.

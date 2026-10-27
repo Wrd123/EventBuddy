@@ -113,21 +113,23 @@ const ShareChoices = ({ event, onShare }) => {
   );
 };
 
-// A friend's pin, tapped
-export const FriendPanel = ({ person }) => (
+// A friend's pin, tapped. here: they have the app open right now.
+export const FriendPanel = ({ person, here = false }) => (
   <div>
     <div className="flex items-center mb-3">
-      <div
-        className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold mr-3 shrink-0"
-        style={{ backgroundColor: person.color }}
-        aria-hidden="true"
-      >
-        {person.name.charAt(0)}
+      <div className="relative mr-3 shrink-0" aria-hidden="true">
+        <div
+          className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold"
+          style={{ backgroundColor: person.color }}
+        >
+          {person.name.charAt(0)}
+        </div>
+        {here && <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-go rounded-full border-2 border-night" />}
       </div>
       <div className="min-w-0">
         <h2 className="font-bold truncate">{person.name}</h2>
         <p className="text-sm text-muted">
-          Updated {agoText(person.positionAt)} • sharing {untilText(person.until)}
+          {here && 'Here now • '}Updated {agoText(person.positionAt)} • sharing {untilText(person.until)}
         </p>
       </div>
     </div>

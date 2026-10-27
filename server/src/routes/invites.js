@@ -59,6 +59,7 @@ router.post('/:code/join', async (req, res) => {
   if (event.removed.some((r) => r.user.equals(me._id))) throw new HttpError(403, REMOVED);
   // Everyone sees the new member, and your other devices see the event
   if (modifiedCount > 0) {
+    realtime.addMember(event._id, me._id);
     realtime.notifyEvent(event._id, 'event');
     realtime.notifyUsers([me._id]);
   }

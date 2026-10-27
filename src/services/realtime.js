@@ -39,6 +39,8 @@ const statusListeners = new Set();
 // subscription (or one not answered yet) gets no pokes, so its screens
 // keep polling at their own pace.
 const covered = new Set();
+// Who has the app open, by event: user ids, as the server last said
+const presence = new Map();
 
 const send = (ws, message) => ws.send(JSON.stringify(message));
 
@@ -49,7 +51,11 @@ const changed = () => statusListeners.forEach((listener) => listener());
 const setConnected = (value) => {
   if (connected === value) return;
   connected = value;
-  if (!value) covered.clear();
+  // Nobody is better than dots that may be stale
+  if (!value) {
+    covered.clear();
+    presence.clear();
+  }
   changed();
 };
 
@@ -121,6 +127,9 @@ function connect() {
       setCovered(message.eventId, message.type === 'subscribed' && watchedEvents().has(message.eventId));
     } else if (message.type === 'changed') {
       heard(message);
+    } else if (message.type === 'presence' && watchedEvents().has(message.eventId) && Array.isArray(message.userIds)) {
+      presence.set(message.eventId, message.userIds);
+      changed();
     }
   };
   ws.onclose = ({ code }) => {
@@ -170,6 +179,10 @@ export const isConnected = () => connected;
 // Whether pokes about this event are reaching this phone
 export const isCovered = (eventId) => connected && covered.has(eventId);
 
+// Members of this event with the app open now (user ids), as far as this
+// phone knows: none while it isn't connected
+export const presenceOf = (eventId) => presence.get(eventId) || [];
+
 // onStatus(listener) -> unlisten; listener() whenever the connection, or
 // which events it covers, changes
 export const onStatus = (listener) => {
@@ -190,6 +203,7 @@ export const watch = (eventId, what, onPoke) => {
     if (!watchers.delete(watcher)) return;
     if (watcher.eventId && connected && !watchedEvents().has(watcher.eventId)) {
       send(socket, { type: 'unsubscribe', eventId: watcher.eventId });
+      presence.delete(watcher.eventId);
       setCovered(watcher.eventId, false);
     }
   };

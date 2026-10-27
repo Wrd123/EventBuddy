@@ -70,6 +70,7 @@ router.post('/', async (req, res) => {
   await event.save();
 
   // Your other devices list it too
+  realtime.addMember(event._id, req.user._id);
   realtime.notifyUsers([req.user._id]);
   res.status(201).json({ event });
 });

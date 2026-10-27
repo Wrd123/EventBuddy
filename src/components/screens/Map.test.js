@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, settle, removeEvent, holdNext } from '../../testUtils/fakeApi';
+import { installFakeApi, settle, removeEvent, holdNext, presence, openSockets } from '../../testUtils/fakeApi';
 import MainLayout from '../layout/MainLayout';
 import { eventDays } from './Map';
 
@@ -631,5 +631,19 @@ describe('eventDays', () => {
 
   it('is nothing once the event is over', () => {
     expect(eventDays({ startDate: '2026-08-08', endDate: '2026-08-08' }, TODAY)).toBeNull();
+  });
+});
+
+describe('Map with who is here now', () => {
+  it("says on a friend's panel when they have the app open", async () => {
+    installFakeApi({ liveEvent: true, realtime: true }).logIn();
+    renderAt('/map');
+    fireEvent.click(await pin('Friend: Alex'));
+    expect(await screen.findByText(/^Updated 2 min ago/)).toBeInTheDocument();
+
+    await waitFor(() => expect(openSockets()[0]?.subscriptions.has('5')).toBe(true));
+    await presence('5', ['u2']);
+    expect(screen.getByText(/^Here now • Updated 2 min ago/)).toBeInTheDocument();
+    await settle();
   });
 });

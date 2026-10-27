@@ -7,6 +7,7 @@ import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
 import MemberSheet from '../common/MemberSheet';
 import { useAppContext } from '../../context/AppContext';
+import { usePresence } from '../../hooks/usePresence';
 import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
 import { usePolling } from '../../hooks/usePolling';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
@@ -67,6 +68,7 @@ const EventDetails = () => {
   const { event, status, error, refresh } = useEvent(eventId);
   const { currentUser } = useAppContext();
   const summary = useEventSummary(eventId);
+  const here = usePresence(eventId);
   // A failure message goes below the floating header, clear of its buttons
   const { bind, indicator } = usePullToRefresh(() => Promise.all([refresh(), summary.refresh()]), { messageTop: FLOATING_HEADER_HEIGHT });
   // Create Event sends new organizers here with the invite sheet open
@@ -128,7 +130,7 @@ const EventDetails = () => {
               Get tickets <ExternalLink size={16} className="ml-2" aria-hidden="true" />
             </a>
           )}
-          <EventContent event={event} onInvite={() => setShowInvite(true)} onMember={setOpenMember} />
+          <EventContent event={event} here={here} onInvite={() => setShowInvite(true)} onMember={setOpenMember} />
         </div>
       </div>
 
@@ -258,7 +260,8 @@ const ActionButton = ({ Icon, label, badge = 0, hint = '', onClick }) => (
   </button>
 );
 
-const EventContent = ({ event, onInvite, onMember }) => {
+// here: the user ids of members with the app open (see usePresence)
+const EventContent = ({ event, here, onInvite, onMember }) => {
   // Preview one day: today while the event is running, else its first day.
   // The Schedule screen shows every day.
   const day = defaultScheduleDay(event);
@@ -277,13 +280,15 @@ const EventContent = ({ event, onInvite, onMember }) => {
           <button
             key={member._id}
             onClick={() => onMember(member)}
-            aria-label={member.user === event.createdBy ? `${member.name}, organizer` : member.name}
+            aria-label={[member.name, member.user === event.createdBy && 'organizer', here.has(member.user) && 'here now']
+              .filter(Boolean).join(', ')}
             className="flex flex-col items-center shrink-0 w-12 transition-transform active:scale-95"
           >
             <Avatar
               initial={member.name.charAt(0)}
               color={member.color}
               size="lg"
+              status={here.has(member.user)}
             />
             <span className="text-xs mt-1.5 text-fg/85 truncate max-w-full">{member.name.split(' ')[0]}</span>
             {member.user === event.createdBy && (

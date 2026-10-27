@@ -10,6 +10,8 @@ const realtime = require('../src/realtime/hub');
 useTestDatabase();
 
 const ORIGIN = 'http://localhost:3000';
+// Long enough to cover a whole reconnect on a slow machine
+const LEAVE_GRACE_MS = 500;
 let server;
 let url;
 const sockets = [];
@@ -19,7 +21,7 @@ const sockets = [];
 before(async () => {
   server = http.createServer(createApp());
   await new Promise((resolve) => server.listen(0, resolve));
-  realtime.attach(server, { origins: [ORIGIN], limits: { authMs: 300 } });
+  realtime.attach(server, { origins: [ORIGIN], limits: { authMs: 300, leaveGraceMs: LEAVE_GRACE_MS } });
   url = `ws://localhost:${server.address().port}${realtime.PATH}`;
 });
 
@@ -311,5 +313,107 @@ describe('pokes', () => {
     await ws.next(listChanged, 'the list poke');
     realtime.notifyEvent(event._id, 'chat');
     await assertHeardNothing(ws, friend);
+  });
+});
+
+describe('presence', () => {
+  const presence = (eventId) => (m) => m.type === 'presence' && m.eventId === eventId;
+  const here = (message) => [...message.userIds].sort();
+  const ids = (...people) => people.map((p) => p.user._id).sort();
+
+  it('tells a new subscriber which members have the app open, and not outsiders', async () => {
+    const { organizer, friend, outsider, event } = await setup();
+    await logIn(friend);
+    await logIn(outsider);
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    assert.deepEqual(here(await ws.next(presence(event._id), 'presence')), ids(organizer, friend));
+  });
+
+  it('tells members when someone opens the app, and never tells outsiders', async () => {
+    const { organizer, friend, outsider, event } = await setup();
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    await ws.next(presence(event._id), 'the first presence');
+    const stranger = await logIn(outsider);
+    await subscribe(stranger, event._id);
+
+    await logIn(friend);
+    assert.deepEqual(here(await ws.next(presence(event._id), 'presence')), ids(organizer, friend));
+    // Anything sent to the stranger would have arrived before this
+    realtime.notifyUsers([outsider.user._id]);
+    await stranger.next(listChanged, 'the barrier');
+    assert.equal(stranger.inbox.some((m) => m.type === 'presence'), false);
+  });
+
+  it('lets them go a moment after they close the app, unless they come straight back', async () => {
+    const { organizer, friend, event } = await setup();
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    const first = await logIn(friend);
+    const second = await logIn(friend);
+    await ws.next((m) => m.type === 'presence' && m.userIds.length === 2, 'both here');
+    ws.inbox.length = 0;
+
+    // One of two sockets closing changes nothing; the other closing starts
+    // the grace, and a reconnect within it means they never left
+    first.close();
+    await first.closed;
+    second.close();
+    await second.closed;
+    const again = await logIn(friend);
+    await new Promise((resolve) => setTimeout(resolve, LEAVE_GRACE_MS + 100));
+    assert.equal(ws.inbox.some((m) => m.type === 'presence'), false);
+
+    again.close();
+    assert.deepEqual(here(await ws.next(presence(event._id), 'the leave')), ids(organizer));
+  });
+
+  it('follows people joining and being removed', async () => {
+    const { organizer, friend, outsider, event } = await setup();
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    const removed = await logIn(friend);
+    await subscribe(removed, event._id);
+    await ws.next((m) => m.type === 'presence' && m.userIds.length === 2, 'the friend arriving');
+    await logIn(outsider);
+
+    await api().post(`/api/invites/${event.inviteCode}/join`).set('Authorization', outsider.auth).expect(200);
+    const joined = await ws.next((m) => m.type === 'presence' && m.userIds.length === 3, 'the join');
+    assert.deepEqual(here(joined), ids(organizer, friend, outsider));
+
+    removed.inbox.length = 0;
+    await api().delete(path(event, 'members', friend.user._id)).set('Authorization', organizer.auth).expect(204);
+    const left = await ws.next((m) => m.type === 'presence' && m.userIds.length === 2, 'the removal');
+    assert.deepEqual(here(left), ids(organizer, outsider));
+    // Their list poke comes after any presence would have, and none did
+    await removed.next(listChanged, 'the list poke');
+    assert.equal(removed.inbox.some((m) => m.type === 'presence'), false);
+  });
+
+  it('lets someone go at once when they log out', async () => {
+    const { organizer, friend, event } = await setup();
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    await logIn(friend);
+    await ws.next((m) => m.type === 'presence' && m.userIds.length === 2, 'both here');
+
+    const loggedOutAt = Date.now();
+    await api().post('/api/auth/logout').set('Authorization', friend.auth).expect(204);
+    assert.deepEqual(here(await ws.next(presence(event._id), 'the leave')), ids(organizer));
+    assert.ok(Date.now() - loggedOutAt < LEAVE_GRACE_MS, 'without waiting out the grace');
+  });
+
+  it("doesn't let someone go when a sixth socket replaces their oldest", async () => {
+    const { organizer, friend, event } = await setup();
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    for (let i = 0; i < 5; i += 1) await logIn(friend);
+    await ws.next((m) => m.type === 'presence' && m.userIds.length === 2, 'both here');
+    ws.inbox.length = 0;
+
+    await logIn(friend);
+    await new Promise((resolve) => setTimeout(resolve, LEAVE_GRACE_MS + 100));
+    assert.equal(ws.inbox.some((m) => m.type === 'presence'), false);
   });
 });

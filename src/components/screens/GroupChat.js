@@ -7,7 +7,9 @@ import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
 import { useChat } from '../../hooks/useChat';
 import { useAppContext } from '../../context/AppContext';
+import { usePresence } from '../../hooks/usePresence';
 import { layoutChat } from '../../utils/chat';
+import { listNames } from '../../utils/map';
 import { tap } from '../../services/haptics';
 
 // For someone who has left the event since they wrote
@@ -22,6 +24,7 @@ const GroupChat = () => {
   const location = useLocation();
   const { event, status, error } = useEvent(eventId);
   const chat = useChat(eventId);
+  const here = usePresence(eventId);
 
   // Back to wherever the chat was opened from
   const backTo = location.state?.from === 'groups' ? '/groups' : `/events/${eventId}`;
@@ -45,9 +48,26 @@ const GroupChat = () => {
           {event.members.length} {event.members.length === 1 ? 'member' : 'members'} • Event details
         </span>
       </Link>
+      <HereNow event={event} here={here} />
 
       <Conversation event={event} chat={chat} />
       <Composer eventName={event.name} onSend={chat.send} />
+    </div>
+  );
+};
+
+// Who else in the event has the app open, under the header. Always in the
+// page (empty when nobody is), so screen readers hear people arrive.
+const HereNow = ({ event, here }) => {
+  const names = event.members.filter(m => here.has(m.user)).map(m => m.name.split(' ')[0]);
+  return (
+    <div role="status" className={names.length > 0 ? 'flex items-center gap-2 px-4 py-2 text-xs text-muted border-b border-line' : 'sr-only'}>
+      {names.length > 0 && (
+        <>
+          <span className="w-2 h-2 rounded-full bg-go shrink-0" aria-hidden="true" />
+          <span className="truncate">Here now: {listNames(names)}</span>
+        </>
+      )}
     </div>
   );
 };

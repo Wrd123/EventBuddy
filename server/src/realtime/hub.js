@@ -13,6 +13,12 @@
 //   hub → { type: 'subscribed', eventId } or { type: 'denied', eventId }
 //   hub → { type: 'changed', eventId, what: 'chat' | 'live' | 'event' }
 //   hub → { type: 'changed', what: 'events' }  your list of events changed
+//   hub → { type: 'presence', eventId, userIds }  members with the app open
+//
+// Presence is the one thing beyond pokes: user ids, sent only to the
+// event's own subscribers, which says no more than "this member has the app
+// open". The socket is only open while the app is on screen, so being
+// connected is what being here means.
 //
 // Everything is in this process's memory, which fits the single instance
 // Render runs. A second instance would need pub/sub (Redis, say) so a change
@@ -21,7 +27,8 @@ const mongoose = require('mongoose');
 const { WebSocketServer, WebSocket } = require('ws');
 const config = require('../config');
 const { authenticate } = require('../middleware/auth');
-const { findVisibleEvent } = require('../eventAccess');
+const Event = require('../models/Event');
+const { findVisibleEvent, visibleTo } = require('../eventAccess');
 
 const PATH = '/api/socket';
 
@@ -44,15 +51,19 @@ const LIMITS = {
   // Unauthenticated sockets count too, so they can't pile up
   sockets: 500,
   authMs: 5000,
-  pingMs: 30000
+  pingMs: 30000,
+  // Someone who closes the app stays here this long, so flicking to another
+  // app and straight back doesn't flash them away for everyone
+  leaveGraceMs: 5000
 };
 
 let state = null;
 
-// Bumped whenever access is taken away (a member removed, a login ended).
-// A check that was waiting on the database while it changed is run again,
-// so it can't add back what was just taken away.
-let revocations = 0;
+// Bumped whenever who may see what changes: a member removed or added, a
+// login ended, someone's presence ending. A check that was waiting on the
+// database while it changed is run again, so it can't add back what was
+// just taken away, or miss what was just given.
+let accessChanges = 0;
 
 const send = (ws, message) => {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
@@ -63,17 +74,39 @@ const reject = (socket, status) => {
   socket.destroy();
 };
 
-// Runs check until no access was taken away while it ran
+// Runs check until no access changed while it ran
 const checked = async (check) => {
   for (let tries = 0; tries < 3; tries += 1) {
-    const seen = revocations;
+    const seen = accessChanges;
     const result = await check();
-    if (seen === revocations) return result;
+    if (seen === accessChanges) return result;
   }
   throw new Error('Access kept changing.');
 };
 
 const subscribersOf = (eventId) => state.subscribers.get(eventId) || new Set();
+
+// Members of the event who are here: memberships holds the events of
+// everyone with the app open (or who closed it moments ago)
+const presenceOf = (eventId) =>
+  [...state.memberships].filter(([, events]) => events.has(eventId)).map(([userId]) => userId);
+
+const sendPresence = (eventId, to = subscribersOf(eventId)) => {
+  const message = { type: 'presence', eventId, userIds: presenceOf(eventId) };
+  to.forEach((ws) => send(ws, message));
+};
+
+// After the grace, if they haven't come back, they're no longer here
+const leaveLater = (userId) => {
+  state.leaving.set(userId, setTimeout(() => {
+    state.leaving.delete(userId);
+    if (state.users.has(userId)) return;
+    accessChanges += 1;
+    const events = state.memberships.get(userId) || new Set();
+    state.memberships.delete(userId);
+    events.forEach((eventId) => sendPresence(eventId));
+  }, state.limits.leaveGraceMs));
+};
 
 const unsubscribe = (ws, eventId) => {
   ws.events.delete(eventId);
@@ -86,37 +119,57 @@ const forget = (ws) => {
   // Sockets closed by close() go after the hub's state does
   if (!state) return;
   [...ws.events].forEach((eventId) => unsubscribe(ws, eventId));
-  const sockets = state?.users.get(ws.userId);
-  sockets?.delete(ws);
-  if (sockets?.size === 0) state.users.delete(ws.userId);
+  const sockets = state.users.get(ws.userId);
+  if (!sockets?.delete(ws) || sockets.size > 0) return;
+  state.users.delete(ws.userId);
+  if (state.memberships.has(ws.userId) && !state.leaving.has(ws.userId)) leaveLater(ws.userId);
 };
 
 const logIn = async (ws, token) => {
+  // The login, and (if they're arriving) which of their events will see
+  // them here, are checked together: a logout, removal or join while either
+  // is loading makes both load again. Everything after this is synchronous,
+  // so nothing can change between the check and the socket being counted.
   let user;
+  let events;
   try {
-    user = await checked(() => authenticate(token));
+    ({ user, events } = await checked(async () => {
+      const found = await authenticate(token);
+      const arriving = !state.memberships.has(found._id.toString());
+      return { user: found, events: arriving ? await Event.find(visibleTo(found), '_id') : null };
+    }));
   } catch {
     ws.close(ENDED, 'Please log in.');
     return;
   }
-  if (ws.readyState !== WebSocket.OPEN) return;
+  if (!state || ws.readyState !== WebSocket.OPEN) return;
+  const userId = user._id.toString();
+
+  // Their events are kept current from here on as they join and leave
+  const arrived = Boolean(events) && !state.memberships.has(userId);
+  if (arrived) state.memberships.set(userId, new Set(events.map((e) => e._id.toString())));
+  // Back within the grace: they never left
+  clearTimeout(state.leaving.get(userId));
+  state.leaving.delete(userId);
 
   clearTimeout(ws.authTimer);
   ws.user = user;
-  ws.userId = user._id.toString();
+  ws.userId = userId;
   const sockets = state.users.get(ws.userId) || new Set();
   state.users.set(ws.userId, sockets);
+  sockets.add(ws);
   // A phone that reconnected many times shouldn't lock itself out behind
-  // its own dead sockets, so the oldest goes
-  // Forgotten at once rather than when its close finishes, which a client
-  // that ignores the close could put off: it stops counting and hearing now
-  if (sockets.size >= state.limits.socketsPerUser) {
+  // its own dead sockets, so the oldest goes. It's forgotten at once rather
+  // than when its close finishes, which a client that ignores the close
+  // could put off: it stops counting and hearing now. The new one is
+  // already counted, so this never looks like the person leaving.
+  if (sockets.size > state.limits.socketsPerUser) {
     const oldest = sockets.values().next().value;
     forget(oldest);
     oldest.close(REPLACED, 'Opened somewhere else.');
   }
-  sockets.add(ws);
   send(ws, { type: 'ready' });
+  if (arrived) state.memberships.get(userId).forEach((eventId) => sendPresence(eventId));
 };
 
 const deny = (ws, eventId) => {
@@ -140,6 +193,7 @@ const subscribe = async (ws, eventId) => {
   if (!state.subscribers.has(eventId)) state.subscribers.set(eventId, new Set());
   state.subscribers.get(eventId).add(ws);
   send(ws, { type: 'subscribed', eventId });
+  sendPresence(eventId, [ws]);
 };
 
 const handle = async (ws, data, isBinary) => {
@@ -218,12 +272,16 @@ const attach = (server, { limits = {}, origins = config.clientOrigin } = {}) => 
   }, merged.pingMs);
   heartbeat.unref();
 
-  state = { wss, server, onUpgrade, heartbeat, limits: merged, users: new Map(), subscribers: new Map() };
+  state = {
+    wss, server, onUpgrade, heartbeat, limits: merged,
+    users: new Map(), subscribers: new Map(), memberships: new Map(), leaving: new Map()
+  };
 };
 
 const close = () => {
   if (!state) return;
   clearInterval(state.heartbeat);
+  state.leaving.forEach((timer) => clearTimeout(timer));
   state.server.off('upgrade', state.onUpgrade);
   state.wss.clients.forEach((ws) => ws.terminate());
   state.wss.close();
@@ -251,7 +309,7 @@ const notifyUsers = (userIds) => {
 // screen of it they have open reads it now, finds it gone and says so,
 // rather than showing it until its next poll.
 const dropFromEvent = (eventId, userIds) => {
-  revocations += 1;
+  accessChanges += 1;
   if (!state) return;
   const id = String(eventId);
   const leaving = userIds && new Set(userIds.map(String));
@@ -260,14 +318,35 @@ const dropFromEvent = (eventId, userIds) => {
     EVERYTHING.forEach((what) => send(ws, { type: 'changed', eventId: id, what }));
     unsubscribe(ws, id);
   });
+  // Nor are they here for it any more
+  state.memberships.forEach((events, userId) => {
+    if (!leaving || leaving.has(userId)) events.delete(id);
+  });
+  if (leaving) sendPresence(id);
 };
 
-// Closes every socket of these people: their login ended
-const closeUsers = (userIds, code = ENDED) => {
-  revocations += 1;
+// Someone joined (or made) an event: if they have the app open, they're
+// here for it now
+const addMember = (eventId, userId) => {
+  accessChanges += 1;
   if (!state) return;
-  userIds.forEach((userId) => {
-    state.users.get(String(userId))?.forEach((ws) => ws.close(code, 'Please log in.'));
+  const id = String(eventId);
+  state.memberships.get(String(userId))?.add(id);
+  sendPresence(id);
+};
+
+// Closes every socket of these people: their login ended. They stop being
+// here at once; the grace is for flicking between apps, not for logging out.
+const closeUsers = (userIds, code = ENDED) => {
+  accessChanges += 1;
+  if (!state) return;
+  userIds.map(String).forEach((userId) => {
+    const events = state.memberships.get(userId) || new Set();
+    state.memberships.delete(userId);
+    clearTimeout(state.leaving.get(userId));
+    state.leaving.delete(userId);
+    state.users.get(userId)?.forEach((ws) => ws.close(code, 'Please log in.'));
+    events.forEach((eventId) => sendPresence(eventId));
   });
 };
 
@@ -287,4 +366,6 @@ const pokeOnSuccess = (what) => (req, res, next) => {
   next();
 };
 
-module.exports = { attach, close, notifyEvent, notifyUsers, dropFromEvent, closeUsers, pokeOnSuccess, PATH, ENDED, REPLACED };
+module.exports = {
+  attach, close, notifyEvent, notifyUsers, dropFromEvent, addMember, closeUsers, pokeOnSuccess, PATH, ENDED, REPLACED
+};

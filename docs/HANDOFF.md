@@ -6,7 +6,8 @@
 
 - **Git, when this note was written:**
   - `main` and GitHub's `main` are both at `af53a28d`: everything up to the Phase 4 plan, including the switched-off address check for F-1.
-  - **Phase 4a (the socket and its pokes) is on the branch `phase-4a-realtime`**, not merged and not pushed.
+  - **Local `main` is at `35265805` (Phase 4a, the socket and its pokes), one commit ahead of GitHub and not pushed.**
+  - **Phase 4b (who's here now) is on the branch `phase-4b-presence`.**
   - The branch `phase-4-handoff` points at the same commit as `main` and can be deleted.
   - Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting any of this.
 - **Deployed on Render:**
@@ -17,7 +18,7 @@
   - A redeploy alone doesn't re-read `render.yaml`, which is why the policy first went out missing.
 - **The map** uses OpenFreeMap's Liberty style, darkened. The map screen's bottom sheet no longer gets covered by the map (see Decisions).
 - **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps), so ask the user to look at the Actions tab.
-- **Tests (on `phase-4a-realtime`):** 352 server tests, 461 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests (on `phase-4b-presence`):** 358 server tests, 467 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1).
@@ -99,7 +100,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done |
 | 3b | Loading skeletons and pull-to-refresh | Done |
 | — | Security review and fixes | Done, except F-1 |
-| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now, and scripted demo friends | 4a built on `phase-4a-realtime`; 4b to 4d next (see `docs/PHASE_4_PLAN.md`) |
+| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now, and scripted demo friends | 4a on `main`; 4b on `phase-4b-presence`; 4c and 4d next (see `docs/PHASE_4_PLAN.md`) |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
@@ -115,7 +116,13 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
      - meetup changes poke both `live` and `event`.
 
      Deploying it needs a **Blueprint sync**, for `wss://*.onrender.com` in `connect-src`. After the deploy, the user checks the live site's console for a socket blocked by the policy.
-   - Build 4b (who's here now), 4c (the activity feed) and 4d (scripted demo friends) next, each on its own branch.
+   - **4b is built** on `phase-4b-presence`:
+     - Presence is "has a logged-in socket", with a 5 s grace on leaving.
+     - It's ids only, sent only to the event's subscribers.
+     - The hub learns each online person's events when their first socket logs in, and keeps them current through `dropFromEvent` and `addMember`.
+     - `usePresence(eventId)` gives the others who are here.
+   - Build 4c (the activity feed) and 4d (scripted demo friends) next, each on its own branch. 4d's friends can show as here by joining `state.memberships` the way a socket does.
+   - **The map's first fit can put a friend's pin right under the bottom sheet's edge.** That was there before 4b; found during the 4b screenshots.
    - Each gets tests, the strict build and the `reviewer` subagent before it's committed, plus screenshots for the user before any UI commit.
    - Plan the first part in plan mode, per `CLAUDE.md`.
 3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.

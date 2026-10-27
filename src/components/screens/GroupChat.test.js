@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, receiveMessage, settle, poke, openSockets } from '../../testUtils/fakeApi';
+import { installFakeApi, receiveMessage, settle, poke, openSockets, presence, changeEvent } from '../../testUtils/fakeApi';
 import MainLayout from '../layout/MainLayout';
 
 const renderAt = (path) =>
@@ -262,5 +262,35 @@ describe('Real time', () => {
     await poke('1', 'chat');
 
     expect(await screen.findByText('Running 10 minutes late!')).toBeInTheDocument();
+  });
+});
+
+describe('Here now', () => {
+  beforeEach(() => installFakeApi({ realtime: true }).logIn());
+
+  const openChat = async () => {
+    renderAt('/events/1/chat');
+    await screen.findByText('I can grab snacks too.');
+    await waitFor(() => expect(openSockets()[0]?.subscriptions.has('1')).toBe(true));
+  };
+
+  it('names the others who have the app open, under the header', async () => {
+    await openChat();
+    expect(screen.queryByText(/Here now/)).not.toBeInTheDocument();
+
+    await presence('1', ['u1', 'u2']);
+    expect(screen.getByText('Here now: Alex')).toBeInTheDocument();
+
+    await presence('1', ['u1']);
+    expect(screen.queryByText(/Here now/)).not.toBeInTheDocument();
+  });
+
+  it('shows a name with markup in it as plain text', async () => {
+    changeEvent('1', (event) => { event.members[1].name = '<img src=x onerror=alert(1)>'; });
+    await openChat();
+
+    await presence('1', ['u2']);
+    expect(screen.getByText('Here now: <img')).toBeInTheDocument();
+    expect(document.querySelector('img[src="x"]')).toBeNull();
   });
 });

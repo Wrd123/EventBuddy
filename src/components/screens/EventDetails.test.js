@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, settle } from '../../testUtils/fakeApi';
+import { installFakeApi, settle, presence, openSockets } from '../../testUtils/fakeApi';
 import MainLayout from '../layout/MainLayout';
 
 const renderAt = (path) =>
@@ -129,5 +129,22 @@ describe("leaving and removing people", () => {
     fireEvent.click(within(removed.parentElement).getByRole('button', { name: 'Let back in' }));
 
     await waitFor(() => expect(within(sheet()).queryByRole('heading', { name: 'Removed' })).not.toBeInTheDocument());
+  });
+});
+
+describe('who is here now', () => {
+  it('puts a dot on the members who have the app open, and says so', async () => {
+    installFakeApi({ realtime: true }).logIn();
+    renderAt('/events/1');
+    await screen.findByRole('button', { name: 'Alex' });
+    await waitFor(() => expect(openSockets()[0]?.subscriptions.has('1')).toBe(true));
+
+    // You're here too, but you know that
+    await presence('1', ['u1', 'u2']);
+    expect(screen.getByRole('button', { name: 'Alex, here now' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^John Doe, organizer$/ })).toBeInTheDocument();
+
+    await presence('1', ['u1']);
+    expect(screen.getByRole('button', { name: 'Alex' })).toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import { Button, EventCover, LocalEventCard, LocalEventSheet, PlaceSheet } from 
 import { useMapEvents } from '../../hooks/useMapEvents';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
 import { useLive } from '../../hooks/useLive';
+import { usePresence } from '../../hooks/usePresence';
 import { useSharing } from '../../context/SharingContext';
 import { usePlace } from '../../hooks/usePlace';
 import { formatDateRange, formatDay, getEventStatus, parseISODate, toISODate, todayISO } from '../../utils/dates';
@@ -53,6 +54,7 @@ const Map = () => {
   // A meetup point can also be planned before the event starts
   const meetupEvent = oneEvent && focusStatus === 'upcoming' ? focusEvent : liveEvent;
   const live = useLive(meetupEvent?._id ?? null);
+  const here = usePresence(meetupEvent?._id ?? null);
 
   // What's on around the event during its days, or around you
   const days = focusEvent ? eventDays(focusEvent) : null;
@@ -200,7 +202,7 @@ const Map = () => {
         {placingMeetup ? (
           <MeetupForm existing={live.meetup} onSave={saveMeetup} onCancel={() => setPlacingMeetup(false)} />
         ) : selectedPerson ? (
-          <FriendPanel person={selectedPerson} />
+          <FriendPanel person={selectedPerson} here={here.has(selectedPerson.user)} />
         ) : selectedMeetup ? (
           <MeetupPanel meetup={selectedMeetup} onClear={async () => { await live.clearMeetup(); setSelectedId(null); }} />
         ) : selectedEvent ? (

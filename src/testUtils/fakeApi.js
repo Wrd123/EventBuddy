@@ -700,6 +700,14 @@ export const poke = (eventId, what) => act(() => {
   });
 });
 
+// The server saying who has the app open: the members of eventId with
+// these user ids. Like the real hub, only to sockets subscribed to it.
+export const presence = (eventId, userIds) => act(() => {
+  openSockets().forEach((ws) => {
+    if (ws.subscriptions.has(eventId)) ws.receive({ type: 'presence', eventId, userIds });
+  });
+});
+
 // The socket dropping, as when the server restarts or the signal goes
 export const dropSocket = (code = 1006) => act(() => {
   openSockets().forEach((ws) => ws.serverClose(code));

@@ -163,6 +163,7 @@ Phase 4 adds a WebSocket at `/api/socket` (`server/src/realtime/hub.js`). It was
 - **Origin.** A browser page from another site is refused at the upgrade. The login isn't a cookie, so such a page couldn't act as anyone anyway; native apps send no Origin.
 - **Limits.** 1 kB messages, 5 sockets per person (the oldest is dropped at once, not when its close finishes), 20 subscriptions per socket, 20 refused subscriptions before the socket is closed (each costs a query), 500 sockets in all, unknown messages ignored, and a 30-second ping that drops dead connections.
 - **Nothing in the upgrade can throw.** It runs outside Express, so an uncaught error would stop the API. A request line Node accepts but `URL` can't parse once did exactly that; the internal reviewer found it before it shipped, and a test sends it.
+- **Presence (phase 4b)** is the one thing beyond pokes: the user ids of an event's members who have the app open, sent only to that event's subscribers, so only to members. It says no more than "this member has EventBuddy open". It never carries names or places. Removal takes someone out of the event's presence and stops it reaching them at once, and logging out ends it at once too; only closing the app waits 5 seconds. A socket's login and the list of events that will see it are checked together, so a logout, removal or join while either is still loading makes both load again.
 - **Production:** `connect-src` in the page's policy allows `wss://*.onrender.com`.
 
 `server/tests/realtime.test.js` covers each of these with a real WebSocket client.

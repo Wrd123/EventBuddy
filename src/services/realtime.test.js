@@ -168,3 +168,36 @@ describe('the socket', () => {
     expect(openSockets()).toHaveLength(0);
   });
 });
+
+describe('presence', () => {
+  it('keeps who is here for each watched event, and forgets it when the socket goes', async () => {
+    const unwatch = watch('1', 'presence', () => {});
+    realtime.start();
+    await settle();
+    const [ws] = openSockets();
+
+    ws.receive({ type: 'presence', eventId: '1', userIds: ['u2'] });
+    ws.receive({ type: 'presence', eventId: '9', userIds: ['u3'] });
+    expect(realtime.presenceOf('1')).toEqual(['u2']);
+    expect(realtime.presenceOf('9')).toEqual([]);
+
+    await dropSocket();
+    expect(realtime.presenceOf('1')).toEqual([]);
+
+    await act(() => { jest.advanceTimersByTime(1000); });
+    await settle();
+    openSockets()[0].receive({ type: 'presence', eventId: '1', userIds: ['u2'] });
+    unwatch();
+    expect(realtime.presenceOf('1')).toEqual([]);
+  });
+
+  it("starts a new login with nobody here, whatever the last one heard", async () => {
+    watch('1', 'presence', () => {});
+    realtime.start();
+    await settle();
+    openSockets()[0].receive({ type: 'presence', eventId: '1', userIds: ['u2'] });
+
+    realtime.start();
+    expect(realtime.presenceOf('1')).toEqual([]);
+  });
+});
