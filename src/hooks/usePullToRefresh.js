@@ -50,6 +50,7 @@ export default function usePullToRefresh(onRefresh, { messageTop = 0 } = {}) {
   const refreshingRef = useRef(false);
   const mountedRef = useRef(false);
   const timersRef = useRef(new Set());
+  const errorTimerRef = useRef(null);
 
   const later = useCallback((fn, ms) => {
     const timer = setTimeout(() => {
@@ -101,7 +102,10 @@ export default function usePullToRefresh(onRefresh, { messageTop = 0 } = {}) {
     if (!ok) {
       warning();
       setFailed(true);
-      later(() => setFailed(false), ERROR_MS);
+      // A new failure gets its full time on screen, not what's left of the last
+      clearTimeout(errorTimerRef.current);
+      timersRef.current.delete(errorTimerRef.current);
+      errorTimerRef.current = later(() => setFailed(false), ERROR_MS);
     }
   }, [show, later]);
 
@@ -121,8 +125,11 @@ export default function usePullToRefresh(onRefresh, { messageTop = 0 } = {}) {
       let pull = null;
 
       const onStart = (e) => {
+        // A second finger landing mid-pull ends it; put the content back
+        if (pull?.active) show(0, { animate: true });
         pull = null;
-        if (refreshingRef.current || e.touches.length !== 1 || node.scrollTop > 0) return;
+        // Below zero, iOS is still bouncing back from a fling into the top
+        if (refreshingRef.current || e.touches.length !== 1 || node.scrollTop !== 0) return;
         const touch = e.touches[0];
         pull = { x: touch.clientX, y: touch.clientY, active: false, crossed: false, distance: 0 };
       };
@@ -133,7 +140,13 @@ export default function usePullToRefresh(onRefresh, { messageTop = 0 } = {}) {
         const dx = touch.clientX - pull.x;
         const dy = touch.clientY - pull.y;
         if (!pull.active) {
-          if (Math.abs(dx) < DIRECTION_SLOP && Math.abs(dy) < DIRECTION_SLOP) return;
+          if (Math.abs(dx) < DIRECTION_SLOP && Math.abs(dy) < DIRECTION_SLOP) {
+            // Hold iOS's own scroll back while we wait to see the direction.
+            // Once it starts, its touchmoves can't be cancelled any more and
+            // its rubber band would run on top of ours.
+            if (dy > 0 && dy >= Math.abs(dx) && e.cancelable) e.preventDefault();
+            return;
+          }
           // Only a mostly-vertical drag downward is ours; anything else
           // (a horizontal carousel, a scroll up) is left to the page
           if (dy <= 0 || Math.abs(dx) > dy) {

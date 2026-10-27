@@ -61,7 +61,7 @@ describe('usePullToRefresh', () => {
     render(<Harness onRefresh={onRefresh} />);
     pull(screen.getByTestId('scroller'), { dy: 40 });
     expect(onRefresh).not.toHaveBeenCalled();
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(haptics.tap).not.toHaveBeenCalled();
   });
 
@@ -77,7 +77,7 @@ describe('usePullToRefresh', () => {
       work.resolve();
     });
     await settle();
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -87,7 +87,7 @@ describe('usePullToRefresh', () => {
     await advance(200);
     expect(screen.getByRole('status')).toHaveTextContent('Refreshing');
     await advance(300);
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('ignores a pull when the list is scrolled down', () => {
@@ -121,14 +121,67 @@ describe('usePullToRefresh', () => {
     expect(haptics.warning).toHaveBeenCalledTimes(1);
 
     await advance(2600);
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('moves the failure message below a floating header', async () => {
     render(<Harness onRefresh={() => Promise.reject(new Error('offline'))} options={{ messageTop: 68 }} />);
     pull(screen.getByTestId('scroller'), { dy: 160 });
     await settle();
-    expect(screen.getByRole('status')).toHaveStyle({ marginTop: '76px' });
+    expect(screen.getByText("Couldn't refresh. Check your connection.", { selector: 'p' })).toHaveStyle({ marginTop: '76px' });
+  });
+
+  it('gives a second failure its full time on screen', async () => {
+    render(<Harness onRefresh={() => Promise.reject(new Error('offline'))} />);
+    const el = screen.getByTestId('scroller');
+    pull(el, { dy: 160 });
+    await settle();
+    await advance(1500);
+    pull(el, { dy: 160 });
+    await settle();
+    // The first message's timer would have cleared it by now
+    await advance(1500);
+    expect(screen.getByRole('status')).toHaveTextContent("Couldn't refresh");
+    await advance(1000);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('puts the content back when a second finger lands mid-pull', () => {
+    const onRefresh = jest.fn();
+    render(<Harness onRefresh={onRefresh} />);
+    const el = screen.getByTestId('scroller');
+    fireEvent.touchStart(el, at(100, 100));
+    fireEvent.touchMove(el, at(100, 150));
+    expect(el.style.transform).toMatch(/translateY\(/);
+    fireEvent.touchStart(el, { touches: [{ clientX: 100, clientY: 150 }, { clientX: 200, clientY: 300 }] });
+    expect(el.style.transform).toBe('');
+    fireEvent.touchEnd(el);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it("holds the page's own scroll back from the first downward move", () => {
+    render(<Harness onRefresh={jest.fn()} />);
+    const el = screen.getByTestId('scroller');
+    fireEvent.touchStart(el, at(100, 100));
+    // fireEvent returns false when the listener called preventDefault
+    expect(fireEvent.touchMove(el, at(100, 103))).toBe(false);
+    expect(fireEvent.touchMove(el, at(100, 160))).toBe(false);
+  });
+
+  it('leaves a sideways first move alone', () => {
+    render(<Harness onRefresh={jest.fn()} />);
+    const el = screen.getByTestId('scroller');
+    fireEvent.touchStart(el, at(100, 100));
+    expect(fireEvent.touchMove(el, at(104, 101))).toBe(true);
+  });
+
+  it('does not start while the list is still bouncing above the top', () => {
+    const onRefresh = jest.fn();
+    render(<Harness onRefresh={onRefresh} />);
+    const el = screen.getByTestId('scroller');
+    Object.defineProperty(el, 'scrollTop', { configurable: true, value: -12 });
+    pull(el, { dy: 160 });
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   it('ignores a second pull while a refresh is running', async () => {

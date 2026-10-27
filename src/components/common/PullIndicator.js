@@ -3,6 +3,7 @@ import React from 'react';
 const SIZE = 32;
 const RADIUS = 12;
 export const RING_CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const FAILED_MESSAGE = "Couldn't refresh. Check your connection.";
 
 // The ring that fills as you pull down, spins while refreshing, and the short
 // message if the refresh failed. While you drag, usePullToRefresh moves and
@@ -39,14 +40,14 @@ const PullIndicator = ({ ringRef, arcRef, refreshing, failed, spin, messageTop =
         />
       </svg>
     </div>
-    {refreshing && (
-      <span role="status" className="sr-only">
-        Refreshing
-      </span>
-    )}
+    {/* Always there, so screen readers notice when its text changes. A live
+        region that appears with its text already in it is often skipped. */}
+    <span role="status" className="sr-only">
+      {refreshing ? 'Refreshing' : failed ? FAILED_MESSAGE : ''}
+    </span>
     {failed && (
-      <p role="status" style={{ marginTop: 8 + messageTop }} className="rounded-full border border-line bg-raised px-3 py-1.5 text-sm text-fg shadow-lg">
-        Couldn't refresh. Check your connection.
+      <p aria-hidden="true" style={{ marginTop: 8 + messageTop }} className="rounded-full border border-line bg-raised px-3 py-1.5 text-sm text-fg shadow-lg">
+        {FAILED_MESSAGE}
       </p>
     )}
   </div>

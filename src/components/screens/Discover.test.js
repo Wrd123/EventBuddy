@@ -56,7 +56,7 @@ describe('Discover without a location yet', () => {
     mockGeolocation((success) => { answer = success; });
     renderAt('/discover');
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Finding events near you...');
+    expect(await screen.findByText('Finding events near you...', { selector: '[role=status]' })).toBeInTheDocument();
     await act(async () => answer({ coords: { latitude: 33.748992, longitude: -84.387985 } }));
 
     expect(await screen.findByText('Near Atlanta, GA')).toBeInTheDocument();

@@ -118,7 +118,7 @@ describe('pull to refresh', () => {
 
     pullDown(scroller(first));
 
-    expect(await screen.findByText("Couldn't refresh. Check your connection.")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't refresh. Check your connection.", { selector: '[role=status]' })).toBeInTheDocument();
     expect(screen.getByText('Arctic Monkeys')).toBeInTheDocument();
     expect(screen.getByText('Tame Impala')).toBeInTheDocument();
   });
@@ -131,7 +131,7 @@ describe('pull to refresh', () => {
 
     pullDown(scroller(greeting));
 
-    expect(await screen.findByText("Couldn't refresh. Check your connection.")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't refresh. Check your connection.", { selector: '[role=status]' })).toBeInTheDocument();
     expect(screen.getByText('Summer Music Festival')).toBeInTheDocument();
   });
 });

@@ -11,8 +11,10 @@ describe('SkeletonScreen', () => {
     );
 
     const status = screen.getByRole('status', { name: 'Loading the schedule' });
-    expect(status).toHaveAttribute('aria-busy', 'true');
-    expect(status.firstChild).toHaveAttribute('aria-hidden', 'true');
-    expect(status.firstChild.firstChild).toHaveClass('skeleton', 'h-4', 'w-20');
+    // The sentence is text in the region, which is what live regions announce
+    expect(status).toHaveTextContent('Loading the schedule');
+    const blocks = status.lastChild;
+    expect(blocks).toHaveAttribute('aria-hidden', 'true');
+    expect(blocks.firstChild).toHaveClass('skeleton', 'h-4', 'w-20');
   });
 });
