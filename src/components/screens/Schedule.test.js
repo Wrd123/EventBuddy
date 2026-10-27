@@ -3,7 +3,6 @@ import { render, screen, fireEvent, within, waitFor } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, changeEvent, removeEvent, holdNext } from '../../testUtils/fakeApi';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 beforeEach(() => {
@@ -13,7 +12,7 @@ beforeEach(() => {
 
 const openSchedule = async () => {
   render(
-    <MemoryRouter initialEntries={['/events/1/schedule']} future={routerFuture}>
+    <MemoryRouter initialEntries={['/events/1/schedule']}>
       <AppProvider>
         <MainLayout />
       </AppProvider>

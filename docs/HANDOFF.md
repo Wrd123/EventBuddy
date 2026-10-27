@@ -31,7 +31,7 @@ Claude and Codex each reviewed the app independently. Findings were checked agai
 ## Still open
 
 - **F-1:** `TRUST_PROXY=3` in `render.yaml`. If fewer proxies sit in front of the API, a forged `X-Forwarded-For` escapes the login rate limit. The user needs to compare `req.ip` on the deployed API with their real IP, then set the right count. A per-address demo limit (the rest of C2) waits on this.
-- **D1:** `maplibre-gl` and `react-router-dom` advisories, neither reachable in this app. Being worked on as this note is written.
+- **D1:** React Router is upgraded to 7, and the audit reports it clean. `maplibre-gl` stays on 5.x, whose advisory isn't reachable here, because 6.x can't be bundled by CRA (see `docs/SECURITY_REVIEW.md`). Upgrade it along with moving off CRA, for example to Vite in phase 5.
 - **Known limit:** a logged-out demo token works again if the hosted demo restarts empty and rebuilds that world. Accepted, and documented in `User.js`.
 
 ## Decisions already made (don't reopen them)
@@ -69,7 +69,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 
 ## What comes next
 
-1. **Dependency upgrades (D1), then the README screenshots.** The screenshots still show the look from before Afterglow. Both were in progress as this note was written.
+1. **The README screenshots.** They still show the look from before Afterglow. This was in progress as this note was written.
 2. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics and the Profile password form. `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox. Open the Simulator panel (`attach`) before building.
 3. **Phase 4**, only when the user asks. WebSockets need their own security pass: authorize on connect and on every subscription, and drop a socket when its user is removed or its session version changes.
 
@@ -104,6 +104,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
   - Options include `demoAccount` (a demo account, with no password form) and failure options such as `stopShareFails` and `paymentOutcomes`.
   - `POST /auth/password` accepts the current password `password`, and refuses `password1` as common.
 - **`role="status"` and `role="alert"` aren't unique on a screen.** Query them by their text, or within a section.
+- **React Router 7 under CRA's Jest** needs the `react-router/dom` mapping in `package.json` and `TextEncoder` from `setupTests.js`. Don't remove them.
 - **jsdom has no `matchMedia`** (so it counts as reduced motion), **no `ResizeObserver` and no WebGL.** `MapCanvas.tooltip.test.js` shows how to run the real Leaflet anyway.
 - **Testing Leaflet output:** `outerHTML` writes a DOM-set style back out as a `style` attribute. Don't use it to check what the page's policy would see.
 

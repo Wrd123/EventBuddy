@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, settle } from '../../testUtils/fakeApi';
-import { routerFuture } from '../../App';
 import MainLayout from './MainLayout';
 
 let fakeApi;
@@ -16,7 +15,7 @@ beforeEach(() => {
 // Start the app at a URL, as if opened from a link or after a refresh
 const renderAt = (path) =>
   render(
-    <MemoryRouter initialEntries={[path]} future={routerFuture}>
+    <MemoryRouter initialEntries={[path]}>
       <AppProvider>
         <MainLayout />
       </AppProvider>
@@ -150,7 +149,7 @@ describe('route transitions', () => {
 
   const renderWithNav = (path) =>
     render(
-      <MemoryRouter initialEntries={[path]} future={routerFuture}>
+      <MemoryRouter initialEntries={[path]}>
         <AppProvider>
           <Nav />
           <MainLayout />

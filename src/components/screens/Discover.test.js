@@ -3,14 +3,13 @@ import { render, screen, fireEvent, within, waitFor, act } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, settle } from '../../testUtils/fakeApi';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 const ATLANTA = { label: 'Atlanta, GA', lat: 33.75, lng: -84.39, source: 'search' };
 
 const renderAt = (path) =>
   render(
-    <MemoryRouter initialEntries={[path]} future={routerFuture}>
+    <MemoryRouter initialEntries={[path]}>
       <AppProvider>
         <MainLayout />
       </AppProvider>

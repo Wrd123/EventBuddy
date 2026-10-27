@@ -32,7 +32,7 @@ The serious finding was on the client: **a member's display name could run as co
 | R3 | A request body over 100 kB returned 500 instead of 413 | Low | **Fixed** on branch `review-fixes-2` |
 | C2 | The one-tap demo sign-in has no rate limit and had no cap on concurrent world creation | Hardening | Cap added on `review-fixes-2`; a per-address limit waits on F-1 |
 | H1 | No `Cache-Control: no-store` on API responses, and no Content Security Policy on the web page | Hardening | **Fixed** on branch `review-fixes-2` |
-| D1 | Dependency advisories in the shipped bundle have no reachable path in this app | Hardening | Triaged |
+| D1 | Dependency advisories in the shipped bundle have no reachable path in this app | Hardening | React Router upgraded on branch `handoff-deps-screenshots`; MapLibre stays on 5.x (see D1) |
 
 ### S1: names on the live map (High, fixed)
 
@@ -137,8 +137,13 @@ The API (`server/`) has no audit findings.
 
 In the app's bundle, two flagged packages actually ship:
 
-- **`maplibre-gl` (critical advisory):** the advisory concerns MapLibre's attribution HTML. The Leaflet bridge turns off MapLibre's own attribution control, and the map style comes from a fixed URL, so the advisory's path isn't reachable here. Upgrade anyway.
-- **`react-router-dom` (moderate advisories):** one needs server-side rendering, and the other needs navigation to an address an attacker controls. Neither applies to this app.
+- **`react-router-dom` (moderate advisories), upgraded.** One advisory needs server-side rendering and the other needs navigation to an address an attacker controls, so neither applied here. It's now on 7.18, which the audit reports clean.
+  - The app had already opted into v7's behaviour, so the upgrade itself was a version bump. The now-pointless `routerFuture` flags are gone.
+  - CRA's old Jest needs two shims, both in the test setup: a `moduleNameMapper` for `react-router/dom` in `package.json`, and Node's `TextEncoder` in `setupTests.js`.
+  - Checked in a real production build: pushing a screen, the header's Back, the tabs, browser Back, a deep link to a nested route, and the map.
+- **`maplibre-gl` (critical advisory), not upgraded.**
+  - **Why not:** the advisory concerns MapLibre's attribution HTML. The Leaflet bridge turns off MapLibre's own attribution control, and the map style comes from a fixed URL, so its path isn't reachable here. Every 5.x release is in the advisory's range, and 6.x is ES modules only. It starts its map worker from a separate file it finds with `import.meta.url`, which CRA's webpack can't bundle: the CI build fails on the warning, and the worker file would be missing.
+  - **When:** upgrade it along with moving off CRA (for example, to Vite in phase 5).
 
 The rest of the findings are in the Create React App build tools and never run in production. Don't run `npm audit fix --force`, because some of the replacements it suggests would break the build.
 

@@ -3,12 +3,11 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, holdNext } from '../../testUtils/fakeApi';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 const open = (path) =>
   render(
-    <MemoryRouter initialEntries={[path]} future={routerFuture}>
+    <MemoryRouter initialEntries={[path]}>
       <AppProvider>
         <MainLayout />
       </AppProvider>

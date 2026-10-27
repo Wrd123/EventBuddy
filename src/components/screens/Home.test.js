@@ -4,12 +4,11 @@ import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, changeEvent } from '../../testUtils/fakeApi';
 import { toISODate } from '../../utils/dates';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 const renderHome = () =>
   render(
-    <MemoryRouter initialEntries={['/']} future={routerFuture}>
+    <MemoryRouter initialEntries={['/']}>
       <AppProvider>
         <MainLayout />
       </AppProvider>

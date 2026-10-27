@@ -5,7 +5,6 @@ import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, holdNext, changeEvent, failNext } from '../../testUtils/fakeApi';
 import * as eventService from '../../services/eventService';
 import { useLedger } from './Expenses';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 // Event 1 starts with one expense: Alex paid a $300 Airbnb, split equally
@@ -17,7 +16,7 @@ beforeEach(() => {
 
 const openExpenses = async () => {
   render(
-    <MemoryRouter initialEntries={['/events/1/expenses']} future={routerFuture}>
+    <MemoryRouter initialEntries={['/events/1/expenses']}>
       <AppProvider>
         <MainLayout />
       </AppProvider>

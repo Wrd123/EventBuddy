@@ -3,7 +3,6 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, settle, changeEvent } from '../../testUtils/fakeApi';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 let fakeApi;
@@ -15,7 +14,7 @@ beforeEach(() => {
 
 const renderAt = (path) =>
   render(
-    <MemoryRouter initialEntries={[path]} future={routerFuture}>
+    <MemoryRouter initialEntries={[path]}>
       <AppProvider>
         <MainLayout />
       </AppProvider>

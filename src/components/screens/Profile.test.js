@@ -3,12 +3,11 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, failNext, settle } from '../../testUtils/fakeApi';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 const renderProfile = () =>
   render(
-    <MemoryRouter initialEntries={['/profile']} future={routerFuture}>
+    <MemoryRouter initialEntries={['/profile']}>
       <AppProvider>
         <MainLayout />
       </AppProvider>

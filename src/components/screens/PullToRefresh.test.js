@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
 import { installFakeApi, changeEvent, receiveMessage, failNext, localEvents } from '../../testUtils/fakeApi';
 import * as eventService from '../../services/eventService';
-import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
 // A friend's change made on their phone, then a pull down on ours: the
@@ -12,7 +11,7 @@ import MainLayout from '../layout/MainLayout';
 
 const open = (path) =>
   render(
-    <MemoryRouter initialEntries={[path]} future={routerFuture}>
+    <MemoryRouter initialEntries={[path]}>
       <AppProvider>
         <MainLayout />
       </AppProvider>
