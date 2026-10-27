@@ -6,7 +6,7 @@ import { usePlace } from '../../hooks/usePlace';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
 import Header from '../common/Header';
 import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
-import { AvatarStack, EventCard, EventCover, LocalEventSheet, PhotoBackdrop, PlaceSheet, SuggestedEventCard } from '../common';
+import { AvatarStack, EventCard, EventCover, LocalEventSheet, PhotoBackdrop, PlaceSheet, Skeleton, SkeletonScreen, SuggestedEventCard } from '../common';
 import { todayISO, getEventStatus, formatDay, daysAwayLabel, daysAwayParts } from '../../utils/dates';
 
 const byStartDate = (a, b) => a.startDate.localeCompare(b.startDate);
@@ -151,11 +151,29 @@ const StopMarker = ({ status, label, parts }) =>
     </span>
   );
 
+// The timeline's outline: the big next-up card, then two rows, each with
+// a marker on the spine, so the real thing lands without shifting anything
+const TimelineSkeleton = () => (
+  <SkeletonScreen label="Loading your events" className="relative">
+    <span className="absolute left-[21px] top-4 bottom-6 w-px bg-white/15" />
+    <TimelineStop marker={<Skeleton className="relative w-11 h-9 rounded-full" />}>
+      <Skeleton className="h-[272px] rounded-[30px]" />
+    </TimelineStop>
+    <div className="mt-6 flex flex-col gap-2.5">
+      {[0, 1].map(i => (
+        <TimelineStop key={i} marker={<Skeleton className="relative w-11 h-9 rounded-full" />}>
+          <Skeleton className="h-[72px] rounded-card" />
+        </TimelineStop>
+      ))}
+    </div>
+  </SkeletonScreen>
+);
+
 // What goes where the timeline would be, depending on why there isn't
 // one: still loading, couldn't load, or no upcoming events
 const NoEvents = ({ status, onRetry }) => {
   if (status === 'loading') {
-    return <div className="h-[272px] rounded-[30px] card animate-pulse" aria-label="Loading your events" />;
+    return <TimelineSkeleton />;
   }
   if (status === 'error') {
     return (
@@ -270,9 +288,11 @@ const Suggestions = ({ place, locating, nearby, onChoosePlace, onOpen }) => {
           </span>
         </button>
       ) : !place || nearby.status === 'loading' ? (
-        <div className="flex space-x-3 overflow-hidden" aria-label="Loading suggestions">
-          {[0, 1, 2].map(i => <div key={i} className="w-40 h-32 rounded-2xl card animate-pulse shrink-0" />)}
-        </div>
+        <SkeletonScreen label="Loading suggestions" className="overflow-hidden">
+          <div className="flex space-x-3">
+            {[0, 1, 2].map(i => <Skeleton key={i} className="w-40 h-32 rounded-2xl shrink-0" />)}
+          </div>
+        </SkeletonScreen>
       ) : (
         <div className="flex overflow-x-auto no-scrollbar space-x-3 -mx-4 px-4 pb-1 snap-x snap-mandatory scroll-px-4">
           {nearby.events.slice(0, SUGGESTION_COUNT).map((event) => (

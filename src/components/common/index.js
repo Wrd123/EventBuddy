@@ -13,6 +13,5 @@ export { default as LocalEventCard } from './LocalEventCard';
 export { default as LocalEventSheet } from './LocalEventSheet';
 export { default as PlaceSheet } from './PlaceSheet';
 export { default as Sheet, SheetHostProvider, useSheet } from './Sheet';
-export { default as ScreenLoader } from './ScreenLoader';
 export { Skeleton, SkeletonScreen } from './Skeleton';
 export { default as SuggestedEventCard } from './SuggestedEventCard';

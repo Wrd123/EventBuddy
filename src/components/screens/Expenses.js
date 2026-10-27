@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Copy, Pencil, Plus, X } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import Header from '../common/Header';
-import { Button, ScreenLoader } from '../common';
+import { Button, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import ExpenseForm from './ExpenseForm';
 import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
@@ -127,7 +127,7 @@ const Expenses = () => {
   // null (no form), 'new', or the expense being edited
   const [editing, setEditing] = useState(null);
 
-  if (status === 'loading' || ledger.status === 'loading') return <ScreenLoader />;
+  if (status === 'loading' || ledger.status === 'loading') return <ExpensesSkeleton eventId={eventId} name={event?.name} />;
   if (status === 'not-found') {
     return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
   }
@@ -211,6 +211,22 @@ const Expenses = () => {
     </div>
   );
 };
+
+// The expenses screen's outline: the balance card and three expense rows.
+// It waits on both the event and the ledger, so the subtitle shows only if
+// the event is already in hand.
+const ExpensesSkeleton = ({ eventId, name }) => (
+  <div className="flex flex-col h-full relative">
+    <Header title="Expenses" subtitle={name} type="screen" showBack showProfile={false} backTo={`/events/${eventId}`} />
+    <SkeletonScreen label="Loading the expenses" className="p-4 flex-1 overflow-y-auto">
+      <Skeleton className="h-28 rounded-card mb-4" />
+      <Skeleton className="h-5 w-24 rounded-full mb-3" />
+      <div className="flex flex-col space-y-3">
+        {[0, 1, 2].map(i => <Skeleton key={i} className="h-[72px] rounded-card" />)}
+      </div>
+    </SkeletonScreen>
+  </div>
+);
 
 const Summary = ({ event, totalCents, myBalance, isOrganizer }) => {
   const net = myBalance?.netCents ?? 0;

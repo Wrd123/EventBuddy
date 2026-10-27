@@ -37,9 +37,10 @@ describe('opening an invite link', () => {
     changeEvent('3', (event) => { event.removed = [{ user: 'u1', name: 'John Doe' }]; });
     renderAt('/invite/game-code');
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      "You were removed from this event. Ask the organizer if you think that's a mistake."
-    );
+    // Found by its text: the loading outline is also a status until then
+    const notice = await screen.findByText(/You were removed from this event/);
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice).toHaveTextContent("You were removed from this event. Ask the organizer if you think that's a mistake.");
     expect(screen.queryByRole('button', { name: 'Join event' })).not.toBeInTheDocument();
   });
 

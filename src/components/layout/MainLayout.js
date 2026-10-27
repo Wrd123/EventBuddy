@@ -17,10 +17,22 @@ import Profile from '../screens/Profile';
 import NotFound from '../screens/NotFound';
 import Invite from '../screens/Invite';
 import RouteTransition from './RouteTransition';
-import { AmbientGlow, ScreenLoader, SheetHostProvider } from '../common';
+import Footer from './Footer';
+import { AmbientGlow, SheetHostProvider, Skeleton, SkeletonScreen } from '../common';
 
 // The map brings in Leaflet, so it loads only when the Map tab is opened
 const Map = lazy(() => import('../screens/Map'));
+
+// Shown while the map's code downloads: a block where the map will be, with
+// the real tab bar so you can still switch away
+const MapSkeleton = () => (
+  <div className="h-full relative">
+    <SkeletonScreen label="Loading the map" className="absolute inset-0">
+      <Skeleton className="absolute inset-0 rounded-none" />
+    </SkeletonScreen>
+    <Footer />
+  </div>
+);
 
 // Every screen has a URL, so refresh, the back button and deep links work.
 // Each screen renders its own Footer when it needs one.
@@ -41,7 +53,7 @@ const MainLayout = () => (
         <Route path="/" element={<Home />} />
         <Route path="/groups" element={<Groups />} />
         <Route path="/discover" element={<Discover />} />
-        <Route path="/map" element={<Suspense fallback={<ScreenLoader />}><Map /></Suspense>} />
+        <Route path="/map" element={<Suspense fallback={<MapSkeleton />}><Map /></Suspense>} />
         <Route path="/create" element={<CreateEvent />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/events/:eventId" element={<EventDetails />} />

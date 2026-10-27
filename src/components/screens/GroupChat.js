@@ -2,7 +2,7 @@ import React, { useState, useRef, useLayoutEffect } from 'react';
 import { Send } from 'lucide-react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
-import { AvatarStack, ScreenLoader } from '../common';
+import { AvatarStack, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
 import { useChat } from '../../hooks/useChat';
@@ -23,15 +23,15 @@ const GroupChat = () => {
   const { event, status, error } = useEvent(eventId);
   const chat = useChat(eventId);
 
-  if (status === 'loading' || chat.status === 'loading') return <ScreenLoader />;
+  // Back to wherever the chat was opened from
+  const backTo = location.state?.from === 'groups' ? '/groups' : `/events/${eventId}`;
+
+  if (status === 'loading' || chat.status === 'loading') return <ChatSkeleton name={event?.name} backTo={backTo} />;
   if (status === 'not-found') {
     return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
   }
   if (status === 'error') return <NotFound title="Couldn't load event" message={error} />;
   if (chat.status === 'error') return <NotFound title="Couldn't load the chat" message={chat.error} />;
-
-  // Back to wherever the chat was opened from
-  const backTo = location.state?.from === 'groups' ? '/groups' : `/events/${eventId}`;
 
   return (
     <div className="flex flex-col h-full">
@@ -51,6 +51,23 @@ const GroupChat = () => {
     </div>
   );
 };
+
+// The chat's outline: bubbles from both sides and the composer bar. The
+// header and its Back button are real; the event's name fills in if known.
+const ChatSkeleton = ({ name, backTo }) => (
+  <div className="flex flex-col h-full">
+    <Header title={name} type="screen" showBack backTo={backTo} showProfile={false} />
+    <SkeletonScreen label="Loading the chat" className="flex-1 overflow-hidden px-4 py-3 space-y-3 border-t border-line">
+      <Skeleton className="h-10 w-2/3 rounded-2xl rounded-bl-md" />
+      <Skeleton className="h-16 w-1/2 rounded-2xl rounded-bl-md" />
+      <Skeleton className="h-10 w-3/5 rounded-2xl rounded-br-md ml-auto" />
+      <Skeleton className="h-12 w-2/3 rounded-2xl rounded-bl-md" />
+    </SkeletonScreen>
+    <div className="px-3 py-3 border-t border-line" aria-hidden="true">
+      <Skeleton className="h-11 rounded-full" />
+    </div>
+  </div>
+);
 
 const Conversation = ({ event, chat }) => {
   const { currentUser } = useAppContext();

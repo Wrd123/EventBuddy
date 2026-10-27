@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import Header from '../common/Header';
-import { Button, ScreenLoader } from '../common';
+import { Button, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import { useAppContext } from '../../context/AppContext';
 import * as eventService from '../../services/eventService';
@@ -26,7 +26,7 @@ const Invite = () => {
     return () => { cancelled = true; };
   }, [code]);
 
-  if (state.status === 'loading') return <ScreenLoader />;
+  if (state.status === 'loading') return <InviteSkeleton />;
   if (state.status === 'error') return <NotFound title="Invite not found" message={state.error} />;
 
   const { invite } = state;
@@ -97,5 +97,21 @@ const Invite = () => {
     </div>
   );
 };
+
+// The invite card's outline, under the real header
+const InviteSkeleton = () => (
+  <div className="flex flex-col h-full">
+    <Header title="You're invited" type="screen" showBack showProfile={false} />
+    <SkeletonScreen label="Loading the invite" className="flex-1 overflow-y-auto p-4">
+      <div className="card p-5 flex flex-col items-center">
+        <Skeleton className="h-4 w-40 rounded-full mb-3" />
+        <Skeleton className="h-7 w-3/4 rounded-xl mb-5" />
+        <div className="w-full space-y-3">
+          {[0, 1, 2].map(i => <Skeleton key={i} className="h-5 w-2/3 rounded-full" />)}
+        </div>
+      </div>
+    </SkeletonScreen>
+  </div>
+);
 
 export default Invite;

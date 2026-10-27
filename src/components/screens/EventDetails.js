@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, MessageCircle, Wallet, Map, MapPin, Plus, ExternalLink, Pencil } from 'lucide-react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
-import { Avatar, EventCover, PhotoBackdrop, ScreenLoader } from '../common';
+import { Avatar, EventCover, PhotoBackdrop, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
 import MemberSheet from '../common/MemberSheet';
@@ -67,7 +67,7 @@ const EventDetails = () => {
   // The person whose sheet is open (leave, or remove as organizer)
   const [openMember, setOpenMember] = useState(null);
 
-  if (status === 'loading') return <ScreenLoader />;
+  if (status === 'loading') return <EventSkeleton />;
   if (status === 'not-found') {
     return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
   }
@@ -134,6 +134,32 @@ const EventDetails = () => {
     </div>
   );
 };
+
+// The event page's outline: photo, title lines, the four action tiles and
+// the member row. The real header stays so Back works while it loads; the
+// Edit action waits for the event, since only its organizer gets it.
+const EventSkeleton = () => (
+  <div className="flex flex-col h-full relative">
+    <Header type="screen" showBack showProfile={false} overPhoto />
+    <SkeletonScreen label="Loading the event" className="relative flex-1 overflow-y-auto pb-16">
+      <Skeleton className="h-[340px] rounded-none [mask-image:linear-gradient(to_bottom,#000_55%,transparent)]" />
+      <div className="relative px-5 -mt-24 flex flex-col gap-2.5">
+        <Skeleton className="h-8 w-28 rounded-full" />
+        <Skeleton className="h-9 w-3/4 rounded-xl" />
+        <Skeleton className="h-5 w-1/2 rounded-full" />
+      </div>
+      <div className="grid grid-cols-4 gap-2.5 px-4 pt-5">
+        {[0, 1, 2, 3].map(i => <Skeleton key={i} className="min-h-[84px] rounded-[22px]" />)}
+      </div>
+      <div className="px-4 pt-7">
+        <Skeleton className="h-5 w-32 rounded-full mb-3" />
+        <div className="flex gap-3.5">
+          {[0, 1, 2, 3].map(i => <Skeleton key={i} className="w-12 h-12 rounded-full shrink-0" />)}
+        </div>
+      </div>
+    </SkeletonScreen>
+  </div>
+);
 
 // Where the event stands, for the pill over the photo
 const statusText = (event) => {

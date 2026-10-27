@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Check, Pencil, Plus } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import Header from '../common/Header';
-import { Button, ScreenLoader, Sheet } from '../common';
+import { Button, Sheet, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
 import { useAppContext } from '../../context/AppContext';
@@ -19,7 +19,7 @@ const Schedule = () => {
   // null (no form), 'new', or the item being edited
   const [editing, setEditing] = useState(null);
 
-  if (status === 'loading') return <ScreenLoader />;
+  if (status === 'loading') return <ScheduleSkeleton eventId={eventId} />;
   if (status === 'not-found') {
     return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
   }
@@ -73,6 +73,22 @@ const Schedule = () => {
     </div>
   );
 };
+
+// The schedule's outline: day tabs and three items. The header keeps its
+// Back button; the event's name joins it once the event arrives.
+const ScheduleSkeleton = ({ eventId }) => (
+  <div className="flex flex-col h-full relative">
+    <Header title="Schedule" type="screen" showBack showProfile={false} backTo={`/events/${eventId}`} />
+    <SkeletonScreen label="Loading the schedule" className="p-4 flex-1 overflow-y-auto">
+      <div className="flex space-x-2 mb-4">
+        {[0, 1, 2].map(i => <Skeleton key={i} className="h-11 w-24 rounded-full shrink-0" />)}
+      </div>
+      <div className="flex flex-col space-y-4">
+        {[0, 1, 2].map(i => <Skeleton key={i} className="h-[104px] rounded-[22px]" />)}
+      </div>
+    </SkeletonScreen>
+  </div>
+);
 
 const DaySelector = ({ days, activeDay, setActiveDay }) => {
   const activeRef = useRef(null);

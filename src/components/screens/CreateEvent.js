@@ -3,7 +3,7 @@ import { Music, Calendar, Map, Users, Trophy, Ticket, Trash2 } from 'lucide-reac
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import Header from '../common/Header';
-import { Button, ScreenLoader } from '../common';
+import { Button, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
 import { todayISO } from '../../utils/dates';
@@ -172,6 +172,23 @@ const CreateEvent = () => {
   );
 };
 
+// The edit form's outline: a few labelled fields, under the real header
+const EditSkeleton = ({ backTo }) => (
+  <div className="flex flex-col h-full">
+    <Header title="Edit event" type="screen" showBack backTo={backTo} showProfile={false} />
+    <SkeletonScreen label="Loading the event" className="flex-1 overflow-y-auto p-4">
+      <div className="space-y-5">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i}>
+            <Skeleton className="h-3.5 w-20 rounded-full mb-2" />
+            <Skeleton className="h-12 rounded-xl" />
+          </div>
+        ))}
+      </div>
+    </SkeletonScreen>
+  </div>
+);
+
 // Changing or deleting an event. Organizer only, like the server.
 export const EditEvent = () => {
   const { eventId } = useParams();
@@ -179,7 +196,7 @@ export const EditEvent = () => {
   const { currentUser, updateEvent, deleteEvent } = useAppContext();
   const navigate = useNavigate();
 
-  if (status === 'loading') return <ScreenLoader />;
+  if (status === 'loading') return <EditSkeleton backTo={`/events/${eventId}`} />;
   if (status === 'not-found') return <NotFound title="Event not found" message="This event doesn't exist or was deleted." />;
   if (status === 'error') return <NotFound title="Couldn't load event" message={error} />;
   if (event.createdBy !== currentUser?._id) {

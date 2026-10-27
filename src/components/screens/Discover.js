@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MapPin, Navigation, Search } from 'lucide-react';
 import Header from '../common/Header';
 import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
-import { Button, CitySearch, LocalEventCard, LocalEventSheet, PlaceSheet } from '../common';
+import { Button, CitySearch, LocalEventCard, LocalEventSheet, PlaceSheet, Skeleton, SkeletonScreen } from '../common';
 import { usePlace } from '../../hooks/usePlace';
 import { useNearbyEvents } from '../../hooks/useNearbyEvents';
 
@@ -134,9 +134,9 @@ const Chip = ({ active, onClick, children }) => (
 const Results = ({ nearby, shown, radius, filter, onOpen, onWiden }) => {
   if (nearby.status === 'loading') {
     return (
-      <div className="space-y-3" aria-label="Loading events">
-        {[0, 1, 2].map(i => <div key={i} className="card h-24 animate-pulse" />)}
-      </div>
+      <SkeletonScreen label="Loading events" className="space-y-3">
+        {[0, 1, 2].map(i => <Skeleton key={i} className="h-24 rounded-card" />)}
+      </SkeletonScreen>
     );
   }
   if (nearby.status === 'error') {

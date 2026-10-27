@@ -3,7 +3,7 @@ import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../common/Header';
 import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
-import { Button, EventCover, ScreenLoader } from '../common';
+import { Button, EventCover, Skeleton, SkeletonScreen } from '../common';
 import { useChats } from '../../hooks/useChats';
 import { useAppContext } from '../../context/AppContext';
 import { getEventStatus } from '../../utils/dates';
@@ -14,7 +14,7 @@ import { shortTime } from '../../utils/chat';
 const Groups = () => {
   const { status, chats, error, reload } = useChats();
 
-  if (status === 'loading') return <ScreenLoader />;
+  if (status === 'loading') return <GroupsSkeleton />;
 
   const current = chats.filter(chat => getEventStatus(chat) !== 'past');
   const past = chats.filter(chat => getEventStatus(chat) === 'past');
@@ -49,6 +49,31 @@ const Groups = () => {
     </div>
   );
 };
+
+// Four chat rows: cover, two lines and a time. The header and tab bar are
+// the real ones.
+const GroupsSkeleton = () => (
+  <div className="flex flex-col h-full relative">
+    <Header title="Chats" />
+    <SkeletonScreen label="Loading your chats" className={`flex-1 overflow-y-auto px-4 ${TAB_BAR_CLEARANCE}`}>
+      <div className="space-y-2">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="card w-full p-3 flex items-center">
+            <Skeleton className="w-12 h-12 rounded-xl shrink-0 mr-3" />
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex justify-between">
+                <Skeleton className="h-4 w-1/2 rounded-full" />
+                <Skeleton className="h-3 w-8 rounded-full" />
+              </div>
+              <Skeleton className="h-3.5 w-3/4 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </SkeletonScreen>
+    <Footer />
+  </div>
+);
 
 const NoGroups = () => {
   const navigate = useNavigate();
