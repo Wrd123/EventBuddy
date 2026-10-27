@@ -21,7 +21,7 @@ import { success, warning } from '../../services/haptics';
 // balances are always computed from what the server has, and every so often
 // so friends' expenses and payments show up too. Also members' payment
 // handles, as { userId: { venmo, cashapp, paypal, zelle } }.
-const useLedger = (eventId) => {
+export const useLedger = (eventId) => {
   const [ledger, setLedger] = useState({ status: 'loading', expenses: [], payments: [], handles: {}, error: '' });
   // Every change here is followed by a reload, so a reload that started
   // earlier and lands later is the only stale case (see utils/freshness.js)
@@ -37,7 +37,9 @@ const useLedger = (eventId) => {
   // rather than in the row, which disappears as soon as the payment shows.
   const uncertain = useRef(new Map());
 
-  const reload = useCallback(async () => {
+  // Polls and saves stay quiet when the read fails; a pull to refresh passes
+  // { rethrow: true } to find out, and the ledger stays on screen either way
+  const reload = useCallback(async ({ rethrow = false } = {}) => {
     const read = freshness.start();
     try {
       const [{ expenses, payments }, handleList] = await Promise.all([
@@ -66,6 +68,7 @@ const useLedger = (eventId) => {
       if (!freshness.accept(read)) return;
       // A failed background check keeps the ledger on screen
       setLedger(prev => (prev.status === 'ready' ? prev : { ...prev, status: 'error', error: err.message }));
+      if (rethrow) throw err;
     }
   }, [eventId, freshness]);
 

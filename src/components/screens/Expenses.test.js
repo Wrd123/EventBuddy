@@ -1,8 +1,10 @@
 import React from 'react';
-import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
+import { render, renderHook, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, holdNext, changeEvent } from '../../testUtils/fakeApi';
+import { installFakeApi, holdNext, changeEvent, failNext } from '../../testUtils/fakeApi';
+import * as eventService from '../../services/eventService';
+import { useLedger } from './Expenses';
 import { routerFuture } from '../../App';
 import MainLayout from '../layout/MainLayout';
 
@@ -294,5 +296,61 @@ describe('Expenses', () => {
 
     expect(await screen.findByText('Budget $250.00')).toBeInTheDocument();
     expect(screen.getByText('$50.00 over')).toBeInTheDocument();
+  });
+});
+
+describe('useLedger reload', () => {
+  const openLedger = async () => {
+    const seen = [];
+    const hook = renderHook(() => {
+      const value = useLedger('1');
+      seen.push(value.status);
+      return value;
+    });
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'));
+    return { ...hook, seen };
+  };
+
+  // A friend's $60 taxi, added from another phone
+  const friendAddsTaxi = () =>
+    eventService.addExpense('1', {
+      description: 'Taxi',
+      amountCents: 6000,
+      date: '2027-03-02',
+      paidBy: 'u2',
+      splitType: 'equal',
+      shares: [{ user: 'u1', amountCents: 3000 }, { user: 'u2', amountCents: 3000 }]
+    });
+
+  it('resolves with the friend\'s expense, without going back to loading', async () => {
+    const { result, seen } = await openLedger();
+    await friendAddsTaxi();
+
+    await act(() => result.current.reload({ rethrow: true }));
+
+    expect(result.current.expenses.map((e) => e.description)).toContain('Taxi');
+    expect(seen.slice(seen.indexOf('ready'))).not.toContain('loading');
+  });
+
+  it('rejects for a pull when the server can not be reached, keeping the ledger', async () => {
+    const { result } = await openLedger();
+    failNext('GET', '/events/1/expenses');
+
+    await act(async () => {
+      await expect(result.current.reload({ rethrow: true })).rejects.toThrow();
+    });
+
+    expect(result.current.status).toBe('ready');
+    expect(result.current.expenses.map((e) => e.description)).toEqual(['Airbnb']);
+  });
+
+  it('stays quiet when a poll fails', async () => {
+    const { result } = await openLedger();
+    failNext('GET', '/events/1/expenses');
+
+    await act(() => result.current.reload());
+
+    expect(result.current.status).toBe('ready');
+    expect(result.current.expenses).toHaveLength(1);
   });
 });

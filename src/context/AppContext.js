@@ -189,6 +189,16 @@ export const AppProvider = ({ children }) => {
     if (isAuthenticated) loadEvents();
   }, [isAuthenticated, loadEvents]);
 
+  // Pull to refresh: reads your events again without going back to
+  // "loading", so the list stays on screen. Resolves once the list is
+  // current, and rejects if the server can't be reached (the pull shows
+  // that). A read overtaken by a change is read again, as on the first
+  // load; a logout ends it, since the new session isn't ours to fill.
+  const refreshEvents = useCallback(async () => {
+    const askedIn = session.current;
+    for (let tries = 0; tries < 3 && session.current === askedIn && !(await readEvents()); tries += 1);
+  }, [readEvents]);
+
   // Background refreshes stay quiet: no loading state, and a failure just
   // waits for the next one
   const authenticatedRef = useRef(isAuthenticated);
@@ -432,6 +442,7 @@ export const AppProvider = ({ children }) => {
     events,
     eventsStatus,
     reloadEvents: loadEvents,
+    refreshEvents,
     fetchEvent,
     place,
     savePlace,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, renderHook, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AppProvider, useAppContext } from './AppContext';
-import { installFakeApi, holdNext, delayNext, changeEvent, serverEvent, settle, demoUser } from '../testUtils/fakeApi';
+import { installFakeApi, holdNext, delayNext, changeEvent, serverEvent, settle, failNext, demoUser } from '../testUtils/fakeApi';
 
 // Shows the events list and offers the changes the tests make
 const Probe = () => {
@@ -300,5 +300,75 @@ describe('Going while refreshes land', () => {
     await settle();
     shown('Tame Impala: nobody');
     expect(serverWho('s2')).toEqual([]);
+  });
+});
+
+describe('refreshEvents (pull to refresh)', () => {
+  // Records eventsStatus on every render to show it never went back to loading
+  const openApp = async () => {
+    const statuses = [];
+    const hook = renderHook(
+      () => {
+        const value = useAppContext();
+        statuses.push(value.eventsStatus);
+        return value;
+      },
+      { wrapper: AppProvider }
+    );
+    await waitFor(() => expect(hook.result.current.events).toHaveLength(2));
+    return { ...hook, statuses };
+  };
+
+  it("brings in a friend's change without going back to loading", async () => {
+    const { result, statuses } = await openApp();
+    changeEvent('1', (event) => { event.name = 'Festival (renamed by Alex)'; });
+
+    await act(() => result.current.refreshEvents());
+
+    expect(result.current.events.map((e) => e.name)).toContain('Festival (renamed by Alex)');
+    expect(statuses.slice(statuses.indexOf('ready'))).not.toContain('loading');
+  });
+
+  it('rejects when the server can not be reached, and keeps the events on screen', async () => {
+    const { result, statuses } = await openApp();
+    failNext('GET', '/events');
+
+    await act(async () => {
+      await expect(result.current.refreshEvents()).rejects.toThrow();
+    });
+
+    expect(result.current.events).toHaveLength(2);
+    expect(result.current.eventsStatus).toBe('ready');
+    expect(statuses.slice(statuses.indexOf('ready'))).not.toContain('loading');
+  });
+
+  it("doesn't let a slow read undo your own edit, and reads again for the answer", async () => {
+    const { result } = await openApp();
+    const release = holdNext('GET', '/events');
+    let refreshing;
+    act(() => { refreshing = result.current.refreshEvents(); });
+
+    await act(() => result.current.updateEvent('1', { name: 'Festival (edited here)' }));
+    await release();
+    await act(() => refreshing);
+
+    expect(result.current.events.map((e) => e.name)).toContain('Festival (edited here)');
+    expect(serverEvent('1').name).toBe('Festival (edited here)');
+  });
+
+  it('writes nothing when you log out while it is reading', async () => {
+    const { result } = await openApp();
+    const release = holdNext('GET', '/events');
+    let refreshing;
+    act(() => { refreshing = result.current.refreshEvents(); });
+
+    act(() => result.current.logout());
+    await release();
+    await act(() => refreshing);
+
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.events).toEqual([]);
+    // It didn't go on to ask again as someone who is no longer logged in
+    expect(global.fetch.mock.calls.filter(([url]) => url === '/api/events')).toHaveLength(2);
   });
 });

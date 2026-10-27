@@ -303,6 +303,13 @@ export const delayNext = (method, path) => {
   });
 };
 
+// Makes the next matching request fail, as if the server were down. For
+// testing that a failed refresh leaves what's on screen alone.
+let failures = [];
+export const failNext = (method, path, status = 503) => {
+  failures.push({ method, path, status });
+};
+
 // A message from someone else arriving while the app is open
 export const receiveMessage = (eventId, { user = 'u2', name = 'Alex', text }) => {
   const message = chatMessage(`c${nextMessageId++}`, user, name, text, 0);
@@ -638,6 +645,7 @@ export const installFakeApi = (options = {}) => {
   handles = { ...demoHandles(), ...options.handles };
   holds = [];
   delays = [];
+  failures = [];
   const serve = (url, method, headers, body) => {
     const [path, search = ''] = url.replace(/^\/api/, '').split('?');
     const response = route(
@@ -654,6 +662,11 @@ export const installFakeApi = (options = {}) => {
   };
   global.fetch = jest.fn((url, { method = 'GET', headers = {}, body } = {}) => {
     const path = url.replace(/^\/api/, '').split('?')[0];
+    const failed = failures.findIndex((f) => f.method === method && f.path === path);
+    if (failed !== -1) {
+      const [{ status }] = failures.splice(failed, 1);
+      return respond(status, { message: 'Service unavailable' });
+    }
     const delayed = delays.findIndex((d) => d.method === method && d.path === path);
     if (delayed === -1) return serve(url, method, headers, body);
     const [{ gate }] = delays.splice(delayed, 1);
