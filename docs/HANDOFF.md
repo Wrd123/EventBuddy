@@ -4,16 +4,17 @@
 
 ## State
 
-- **Security work is done and on `main`.**
-  - `origin/main` is at `499991c2`, which covers the map fix (S1) and sessions and passwords (S2, S3).
-  - Local `main` is at `2842a117`, with two more commits: the account-switch and API fixes, and the Content Security Policy. Those two weren't pushed when this note was written, so check `git status`.
+- **Everything below is on GitHub's `main`** (`96fa8e54` when this note was written): the security work, the Content Security Policy, React Router 7, the Afterglow README screenshots, and the map's detail fix. Later commits may not be pushed yet, so check `git status`.
+- **The map** uses OpenFreeMap's Liberty style, darkened, and the map screen's bottom sheet no longer gets covered by the map (see Decisions).
 - **Render needs a redeploy** of both services after each push.
   - The static site must pick up the new `headers` and `INLINE_RUNTIME_CHUNK` from `render.yaml`. If it was set up by hand in the dashboard, add them there.
   - After deploying, open the live site and its map once, to check the policy refuses nothing.
 - **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps).
-- **Tests:** 329 server tests, 434 app tests and 12 script tests pass, and `CI=true npm run build` is clean. Run the app suite with `--maxWorkers=2`.
-- **Not checked on a device:** the iOS build, haptics, pull-to-refresh in WKWebView, the sheets with a real keyboard, enlarged text or VoiceOver, and the new Profile password form.
-- **Merged branches that can be deleted (ask first):** `small-fixes`, `phase-3-feel`, `phase-3b`, `going-poll-fix`, `fix-map-tooltip-xss`, `review-fixes-2`.
+- **Tests:** 329 server tests, 436 app tests and 12 script tests pass, and `CI=true npm run build` is clean. Run the app suite with `--maxWorkers=2`.
+- **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1). `react-scripts` is a dev dependency, so CRA's dev-server advisories (`webpack-dev-server`, `proxy-addr`, `websocket-driver` and the rest) only show in the full `npm audit`. None of it ships in the built site.
+- **Not checked on a device:** the iOS build, haptics, pull-to-refresh in WKWebView, the sheets with a real keyboard, enlarged text or VoiceOver, the Profile password form, and the darkened Liberty map in WKWebView.
+- **Merged branches that can be deleted (ask first):** `small-fixes`, `phase-3-feel`, `phase-3b`, `going-poll-fix`, `fix-map-tooltip-xss`, `review-fixes-2`, `handoff-deps-screenshots`, `map-detail`.
+- **No test servers are left running.** Start a fresh isolated API as described under Traps when one is needed.
 
 ## What was done: the security review
 

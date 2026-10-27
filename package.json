@@ -16,8 +16,7 @@
         "qrcode-generator": "^2.0.4",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "react-router-dom": "^7.18.4",
-        "react-scripts": "^5.0.1"
+        "react-router-dom": "^7.18.4"
     },
     "scripts": {
         "dev": "concurrently --names web,api --prefix-colors magenta,green \"npm start\" \"npm run server\"",
@@ -57,6 +56,7 @@
         "autoprefixer": "^10.4.14",
         "concurrently": "^10.0.6",
         "postcss": "^8.4.24",
+        "react-scripts": "^5.0.1",
         "tailwindcss": "^3.3.2"
     },
     "proxy": "http://localhost:4000",
