@@ -14,10 +14,12 @@ const connectDatabase = async () => {
   if (isProduction && !demoMode) throw new Error('MONGODB_URI is required in production');
 
   // Only loaded when needed. The demo data is tiny, so a small cache keeps
-  // MongoDB within a free host's 512 MB alongside the API.
+  // MongoDB within a free host's 512 MB alongside the API. The API reaches it
+  // over a local port, so it skips its /tmp socket file, which sandboxed
+  // shells (like the one Claude Code runs tests in) aren't allowed to create.
   const { MongoMemoryServer } = require('mongodb-memory-server');
   memoryServer = await MongoMemoryServer.create({
-    instance: { args: ['--wiredTigerCacheSizeGB', '0.25'] }
+    instance: { args: ['--wiredTigerCacheSizeGB', '0.25', '--nounixsocket'] }
   });
   await mongoose.connect(memoryServer.getUri());
   return true;

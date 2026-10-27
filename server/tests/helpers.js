@@ -14,9 +14,10 @@ let mongo;
 // own process), emptied between tests
 const useTestDatabase = () => {
   // Starting mongod takes a few seconds, longer the first time while the
-  // binary downloads
+  // binary downloads. No /tmp socket file, as in src/db.js, so the tests also
+  // run in a sandboxed shell.
   before(async () => {
-    mongo = await MongoMemoryServer.create();
+    mongo = await MongoMemoryServer.create({ instance: { args: ['--nounixsocket'] } });
     await mongoose.connect(mongo.getUri());
   }, { timeout: 120000 });
 
