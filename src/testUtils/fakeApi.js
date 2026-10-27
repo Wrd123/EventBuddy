@@ -311,6 +311,12 @@ export const failNext = (method, path, status = 503) => {
   failures.push({ method, path, status });
 };
 
+// A friend sending a new position, as a later read of the map will show
+export const moveFriend = (eventId, user, { lat, lng }) => {
+  const person = live[eventId].people.find((p) => p.user === user);
+  Object.assign(person, { lat, lng, positionAt: new Date().toISOString() });
+};
+
 // A message from someone else arriving while the app is open
 export const receiveMessage = (eventId, { user = 'u2', name = 'Alex', text }) => {
   const message = chatMessage(`c${nextMessageId++}`, user, name, text, 0);

@@ -129,15 +129,19 @@ export const useLive = (eventId) => {
 
   // A friend's share leaves the map the moment it runs out. Reads come only
   // once a minute while pokes are arriving, and nobody pokes when a share
-  // simply ends.
-  const [now, setNow] = useState(Date.now);
+  // simply ends. Both the filter and the timer go by the clock right now: a
+  // time saved earlier would push the end back by however long the map had
+  // been open each time a read came in. The tick only makes the screen
+  // draw again when the next share ends.
+  const [tick, setTick] = useState(0);
   useEffect(() => {
+    const now = Date.now();
     const end = nextShareEnd(state.people, now);
     if (end === null) return undefined;
-    const timer = setTimeout(() => setNow(Date.now()), end - now);
+    const timer = setTimeout(() => setTick(t => t + 1), end - now);
     return () => clearTimeout(timer);
-  }, [state.people, now]);
-  const people = stillSharing(state.people, now);
+  }, [state.people, tick]);
+  const people = stillSharing(state.people, Date.now());
 
   return { ...state, people, stopPending, reload: load, startSharing, stopSharing, setMeetup, clearMeetup };
 };

@@ -23,6 +23,7 @@
 // Everything is in this process's memory, which fits the single instance
 // Render runs. A second instance would need pub/sub (Redis, say) so a change
 // on one reaches sockets held by the other.
+const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { WebSocketServer, WebSocket } = require('ws');
 const config = require('../config');
@@ -65,8 +66,12 @@ let state = null;
 // just taken away, or miss what was just given.
 let accessChanges = 0;
 
+// Nothing goes to a socket whose login has run out, even in the moment
+// before its expiry timer gets to run
 const send = (ws, message) => {
-  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
+  if (ws.readyState !== WebSocket.OPEN) return;
+  if (hasExpired(ws)) return expire(ws);
+  ws.send(JSON.stringify(message));
 };
 
 const reject = (socket, status) => {
@@ -94,6 +99,17 @@ const presenceOf = (eventId) =>
 const sendPresence = (eventId, to = subscribersOf(eventId)) => {
   const message = { type: 'presence', eventId, userIds: presenceOf(eventId) };
   to.forEach((ws) => send(ws, message));
+};
+
+// They're no longer here, straight away: their login ended
+const endPresence = (userId) => {
+  // A login in flight for them must load their events again
+  accessChanges += 1;
+  const events = state.memberships.get(userId) || new Set();
+  state.memberships.delete(userId);
+  clearTimeout(state.leaving.get(userId));
+  state.leaving.delete(userId);
+  events.forEach((eventId) => sendPresence(eventId));
 };
 
 // After the grace, if they haven't come back, they're no longer here
@@ -144,6 +160,11 @@ const logIn = async (ws, token) => {
   }
   if (!state || ws.readyState !== WebSocket.OPEN) return;
   const userId = user._id.toString();
+  // The token was verified above, so its expiry can be read without
+  // checking it again. It may have run out while its events were loading.
+  const { exp } = jwt.decode(token);
+  ws.expiresAt = exp ? exp * 1000 : Infinity;
+  if (hasExpired(ws)) return ws.close(ENDED, 'Please log in again.');
 
   // Their events are kept current from here on as they join and leave
   const arrived = Boolean(events) && !state.memberships.has(userId);
@@ -168,8 +189,29 @@ const logIn = async (ws, token) => {
     forget(oldest);
     oldest.close(REPLACED, 'Opened somewhere else.');
   }
+  // Only once it's counted, so expiring takes it out again cleanly
+  if (ws.expiresAt !== Infinity) closeAtExpiry(ws);
   send(ws, { type: 'ready' });
   if (arrived) state.memberships.get(userId).forEach((eventId) => sendPresence(eventId));
+};
+
+// A socket lives no longer than the login it was opened with: when the
+// token expires, so does the socket, as REST would refuse it from then on.
+// setTimeout can't wait longer than about 24.8 days, so a longer token
+// re-arms on the way (not covered by a test: it would need a fake clock).
+const MAX_TIMER_MS = 2 ** 31 - 1;
+const hasExpired = (ws) => Date.now() >= ws.expiresAt;
+// Like a logout for this one socket: it stops hearing anything now, and if
+// it was their last, they stop being here now too, without the grace
+const expire = (ws) => {
+  forget(ws);
+  if (state && !state.users.has(ws.userId)) endPresence(ws.userId);
+  ws.close(ENDED, 'Please log in again.');
+};
+const closeAtExpiry = (ws) => {
+  const wait = ws.expiresAt - Date.now();
+  if (wait <= 0) return expire(ws);
+  ws.expiryTimer = setTimeout(() => closeAtExpiry(ws), Math.min(wait, MAX_TIMER_MS));
 };
 
 const deny = (ws, eventId) => {
@@ -188,6 +230,8 @@ const subscribe = async (ws, eventId) => {
   } catch {
     return deny(ws, eventId);
   }
+  // The login may have run out while the check was waiting on the database
+  if (hasExpired(ws)) return expire(ws);
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.events.add(eventId);
   if (!state.subscribers.has(eventId)) state.subscribers.set(eventId, new Set());
@@ -209,6 +253,7 @@ const handle = async (ws, data, isBinary) => {
     if (message.type === 'auth' && typeof message.token === 'string') return logIn(ws, message.token);
     return ws.close(ENDED, 'Please log in.');
   }
+  if (hasExpired(ws)) return expire(ws);
   const eventId = typeof message.eventId === 'string' ? message.eventId : '';
   if (message.type === 'subscribe') return subscribe(ws, eventId);
   if (message.type === 'unsubscribe') return unsubscribe(ws, eventId);
@@ -227,6 +272,7 @@ const onConnection = (ws) => {
   });
   ws.on('close', () => {
     clearTimeout(ws.authTimer);
+    clearTimeout(ws.expiryTimer);
     forget(ws);
   });
   // An oversized message is reported here before the socket closes
@@ -341,12 +387,8 @@ const closeUsers = (userIds, code = ENDED) => {
   accessChanges += 1;
   if (!state) return;
   userIds.map(String).forEach((userId) => {
-    const events = state.memberships.get(userId) || new Set();
-    state.memberships.delete(userId);
-    clearTimeout(state.leaving.get(userId));
-    state.leaving.delete(userId);
     state.users.get(userId)?.forEach((ws) => ws.close(code, 'Please log in.'));
-    events.forEach((eventId) => sendPresence(eventId));
+    endPresence(userId);
   });
 };
 

@@ -33,7 +33,9 @@ The serious finding was on the client: **a member's display name could run as co
 | C2 | The one-tap demo sign-in has no rate limit and had no cap on concurrent world creation | Hardening | Cap added on `review-fixes-2`; a per-address limit waits on F-1 |
 | H1 | No `Cache-Control: no-store` on API responses, and no Content Security Policy on the web page | Hardening | **Fixed** on branch `review-fixes-2`; the policy is live on the deployed site (27 Oct 2026) |
 | D1 | Dependency advisories in the shipped bundle have no reachable path in this app | Hardening | React Router upgraded on branch `handoff-deps-screenshots`; MapLibre stays on 5.x (see D1) |
-| WS | The real-time socket added in phase 4a | Design review | Built with the checks below on branch `phase-4a-realtime` |
+| WS | The real-time socket added in phase 4a | Design review | Built with the checks below; on `main` at `45390d63` |
+| WS-1 | An open socket kept its subscriptions and presence after its login token expired (found by Codex at `45390d63`) | Medium | **Fixed** on branch `fix-realtime-expiry` |
+| L-1 | Each map read pushed back when an expired friend's pin left the map (found by Codex at `45390d63`) | Medium (privacy, stale display) | **Fixed** on branch `fix-realtime-expiry` |
 
 ### S1: names on the live map (High, fixed)
 
@@ -166,7 +168,13 @@ Phase 4 adds a WebSocket at `/api/socket` (`server/src/realtime/hub.js`). It was
 - **Presence (phase 4b)** is the one thing beyond pokes: the user ids of an event's members who have the app open, sent only to that event's subscribers, so only to members. It says no more than "this member has EventBuddy open". It never carries names or places. Removal takes someone out of the event's presence and stops it reaching them at once, and logging out ends it at once too; only closing the app waits 5 seconds. A socket's login and the list of events that will see it are checked together, so a logout, removal or join while either is still loading makes both load again.
 - **Production:** `connect-src` in the page's policy allows `wss://*.onrender.com`.
 
+- **A socket lives no longer than its token (WS-1).** The token is checked once at login, but its expiry is then enforced for the life of the connection. The socket closes with 4401 when the token runs out, and the person stops being here at once if it was their last socket. A message or a subscription that arrives after expiry, or whose access check finishes after it, closes the socket instead of being answered. Other sockets with newer tokens carry on.
+
 `server/tests/realtime.test.js` covers each of these with a real WebSocket client.
+
+### L-1: an expired share could stay on the map
+
+`useLive` hides a friend's pin when their share ends, without waiting for a read. But it measured the time left from a clock reading saved when the map opened, so each read that came in pushed the end back by however long the map had been open. Codex reproduced a share due to end at 20 seconds still showing after a read at 15. The hook now uses the current time for both the filter and the timer. `src/hooks/useLive.test.js` replays Codex's case, and it fails on the old code.
 
 ### Secrets
 

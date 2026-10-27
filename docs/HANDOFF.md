@@ -5,10 +5,9 @@
 ## State
 
 - **Git, when this note was written:**
-  - `main` and GitHub's `main` are both at `af53a28d`: everything up to the Phase 4 plan, including the switched-off address check for F-1.
-  - **Local `main` is at `35265805` (Phase 4a, the socket and its pokes), one commit ahead of GitHub and not pushed.**
-  - **Phase 4b (who's here now) is on the branch `phase-4b-presence`.**
-  - The branch `phase-4-handoff` points at the same commit as `main` and can be deleted.
+  - `main` and GitHub's `main` are both at `45390d63`, with Phases 4a (pokes) and 4b (who's here now). The user pushed it on 27 Oct 2026.
+  - **The fixes for Codex's review of `45390d63` are on the branch `fix-realtime-expiry`**: WS-1, sockets now close when their token expires, and L-1, the map's share-expiry clock. See `docs/SECURITY_REVIEW.md`.
+  - The only local branch besides that one is `main`.
   - Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting any of this.
 - **Deployed on Render:**
   - The live site matches `acae73de`.
@@ -18,7 +17,7 @@
   - A redeploy alone doesn't re-read `render.yaml`, which is why the policy first went out missing.
 - **The map** uses OpenFreeMap's Liberty style, darkened. The map screen's bottom sheet no longer gets covered by the map (see Decisions).
 - **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps), so ask the user to look at the Actions tab.
-- **Tests (on `phase-4b-presence`):** 358 server tests, 467 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests (on `fix-realtime-expiry`):** 360 server tests, 468 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1).
@@ -123,6 +122,10 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
      - `usePresence(eventId)` gives the others who are here.
    - Build 4c (the activity feed) and 4d (scripted demo friends) next, each on its own branch. 4d's friends can show as here by joining `state.memberships` the way a socket does.
    - **The map's first fit can put a friend's pin right under the bottom sheet's edge.** That was there before 4b; found during the 4b screenshots.
+   - **Hardening backlog from Codex's review:**
+     - a per-socket budget for queued inbound messages. The 1 kB frame limit and the socket cap don't bound how many small messages queue up.
+     - a check of what Origin the iPhone app's WebView really sends. It must be in `CLIENT_ORIGIN`, so don't assume it sends none.
+   - **Render last deployed `2842a117`** (according to the log the user shared with Codex), which predates Phase 4. Deploying needs a Blueprint sync, then both services redeployed.
    - Each gets tests, the strict build and the `reviewer` subagent before it's committed, plus screenshots for the user before any UI commit.
    - Plan the first part in plan mode, per `CLAUDE.md`.
 3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.

@@ -4,6 +4,7 @@ const http = require('node:http');
 const net = require('node:net');
 const { describe, it, before, after, afterEach } = require('node:test');
 const { WebSocket } = require('ws');
+const jwt = require('jsonwebtoken');
 const { createApp } = require('../src/app');
 const realtime = require('../src/realtime/hub');
 
@@ -316,10 +317,11 @@ describe('pokes', () => {
   });
 });
 
+const presence = (eventId) => (m) => m.type === 'presence' && m.eventId === eventId;
+const here = (message) => [...message.userIds].sort();
+const ids = (...people) => people.map((p) => p.user._id).sort();
+
 describe('presence', () => {
-  const presence = (eventId) => (m) => m.type === 'presence' && m.eventId === eventId;
-  const here = (message) => [...message.userIds].sort();
-  const ids = (...people) => people.map((p) => p.user._id).sort();
 
   it('tells a new subscriber which members have the app open, and not outsiders', async () => {
     const { organizer, friend, outsider, event } = await setup();
@@ -414,6 +416,44 @@ describe('presence', () => {
 
     await logIn(friend);
     await new Promise((resolve) => setTimeout(resolve, LEAVE_GRACE_MS + 100));
+    assert.equal(ws.inbox.some((m) => m.type === 'presence'), false);
+  });
+});
+
+describe('a login running out', () => {
+  // A real token for this person, signed like the API's own (tests/env.js
+  // sets the secret). exp counts whole seconds, so +2 leaves one to two
+  // seconds: enough to log in and subscribe on a slow machine.
+  const shortLived = (person) =>
+    jwt.sign({ sub: person.user._id, sv: 0, exp: Math.floor(Date.now() / 1000) + 2 }, 'test-secret', { algorithm: 'HS256' });
+
+  it('closes the socket when its token expires, and lets them go at once', async () => {
+    const { organizer, friend, event } = await setup();
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    const expiring = await logIn({ token: shortLived(friend) });
+    await subscribe(expiring, event._id);
+    await ws.next((m) => m.type === 'presence' && m.userIds.length === 2, 'both here');
+
+    assert.equal(await within(expiring.closed, 'the close', 4000), realtime.ENDED);
+    const closedAt = Date.now();
+    assert.deepEqual(here(await ws.next((m) => m.type === 'presence' && m.userIds.length === 1, 'the leave')), ids(organizer));
+    assert.ok(Date.now() - closedAt < LEAVE_GRACE_MS, 'without waiting out the grace');
+  });
+
+  it('leaves their other, newer logins alone', async () => {
+    const { organizer, friend, event } = await setup();
+    const ws = await logIn(organizer);
+    await subscribe(ws, event._id);
+    const expiring = await logIn({ token: shortLived(friend) });
+    const current = await logIn(friend);
+    await subscribe(current, event._id);
+    await ws.next((m) => m.type === 'presence' && m.userIds.length === 2, 'both here');
+    ws.inbox.length = 0;
+
+    assert.equal(await within(expiring.closed, 'the close', 4000), realtime.ENDED);
+    await api().post(path(event, 'messages')).set('Authorization', organizer.auth).send({ text: 'Still here?' }).expect(201);
+    await current.next(poke(event._id, 'chat'), 'the chat poke');
     assert.equal(ws.inbox.some((m) => m.type === 'presence'), false);
   });
 });
