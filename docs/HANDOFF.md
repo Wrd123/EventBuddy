@@ -1,16 +1,23 @@
-# Handoff: where EventBuddy stands (27 Oct 2026)
+# Handoff: where EventBuddy stands (28 Oct 2026)
 
-`CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what's done, what's next (**Phase 4c, the activity feed**), and the traps. `docs/PHASE_4_PLAN.md` is the plan for Phase 4. Its 4a and 4b parts are built; where the build departed from it, this note says so.
+`CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what's done, what's next, and the traps.
+- **`docs/FINISH_PLAN.md` sets the order of work now.** Items 1 and 2 are done and deployed; **item 3, the compact activity feed (Phase 4c), is next**.
+- `docs/PHASE_4_PLAN.md` is the plan for Phase 4. Its 4a and 4b parts are built; where the build departed from it, this note says so.
 
 ## State
 
-- **Git:** `main` and GitHub's `main` are at `4e413b19`, plus this note's own commit once it's merged and pushed. CI passed for everything up to `41d05175`. The user checked the Actions tab on 27 Oct 2026. Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting this.
-- **Deployed on Render (checked live on 27 Oct 2026):**
-  - Both services run Phase 4, the expiry fixes and every earlier security fix.
+- **Git:**
+  - GitHub's `main` is at `4da7140a` (the demo pass), plus this note's commit once it's pushed.
+  - The user pushes with `git push origin <branch>:main`, so **local `main` can lag behind**. Bring it level with `git switch main && git merge --ff-only origin/main` (or the branch), and check `git rev-list --left-right --count origin/main...main` before trusting this.
+  - CI wasn't checked for the 28 Oct pushes. Ask the user to look at the Actions tab.
+- **Deployed on Render:**
+  - **Checked live on 28 Oct 2026:** retry-safe expense creates are on the API. A retry with the same `clientId` answered 200 with the same expense, and only one was stored.
+  - **The API didn't have the demo pass yet** when checked after the push on 28 Oct: a new demo world's picnic had 0 schedule items. It needs a redeploy (see Waiting on the user). The web app deploys itself from `main`.
+  - **From 27 Oct:** both services run Phase 4, the expiry fixes and every earlier security fix.
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 362 server tests, 468 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 373 server tests, 484 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -23,20 +30,44 @@
   - the darkened Liberty map in WKWebView
   - **the socket from the iPhone app:** what Origin its WebView sends. It must be in `CLIENT_ORIGIN`.
 - **Branches:**
-  - Only `main` locally.
+  - Locally: `main`, plus `expense-retry`, `chat-read` and `demo-polish`. All three are already in GitHub's `main`, so `git branch -d` can tidy them once local `main` has caught up.
   - `origin/phase-3b` still exists on GitHub. Deleting it would be a push, so leave it to the user.
   - `.git/config` has three harmless stale `vscode-merge-base` lines. The sandbox can't edit that file.
 - **Local servers:**
   - None of Claude's are running.
   - `.claude/launch.json` (gitignored) has `rt-api-4150`, an isolated demo API, and `rt-web-3999`, the production build served with the real headers against it. Rebuild first with `INLINE_RUNTIME_CHUNK=false REACT_APP_API_URL=http://localhost:4150/api npm run build`.
   - A stray API process may still be running from the 4a session (PID 66908, no port). The user was told `kill 66908` stops it.
+  - **To screenshot the waiting screen**, build with `REACT_APP_WAKE_SCREEN=true` as well, and open the page before starting `rt-api-4150`.
 
 ## Waiting on the user
 
-- **Turn on Auto-Deploy for `eventbuddy-api`** (Settings → Build & Deploy). Until 27 Oct 2026 the API had sat on `f2e16a0` from 24 Oct, 63 commits behind, because pushes only deployed the web app.
-- That's all. F-1 is resolved (see below).
+- **Redeploy `eventbuddy-api` for `4da7140a`**, if it hasn't been done. Without it, the live picnic has no schedule or costs, and Discover's not-configured message is the old one.
+  - Check: a new demo world's "Picnic in the Park" should have 4 schedule items.
+- **Turn on Auto-Deploy for `eventbuddy-api`** (Settings → Build & Deploy), so this stops being a manual step.
+- **Check CI** for the 28 Oct pushes.
 
 ## What was done
+
+**Finish plan, item 1 (28 Oct, deployed):**
+- **Retry-safe expense creates** (`742baab7`).
+  - `Expense` has a `clientId` with the shared `clientIdIndex`. The POST route checks for a saved retry before validating, so a retry still gets its expense back after the payer left. A reused id with a different expense gets 409.
+  - `ExpenseForm` keeps one id per Add sheet. After a lost response it says the save is unconfirmed, and closing the sheet reloads the list. On a 409 after that, it says the first try was saved.
+  - `fakeApi` has `expenseOutcomes`.
+- **Chat read only up to what you've seen** (`c82c7e5b`).
+  - `useChat` no longer marks read on its own; it exposes `markSeen(id)`. `GroupChat`'s `Conversation` calls it only when the newest message is in view: at the bottom, on scrolling down, from the pill, or on returning to the app while at the bottom.
+  - A solid "New messages" pill appears when someone else writes while you're scrolled up.
+  - Sending takes you to the bottom.
+  - The old code also never marked a message that landed as the app went to the background; that's fixed and tested.
+
+**Finish plan, item 2 (28 Oct, pushed; see Waiting on the user):** `4da7140a`
+- **Try the demo copy:** made-up friends, a private copy that resets when the free server sleeps, and EventBuddy never moves money.
+- **Sign up** warns, on a demo server only, that accounts are temporary. `useDemoAvailable()` is shared by Login and Register.
+- **`ServerWake`** shows a sliding bar (`.wake-bar`, still under reduced motion) in place of the fake percentage, and a README link after 90 s.
+- **The picnic** has four schedule items and two expenses. `equalShares` is shared in `demoData.js`.
+- **Wording:**
+  - "A short list of payments" in the README and `ledger.js`. A test pins the greedy method's 4-where-3-would-do case.
+  - The README says US dollars only, times local to the event, and money moves in the payment apps.
+  - Discover's not-configured message no longer mentions API keys.
 
 **Security review** (Claude and Codex independently, then fixes with tests). `docs/SECURITY_REVIEW.md` is the full record.
 
@@ -126,9 +157,9 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 ## What comes next
 
 Follow `docs/FINISH_PLAN.md`, in order:
-1. **Correctness:** retry-safe expense creates (on branch `expense-retry`), then chat marked read only up to what you've seen.
-2. **The demo and copy pass:** the temporary-sample notice, a picnic with a schedule and ledger, an honest startup state, the settle-up wording, and no Ticketmaster setup sentence for visitors.
-3. **4c, compact** (notes below).
+1. ~~Correctness~~ (done).
+2. ~~The demo and copy pass~~ (done).
+3. **4c, compact. Next** (notes below). Plan it in plan mode first.
 4. **4d** (notes below).
 5. **The abuse backlog:** a per-visitor demo budget and a socket queue budget.
 6. **Playwright against a real API, the Simulator pass, and the user's physical-iPhone location check.**
@@ -140,11 +171,12 @@ Notes for the Phase 4 items:
    - a compact entry on EventDetails (one or two lines plus See all) instead of five rows;
    - no meetup note or coordinates;
    - `record` awaited and never failing the write;
-   - the list replaced when a fresh page doesn't overlap.   - **Server:**
+   - the list replaced when a fresh page doesn't overlap.
+   - **Server:**
      - `models/Activity.js` (`{ event, actor, kind, data, createdAt }`, indexed by `{ event, _id }`, with a 30-day TTL).
      - A `record(event, user, kind, data)` called beside each poke.
      - `GET /api/events/:id/activity?before=<id>`, members only through `findVisibleEvent`, 20 per page, paged by id like chat.
-     - Seed the demo data with a short, believable history.
+     - Seed the demo data with a short, believable history that matches what's there now. The picnic now has its schedule (set up by the lake, lunch, frisbee, sunset walk) and two expenses: Taylor's Snacks & drinks and John's Blanket & frisbee.
    - **Where to record:**
      - Most writes under `/api/events/:id/...` already pass through `pokeOnSuccess` in `routes/events.js`, but recording needs the route's own details (an item's title, an amount), so `record` belongs in each route.
      - Joins and removals go through `routes/invites.js` and the members route in `routes/events.js`, beside `addMember` and `dropFromEvent`.
@@ -160,6 +192,7 @@ Notes for the Phase 4 items:
    - Open the Simulator panel (`attach`) before building.
 
 **Later:**
+- The pill and the new sheets need a VoiceOver pass on a device (finish-plan item 6).
 - Optimistic creates for expenses and schedule items, once there's a server `clientId` for both (expenses get theirs in finish-plan item 1).
 - The sheets need a check with a real phone keyboard, enlarged text and VoiceOver on a device.
 
@@ -223,7 +256,7 @@ Notes for the Phase 4 items:
 
 - They want whole features built and the reasoning explained, with no TODOs left for them.
 - **Git:**
-  - Commit on a new branch. Fast-forward `main` locally **only when they ask**. In the last session Claude once fast-forwarded without asking, and owned it.
+  - Commit on a new branch. One branch per finish-plan piece has worked well, each branched from the last. Fast-forward `main` locally **only when they ask**. In the last session Claude once fast-forwarded without asking, and owned it.
   - Push only when they say so. They run the push themselves, since the sandbox can't.
 - **Commit messages:** one sentence on what the user gets, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Asking permission:** follow "Explain permission requests in plain English" in `CLAUDE.md`.
