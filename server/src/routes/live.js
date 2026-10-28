@@ -12,6 +12,8 @@ const { text } = require('../validation');
 const { findVisibleEvent } = require('../eventAccess');
 const { TIME } = require('../models/Event');
 const { isTest } = require('../config');
+const realtime = require('../realtime/hub');
+const { record } = require('../activityLog');
 
 const MAX_SHARE_MS = 24 * 60 * 60 * 1000;
 const MEETUP_LIFETIME_MS = 12 * 60 * 60 * 1000;
@@ -112,11 +114,22 @@ router.put('/share', async (req, res) => {
     throw new HttpError(400, 'You can share for up to 24 hours at a time.');
   }
 
-  await LocationShare.updateOne(
-    { event: event._id, user: req.user._id },
-    { $set: { until } },
-    { upsert: true }
-  );
+  // Starting to share is news; changing until when isn't. A share that ran
+  // out stays in the database until MongoDB's next sweep (about a minute),
+  // so clear it first, so a restart doesn't bring back where the phone was
+  // before. A start is there being no live share before this one (checked
+  // again, as one could run out in between). The unique { event, user }
+  // index means two taps at once still make one share, and only one of them
+  // sees none before it.
+  const key = { event: event._id, user: req.user._id };
+  await LocationShare.deleteOne({ ...key, until: { $lte: new Date() } });
+  const before = await LocationShare.findOneAndUpdate(key, { $set: { until } }, { upsert: true, returnDocument: 'before' });
+  if (!before || before.until <= new Date()) {
+    await record(event, req.user, 'sharing_started');
+    // The map hears about every share change; the event page only needs
+    // to hear about this one
+    realtime.notifyEvent(event._id, 'event');
+  }
   res.json({ sharing: { until } });
 });
 
@@ -165,6 +178,8 @@ router.put('/meetup', async (req, res) => {
     expiresAt: meetupExpiry(event, now)
   };
   await event.save();
+  // Just who set it: where, and the note, stay on the map
+  await record(event, req.user, 'meetup_set');
   res.json({ meetup: currentMeetup(event) });
 });
 

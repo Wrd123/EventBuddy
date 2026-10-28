@@ -14,13 +14,16 @@ const Expense = require('../models/Expense');
 const Payment = require('../models/Payment');
 const Message = require('../models/Message');
 const ChatRead = require('../models/ChatRead');
+const Activity = require('../models/Activity');
 const messageRoutes = require('./messages');
+const activityRoutes = require('./activity');
 const liveRoutes = require('./live');
 const LocationShare = require('../models/LocationShare');
 const { MAX_CENTS } = require('../models/Expense');
 const { withEventLock } = require('../eventLock');
 const { netCents, formatCents } = require('../ledger');
 const realtime = require('../realtime/hub');
+const { record } = require('../activityLog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -33,6 +36,7 @@ router.use('/:id/expenses', pokeOnSuccess('event'), expenseRoutes);
 router.use('/:id/payments', pokeOnSuccess('event'), paymentRoutes);
 router.use('/:id/messages', pokeOnSuccess((req) => (req.path === '/read' ? null : 'chat')), messageRoutes);
 router.use('/:id/live', pokeOnSuccess((req) => (req.path === '/meetup' ? ['live', 'event'] : 'live')), liveRoutes);
+router.use('/:id/activity', activityRoutes);
 
 router.get('/', async (req, res) => {
   const events = await Event.find(visibleTo(req.user)).sort({ startDate: 1 });
@@ -125,7 +129,11 @@ router.patch('/:id', async (req, res) => {
   // A festival photo shouldn't stay on what's now a ballgame
   if (event.isModified('type')) event.coverIndex = await nextCoverIndex(event);
 
+  // Read before saving, which clears it. Setting a field to what it already
+  // was doesn't count, so an unchanged save adds no line.
+  const changed = [...EDITABLE_FIELDS, 'budgetCents'].filter((field) => event.isModified(field));
   await event.save();
+  if (changed.length > 0) await record(event, req.user, 'event_updated', { fields: changed });
   realtime.notifyEvent(event._id, 'event');
   res.json({ event });
 });
@@ -175,8 +183,8 @@ const unsettledReason = async (event, userId, leaving) => {
 
 // Leave an event (your own id), or, for the organizer, remove someone. They
 // lose access to everything at once: every event route checks membership.
-// Their shared location and read marker go too; their messages stay, with
-// their name, so the conversation still reads right.
+// Their shared location and read marker go too; their messages and their
+// lines in the activity stay, with their name, so both still read right.
 router.delete('/:id/members/:userId', (req, res) => withEventLock(req.params.id, async () => {
   // Loaded under the ledger lock, like every money change, so no expense or
   // payment involving them can land between checking their balance and
@@ -205,6 +213,9 @@ router.delete('/:id/members/:userId', (req, res) => withEventLock(req.params.id,
     LocationShare.deleteMany({ event: event._id, user: member.user }),
     ChatRead.deleteMany({ event: event._id, user: member.user })
   ]);
+  // Someone leaving is news to the rest. Being removed isn't announced:
+  // the others just see them gone.
+  if (leaving) await record(event, req.user, 'left');
   // They stop hearing about it, their own list (on every device) drops it,
   // and the others see them gone, from the members and from the map
   realtime.dropFromEvent(event._id, [member.user]);
@@ -239,6 +250,7 @@ router.delete('/:id', async (req, res) => {
     Message.deleteMany({ event: event._id }),
     ChatRead.deleteMany({ event: event._id }),
     LocationShare.deleteMany({ event: event._id }),
+    Activity.deleteMany({ event: event._id }),
     event.deleteOne()
   ]);
   // Anyone on one of its screens reads it and finds it gone; then nobody

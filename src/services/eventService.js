@@ -35,6 +35,11 @@ export const getRemoved = async (eventId) => (await apiRequest(`${eventPath(even
 export const letBackIn = (eventId, userId) =>
   apiRequest(`${eventPath(eventId)}/removed/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 
+// What's been happening in the event -> { activity (newest first), hasMore }.
+// before: the page just older than this line's id.
+export const getActivity = (eventId, { before } = {}) =>
+  apiRequest(`${eventPath(eventId)}/activity${before ? `?before=${encodeURIComponent(before)}` : ''}`);
+
 // Schedule items. Each call returns the whole updated event.
 const schedulePath = (eventId, itemId) =>
   `${eventPath(eventId)}/schedule${itemId ? `/${encodeURIComponent(itemId)}` : ''}`;

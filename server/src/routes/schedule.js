@@ -6,6 +6,7 @@ const Event = require('../models/Event');
 const { HttpError } = require('../errors');
 const { validateScheduleItem, text } = require('../validation');
 const { visibleTo, findVisibleEvent } = require('../eventAccess');
+const { record, follow, forget } = require('../activityLog');
 
 // mergeParams: see the parent route's :id
 const router = express.Router({ mergeParams: true });
@@ -28,8 +29,9 @@ router.post('/', async (req, res) => {
   const error = validateScheduleItem(fields, event);
   if (error) throw new HttpError(400, error);
 
-  event.schedule.push({ ...fields, attendees: [], createdBy: req.user._id });
+  const item = event.schedule[event.schedule.push({ ...fields, attendees: [], createdBy: req.user._id }) - 1];
   await event.save();
+  await record(event, req.user, 'schedule_added', { subject: item._id, activity: item.activity });
   res.status(201).json({ event });
 });
 
@@ -49,15 +51,19 @@ router.patch('/:itemId', async (req, res) => {
   const error = validateScheduleItem(updated, event);
   if (error) throw new HttpError(400, error);
 
+  const renamed = updated.activity !== item.activity;
   item.set(updated);
   await event.save();
+  if (renamed) await follow(event, item._id, { activity: item.activity });
   res.json({ event });
 });
 
 router.delete('/:itemId', async (req, res) => {
   const event = await findVisibleEvent(req.params.id, req.user);
-  findItem(event, req.params.itemId).deleteOne();
+  const item = findItem(event, req.params.itemId);
+  item.deleteOne();
   await event.save();
+  await forget(event, item._id);
   res.json({ event });
 });
 

@@ -10,6 +10,7 @@ const Payment = require('../models/Payment');
 const Message = require('../models/Message');
 const ChatRead = require('../models/ChatRead');
 const LocationShare = require('../models/LocationShare');
+const Activity = require('../models/Activity');
 const { ORGANIZER_COLOR } = require('../colors');
 
 const DEMO_PASSWORD = 'password';
@@ -262,8 +263,58 @@ const demoLedger = (users, ids) => {
   };
 };
 
-// Saves a whole demo world: accounts, events, money, chat and the picnic's
-// live locations. users: [{ key, _id, name, username, email }] with key 'me'
+// A short history for the activity feeds that fits everything above: some
+// festival planning around its chat, then the picnic coming together (people
+// joining, Taylor planning the day, the snacks, friends starting to share,
+// the meetup point). saved: the inserted events and money, which the lines
+// point at. Ids are made from the times, as in the chat.
+const demoActivity = (users, { festival, picnic, festivalExpenses, festivalPayments, picnicExpenses }) => {
+  const now = Date.now();
+  const line = (minutes, name, event, kind, { subject, ...data } = {}) => {
+    const createdAt = new Date(now - minutes * 60 * 1000);
+    return {
+      _id: objectIdAt(createdAt),
+      event: event._id,
+      actor: { user: users[name]._id, name: users[name].name },
+      kind,
+      subject,
+      data,
+      createdAt
+    };
+  };
+  const planned = (event, title) => {
+    const item = event.schedule.find((i) => i.activity === title);
+    return { subject: item._id, activity: item.activity };
+  };
+  const added = (expense) => ({ subject: expense._id, description: expense.description, amountCents: expense.amountCents });
+  const rentalCar = festivalExpenses.find((e) => e.description === 'Rental car');
+  const [settled] = festivalPayments;
+  const [snacks, blanket] = picnicExpenses;
+
+  return [
+    line(27 * 60, 'Taylor', festival, 'expense_added', added(rentalCar)),
+    line(26 * 60 + 4, 'Alex', festival, 'schedule_added', planned(festival, 'Arctic Monkeys')),
+    line(24 * 60, 'Jordan', festival, 'payment_marked', {
+      subject: settled._id, from: settled.from, to: settled.to, amountCents: settled.amountCents
+    }),
+
+    line(48 * 60, 'Alex', picnic, 'joined'),
+    line(48 * 60 - 10, 'Jordan', picnic, 'joined'),
+    line(48 * 60 - 95, 'me', picnic, 'joined'),
+    ...['Set up by the lake', 'Picnic lunch', 'Frisbee', 'Sunset walk']
+      .map((title, i) => line(20 * 60 - i, 'Taylor', picnic, 'schedule_added', planned(picnic, title))),
+    line(3 * 60, 'Taylor', picnic, 'expense_added', added(snacks)),
+    line(2 * 60 + 30, 'me', picnic, 'expense_added', added(blanket)),
+    line(40, 'Jordan', picnic, 'sharing_started'),
+    line(33, 'Taylor', picnic, 'sharing_started'),
+    line(28, 'Alex', picnic, 'sharing_started'),
+    // When the picnic's meetup point says it was set
+    line(20, 'Taylor', picnic, 'meetup_set')
+  ];
+};
+
+// Saves a whole demo world: accounts, events, money, chat, the picnic's
+// live locations and the activity. users: [{ key, _id, name, username, email }] with key 'me'
 // first, then the friends' names.
 const insertDemoWorld = async ({ users: accounts, eventIds, passwordHash, demoWorld, today }) => {
   const created = await User.create(accounts.map(({ key, ...account }) => ({
@@ -278,17 +329,24 @@ const insertDemoWorld = async ({ users: accounts, eventIds, passwordHash, demoWo
   const users = Object.fromEntries(accounts.map(({ key }, i) => [key, created[i]]));
 
   // Validation is skipped on purpose: some demo events are in the past
-  await Event.insertMany(demoEvents(users, eventIds));
+  const events = await Event.insertMany(demoEvents(users, eventIds));
   const ledger = demoLedger(users, eventIds);
-  await Expense.insertMany(ledger.expenses);
-  await Payment.insertMany(ledger.payments);
+  const festivalExpenses = await Expense.insertMany(ledger.expenses);
+  const festivalPayments = await Payment.insertMany(ledger.payments);
   const chat = demoChat(users, eventIds);
   await Message.insertMany(chat.messages);
   await ChatRead.create(chat.read);
   const picnic = demoPicnic(users, eventIds, today);
-  await Event.insertMany([picnic.event]);
+  const [picnicEvent] = await Event.insertMany([picnic.event]);
   await LocationShare.insertMany(picnic.shares);
-  await Expense.insertMany(picnic.expenses);
+  const picnicExpenses = await Expense.insertMany(picnic.expenses);
+  await Activity.insertMany(demoActivity(users, {
+    festival: events.find((e) => e._id.equals(eventIds.festival)),
+    picnic: picnicEvent,
+    festivalExpenses,
+    festivalPayments,
+    picnicExpenses
+  }));
   return users.me;
 };
 
@@ -373,6 +431,7 @@ const pruneDemoWorlds = async ({ maxAgeMs, maxWorlds }) => {
     Message.deleteMany({ event: { $in: eventIds } }),
     ChatRead.deleteMany({ $or: [{ event: { $in: eventIds } }, { user: { $in: userIds } }] }),
     LocationShare.deleteMany({ $or: [{ event: { $in: eventIds } }, { user: { $in: userIds } }] }),
+    Activity.deleteMany({ event: { $in: eventIds } }),
     User.deleteMany({ _id: { $in: userIds } })
   ]);
   return tags.length;

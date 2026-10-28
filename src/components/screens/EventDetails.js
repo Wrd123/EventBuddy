@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, MessageCircle, Wallet, Map, MapPin, Plus, ExternalLink, Pencil } from 'lucide-react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
-import { Avatar, EventCover, PhotoBackdrop, Skeleton, SkeletonScreen } from '../common';
+import { ActivityLine, ActivitySheet, Avatar, EventCover, PhotoBackdrop, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
 import MemberSheet from '../common/MemberSheet';
 import { useAppContext } from '../../context/AppContext';
 import { usePresence } from '../../hooks/usePresence';
+import { useActivity } from '../../hooks/useActivity';
 import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
 import { usePolling } from '../../hooks/usePolling';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
@@ -69,13 +70,22 @@ const EventDetails = () => {
   const { currentUser } = useAppContext();
   const summary = useEventSummary(eventId);
   const here = usePresence(eventId);
+  const activity = useActivity(eventId);
   // A failure message goes below the floating header, clear of its buttons
-  const { bind, indicator } = usePullToRefresh(() => Promise.all([refresh(), summary.refresh()]), { messageTop: FLOATING_HEADER_HEIGHT });
+  const { bind, indicator } = usePullToRefresh(
+    () => Promise.all([refresh(), summary.refresh(), activity.refresh()]),
+    { messageTop: FLOATING_HEADER_HEIGHT }
+  );
   // Create Event sends new organizers here with the invite sheet open
   const location = useLocation();
   const [showInvite, setShowInvite] = useState(Boolean(location.state?.showInvite));
   // The person whose sheet is open (leave, or remove as organizer)
   const [openMember, setOpenMember] = useState(null);
+  const [showActivity, setShowActivity] = useState(false);
+  // Lost access closes the sheet for good, rather than until the lines return
+  useEffect(() => {
+    if (activity.status !== 'ready') setShowActivity(false);
+  }, [activity.status]);
 
   if (status === 'loading') return <EventSkeleton />;
   if (status === 'not-found') {
@@ -130,7 +140,15 @@ const EventDetails = () => {
               Get tickets <ExternalLink size={16} className="ml-2" aria-hidden="true" />
             </a>
           )}
-          <EventContent event={event} here={here} onInvite={() => setShowInvite(true)} onMember={setOpenMember} />
+          <EventContent
+            event={event}
+            here={here}
+            onInvite={() => setShowInvite(true)}
+            onMember={setOpenMember}
+            activity={activity}
+            me={currentUser?._id}
+            onSeeActivity={() => setShowActivity(true)}
+          />
         </div>
       </div>
 
@@ -143,6 +161,10 @@ const EventDetails = () => {
       )}
       {openMember && (
         <MemberSheet event={event} member={openMember} onClose={() => setOpenMember(null)} />
+      )}
+      {/* Gone with the lines if you lose access while it's open */}
+      {showActivity && activity.status === 'ready' && (
+        <ActivitySheet activity={activity} members={event.members} me={currentUser?._id} onClose={() => setShowActivity(false)} />
       )}
     </div>
   );
@@ -260,8 +282,9 @@ const ActionButton = ({ Icon, label, badge = 0, hint = '', onClick }) => (
   </button>
 );
 
-// here: the user ids of members with the app open (see usePresence)
-const EventContent = ({ event, here, onInvite, onMember }) => {
+// here: the user ids of members with the app open (see usePresence).
+// activity: what useActivity returns.
+const EventContent = ({ event, here, onInvite, onMember, activity, me, onSeeActivity }) => {
   // Preview one day: today while the event is running, else its first day.
   // The Schedule screen shows every day.
   const day = defaultScheduleDay(event);
@@ -304,6 +327,8 @@ const EventContent = ({ event, here, onInvite, onMember }) => {
         </button>
       </div>
     
+      <RecentActivity activity={activity} members={event.members} me={me} onSeeAll={onSeeActivity} />
+
       <h3 className="text-lg font-semibold tracking-[-0.01em] mb-3">{heading}</h3>
       {items.length > 0 ? (
         <div className="flex flex-col space-y-3">
@@ -315,6 +340,33 @@ const EventContent = ({ event, here, onInvite, onMember }) => {
         <p className="text-sm text-muted">Nothing scheduled for this day yet.</p>
       )}
     </div>
+  );
+};
+
+// The newest two lines of what's been happening, with the rest a tap away.
+// Nothing at all until there's something to show.
+const RecentActivity = ({ activity, members, me, onSeeAll }) => {
+  if (activity.status !== 'ready' || activity.items.length === 0) return null;
+  return (
+    <section className="mb-7">
+      <div className="flex items-baseline justify-between mb-2">
+        <h3 className="text-lg font-semibold tracking-[-0.01em]">Recent activity</h3>
+        {(activity.items.length > 2 || activity.hasMore) && (
+          <button
+            onClick={onSeeAll}
+            aria-label="See all activity"
+            className="-my-3 -mr-2 px-2 py-3 text-sm font-semibold text-accent-soft transition-transform active:scale-95"
+          >
+            See all
+          </button>
+        )}
+      </div>
+      <ul className="card rounded-[22px] px-4 py-0.5 divide-y divide-line">
+        {activity.items.slice(0, 2).map((line) => (
+          <ActivityLine key={line._id} line={line} members={members} me={me} compact />
+        ))}
+      </ul>
+    </section>
   );
 };
 

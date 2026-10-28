@@ -15,6 +15,7 @@ Built end to end by me: React front end, Express and MongoDB API, and a native i
 - **Plan together.** Single or multi-day events, a shared schedule with who's going to what, and invite links that let friends join in one tap.
 - **Talk in one place.** Every event has its own group chat, with unread counts on the Groups tab and new messages arriving the moment they're sent.
 - **See who's here.** A green dot on a friend's avatar, a "Here now" line in the chat and on the map mean they have EventBuddy open right now.
+- **Catch up at a glance.** The event page shows the latest things that happened ("Taylor set the meetup point", "Alex added Snacks & drinks"), with the whole history a tap away.
 - **Split costs.** Add expenses split equally or by exact amounts. EventBuddy works out balances and a short list of payments to settle up, then opens Venmo, Cash App or PayPal with the amount filled in. The money moves in those apps; EventBuddy only records what you mark paid. Amounts are US dollars, and schedule times are local to the event.
 - **Find each other.** During an event, friends can share their location for an hour, a few hours or until midnight. The map shows where everyone is, how recently they updated, and a meetup point anyone can set. In the iPhone app, sharing keeps working with the screen locked. Before the trip, an event's map helps plan it instead: directions, a meetup point for the first day, and what else is on nearby during those dates.
 - **Discover things to do.** Concerts, games and shows near you (Ticketmaster), found from your phone's location without setting anything up, each one a tap away from becoming a plan with friends.
@@ -85,7 +86,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet with MapLibre vector tiles from OpenFreeMap (free, keyless) |
 | iPhone | Capacitor 7, background geolocation, native HTTP, haptics |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt, `ws` for real-time pokes |
-| Testing | Jest and Testing Library (468 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (360 tests) |
+| Testing | Jest and Testing Library (511 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (396 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
@@ -94,6 +95,7 @@ flowchart LR
 - **Chat pages by message id, not timestamp.** MongoDB ids increase over time, so "everything after this id" never skips or repeats a message, even when two arrive in the same second.
 - **Real time is a poke, not a payload.** When something changes, the server sends the event's members a WebSocket message that only says what changed (`chat`, `live`, the `event`), and the app runs the same read it would have polled with. All the work that keeps late or overlapping answers from undoing newer ones stays in one place, a slip in the socket's access checks could reveal at most that something changed, and without a socket (offline, a blocking proxy, an older app) polling carries on as before. While connected, polling slows to a once-a-minute safety net; it only runs while the app is on screen, and so does the socket. The socket logs in with its first message rather than the URL, so tokens stay out of logs. Its subscriptions are tracked in the server's memory, which suits the single free instance; a second instance would need pub/sub such as Redis to pass pokes between them.
 - **Here now is just an open socket.** The socket only exists while the app is on screen, so having one is what being here means; there's no separate heartbeat or "last seen" to store. The server sends each event's members the ids of the others who are connected, never to anyone outside the event, and waits 5 seconds before letting someone go, so switching apps for a moment doesn't flash them away.
+- **An activity line describes a change but is never part of it.** Each route writes its line once the change is saved, waits at most two seconds for it, and logs rather than fails when it can't be saved. So an optional extra can't stall the per-event lock that keeps payments consistent, or turn a saved expense into one the app can't confirm. Only real changes count: a retried expense, a second tap on an invite link, or extending a share adds nothing. A line keeps only what its sentence needs (the schema drops anything else, so never a position or a meetup note), follows what it's about when that's edited or deleted, and pages by id like the chat.
 - **Read receipts are deliberately absent.** How far you've read is stored apart from the event's member list, which every member receives, so unread counts work without telling the group what you've read.
 - **Location sharing is built to forget.** It's opt-in per event, lasts at most 24 hours and only while the event is on. The server keeps only your latest position, and a MongoDB TTL index deletes it when sharing ends; reads also filter on the end time, since TTL cleanup runs about once a minute. A map opened from an event only ever shows that event's members, and only while it's on.
 - **Background location is one small seam.** A single tracker module uses the native background plugin in the app and the browser's geolocation on the web, and app-wide sharing state keeps it running on every screen, through a relaunch, and stops it on logout.
@@ -116,12 +118,12 @@ EventBuddy/
 │   │   ├── common/          # Shared components
 │   │   └── layout/          # Routing, tab bar, laptop showcase frame
 │   ├── context/             # Auth/events state and app-wide location sharing
-│   ├── hooks/               # Data hooks (chat, live locations, map, places)
+│   ├── hooks/               # Data hooks (chat, activity, live locations, map, places)
 │   ├── services/            # API calls, the real-time socket and the location tracker
-│   └── utils/               # Dates, money, ledger, chat and map helpers
+│   └── utils/               # Dates, money, ledger, chat, activity and map helpers
 ├── server/                  # Express API
 │   ├── src/
-│   │   ├── routes/          # auth, events, schedule, expenses, messages, live, map, discover
+│   │   ├── routes/          # auth, events, schedule, expenses, messages, live, activity, map, discover
 │   │   ├── models/          # Mongoose models
 │   │   ├── realtime/        # WebSocket hub: who's subscribed to what, and the pokes
 │   │   ├── discover/        # Ticketmaster and OpenStreetMap clients with caching

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, settle, presence, openSockets } from '../../testUtils/fakeApi';
+import { installFakeApi, settle, presence, openSockets, poke, addActivity, removeEvent, failNext } from '../../testUtils/fakeApi';
 import MainLayout from '../layout/MainLayout';
 
 const renderAt = (path) =>
@@ -146,5 +146,121 @@ describe('who is here now', () => {
 
     await presence('1', ['u1']);
     expect(screen.getByRole('button', { name: 'Alex' })).toBeInTheDocument();
+  });
+});
+
+describe('recent activity', () => {
+  const activitySection = () => screen.getByRole('heading', { name: 'Recent activity' }).closest('section');
+  const sheet = () => screen.getByRole('dialog', { name: 'Activity' });
+
+  // n lines by Alex in event 1, oldest first, with ids that sort like real ones
+  const history = (n) => Array.from({ length: n }, (_, i) => ({
+    _id: `a${String(i + 1).padStart(4, '0')}`,
+    actor: { user: 'u2', name: 'Alex' },
+    kind: 'schedule_added',
+    data: { activity: `Plan ${i + 1}` },
+    createdAt: new Date().toISOString()
+  }));
+
+  const subscribed = () => waitFor(() => expect(openSockets()[0]?.subscriptions.has('1')).toBe(true));
+
+  it('shows the newest two lines, and the rest in a sheet', async () => {
+    installFakeApi().logIn();
+    renderAt('/events/1');
+
+    await screen.findByText('Alex added Airbnb ($300.00)');
+    const preview = within(activitySection());
+    expect(preview.getAllByRole('listitem')).toHaveLength(2);
+    expect(preview.getByText('Alex added Arctic Monkeys to the schedule')).toBeInTheDocument();
+    expect(preview.queryByText('Alex joined')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'See all activity' }));
+    expect(within(sheet()).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(sheet()).getByText('Alex joined')).toBeInTheDocument();
+  });
+
+  it('brings in what just happened as soon as the event changes', async () => {
+    installFakeApi({ realtime: true }).logIn();
+    renderAt('/events/1');
+    await screen.findByText('Alex added Airbnb ($300.00)');
+    await subscribed();
+
+    addActivity('1', { kind: 'meetup_set' });
+    await poke('1', 'event');
+
+    expect(await within(activitySection()).findByText('Alex set the meetup point')).toBeInTheDocument();
+    expect(within(activitySection()).queryByText('Alex added Arctic Monkeys to the schedule')).not.toBeInTheDocument();
+  });
+
+  it('shows a name with markup in it as plain text', async () => {
+    installFakeApi({
+      activity: { '1': [{ ...history(1)[0], actor: { user: 'u9', name: '<img src=x onerror=alert(1)>' }, kind: 'joined', data: {} }] }
+    }).logIn();
+    renderAt('/events/1');
+
+    expect(await screen.findByText('<img src=x onerror=alert(1)> joined')).toBeInTheDocument();
+    expect(document.querySelector('img[src="x"]')).toBeNull();
+  });
+
+  it("isn't there until something has happened", async () => {
+    installFakeApi({ activity: {} }).logIn();
+    renderAt('/events/1');
+    await screen.findByRole('button', { name: 'Alex' });
+    await settle();
+
+    expect(screen.queryByRole('heading', { name: 'Recent activity' })).not.toBeInTheDocument();
+  });
+
+  it('keeps each preview line to one line, and lets the sheet wrap them', async () => {
+    installFakeApi().logIn();
+    renderAt('/events/1');
+    expect(await screen.findByText('Alex added Airbnb ($300.00)')).toHaveClass('truncate');
+
+    fireEvent.click(screen.getByRole('button', { name: 'See all activity' }));
+    expect(within(sheet()).getByText('Alex added Airbnb ($300.00)')).toHaveClass('break-words');
+  });
+
+  it('pages back through older lines in the sheet', async () => {
+    installFakeApi({ activity: { '1': history(25) } }).logIn();
+    renderAt('/events/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'See all activity' }));
+    expect(within(sheet()).getAllByRole('listitem')).toHaveLength(20);
+
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Show earlier' }));
+    expect(await within(sheet()).findByText('Alex added Plan 1 to the schedule')).toBeInTheDocument();
+    expect(within(sheet()).getAllByRole('listitem')).toHaveLength(25);
+    expect(within(sheet()).queryByRole('button', { name: 'Show earlier' })).not.toBeInTheDocument();
+  });
+
+  it('closes the sheet when you lose access to the event', async () => {
+    installFakeApi({ realtime: true }).logIn();
+    renderAt('/events/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'See all activity' }));
+    await subscribed();
+
+    removeEvent('1');
+    await poke('1', 'event');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByText('Event not found')).toBeInTheDocument();
+    expect(screen.queryByText('Alex joined')).not.toBeInTheDocument();
+  });
+
+  it('closes the sheet as soon as the activity says you lost access, for good', async () => {
+    installFakeApi({ realtime: true }).logIn();
+    renderAt('/events/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'See all activity' }));
+    await subscribed();
+
+    // Only the activity read finds out; the event page hasn't yet
+    failNext('GET', '/events/1/activity', 404);
+    await poke('1', 'event');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: "Who's going" })).toBeInTheDocument();
+
+    // The lines coming back doesn't open it again by itself
+    await poke('1', 'event');
+    expect(await screen.findByRole('heading', { name: 'Recent activity' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

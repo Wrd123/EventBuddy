@@ -1,4 +1,5 @@
 // src/components/common/index.js
+export { default as ActivitySheet, ActivityLine } from './ActivitySheet';
 export { default as Avatar } from './Avatar';
 export { default as AvatarStack } from './AvatarStack';
 export { default as Button } from './Button';

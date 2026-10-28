@@ -13,6 +13,7 @@ const { findVisibleEvent } = require('../eventAccess');
 const { withEventLock } = require('../eventLock');
 const { readClientId, findExisting, createOnce } = require('../idempotency');
 const { netCents, settlesWithinBalances, formerMembersLeftUneven } = require('../ledger');
+const { record, follow, forget } = require('../activityLog');
 
 // A person as stored on money records: { user, name }. Someone who has
 // left keeps the name already on the expense being edited.
@@ -118,6 +119,11 @@ expenses.post('/', ledgerChange(async (req, res) => {
   const { record: expense, created } = await createOnce(
     Expense, key, { ...toStored(fields, event), event: event._id, createdBy: req.user._id }, sameExpense(fields)
   );
+  if (created) {
+    await record(event, req.user, 'expense_added', {
+      subject: expense._id, description: expense.description, amountCents: expense.amountCents
+    });
+  }
   res.status(created ? 201 : 200).json({ expense });
 }));
 
@@ -132,12 +138,14 @@ expenses.patch('/:expenseId', ledgerChange(async (req, res) => {
   if (error) throw new HttpError(400, error);
 
   const stored = toStored(fields, event, expense);
+  const relabeled = stored.description !== expense.description || stored.amountCents !== expense.amountCents;
   await keepFormerMembersEven(event, ({ expenses: list, payments }) => ({
     expenses: list.map((e) => (e._id.equals(expense._id) ? stored : e)),
     payments
   }));
   expense.set(stored);
   await expense.save();
+  if (relabeled) await follow(event, expense._id, { description: expense.description, amountCents: expense.amountCents });
   res.json({ expense });
 }));
 
@@ -151,6 +159,7 @@ expenses.delete('/:expenseId', ledgerChange(async (req, res) => {
     payments
   }));
   await expense.deleteOne();
+  await forget(event, expense._id);
   res.status(204).end();
 }));
 
@@ -195,6 +204,11 @@ payments.post('/', ledgerChange(async (req, res) => {
     date: fields.date,
     createdBy: req.user._id
   }, isSame);
+  if (created) {
+    await record(event, req.user, 'payment_marked', {
+      subject: payment._id, from: payment.from, to: payment.to, amountCents: payment.amountCents
+    });
+  }
   res.status(created ? 201 : 200).json({ payment });
 }));
 
@@ -209,6 +223,7 @@ payments.delete('/:paymentId', ledgerChange(async (req, res) => {
     payments: payments.filter((p) => !p._id.equals(payment._id))
   }));
   await payment.deleteOne();
+  await forget(event, payment._id);
   res.status(204).end();
 }));
 

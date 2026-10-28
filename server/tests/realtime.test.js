@@ -241,6 +241,8 @@ describe('pokes', () => {
 
     await as(api().put(path(event, 'live', 'share'))).send({ until: new Date(Date.now() + 3600000).toISOString() }).expect(200);
     await ws.next(poke(event._id, 'live'), 'the live poke');
+    // Starting to share is in the event's activity too (see below)
+    await ws.next(poke(event._id, 'event'), 'the sharing poke');
 
     await as(api().post(path(event, 'schedule'))).send({ date: isoDay(0), startTime: '10:00', activity: 'Brunch' }).expect(201);
     await ws.next(poke(event._id, 'event'), 'the schedule poke');
@@ -262,6 +264,21 @@ describe('pokes', () => {
     await api().put(path(event, 'live', 'meetup')).set('Authorization', organizer.auth).send({ lat: 40.7, lng: -74 }).expect(200);
     await ws.next(poke(event._id, 'live'), 'the live poke');
     await ws.next(poke(event._id, 'event'), 'the event poke');
+  });
+
+  it('tell the event page someone started sharing, but not when they change until when', async () => {
+    const { organizer, friend, event } = await setup();
+    const ws = await logIn(friend);
+    await subscribe(ws, event._id);
+    const share = (hours) => api().put(path(event, 'live', 'share')).set('Authorization', organizer.auth)
+      .send({ until: new Date(Date.now() + hours * 3600000).toISOString() }).expect(200);
+
+    await share(1);
+    await ws.next(poke(event._id, 'event'), 'the event poke');
+    await ws.next(poke(event._id, 'live'), 'the live poke');
+    await share(2);
+    await ws.next(poke(event._id, 'live'), 'the live poke for the change');
+    await assertHeardNothing(ws, friend);
   });
 
   it('tell your events when your payment handles change', async () => {

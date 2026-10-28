@@ -275,6 +275,49 @@ const messagesFor = (eventId) => {
   return chats[eventId];
 };
 
+// Event 1's recent activity, oldest first (pages go out newest first, like
+// the server's): Alex joining, then planning and paying for the Airbnb. Ids
+// sort in time order, like real ones.
+const ALEX = { user: 'u2', name: 'Alex' };
+const activityLine = (id, actor, kind, data, minutes, subject) =>
+  ({ _id: id, actor, kind, data, ...(subject && { subject }), createdAt: minutesAgo(minutes) });
+
+const demoActivity = () => ({
+  '1': [
+    activityLine('a0001', ALEX, 'joined', {}, 3 * 24 * 60),
+    activityLine('a0002', ALEX, 'schedule_added', { activity: 'Arctic Monkeys' }, 26 * 60 + 5, 's1'),
+    activityLine('a0003', ALEX, 'expense_added', { description: 'Airbnb', amountCents: 30000 }, 25 * 60, 'x1')
+  ]
+});
+
+let activity = demoActivity();
+let nextActivityId = 100;
+const ACTIVITY_PAGE = 20;
+
+const activityFor = (eventId) => {
+  activity[eventId] = activity[eventId] || [];
+  return activity[eventId];
+};
+
+// Something happening in an event while the app is open, as its next read
+// of the activity will show. Returns the new line.
+export const addActivity = (eventId, { actor = ALEX, kind, data = {}, subject }) => {
+  const line = activityLine(`a${String(nextActivityId++).padStart(4, '0')}`, actor, kind, data, 0, subject);
+  activityFor(eventId).push(line);
+  return line;
+};
+
+// A line going, as when the expense or payment it's about is deleted
+export const removeActivity = (eventId, id) => {
+  activity[eventId] = activityFor(eventId).filter((line) => line._id !== id);
+};
+
+const activityRoute = (event, params) => {
+  const lines = activityFor(event._id);
+  const older = params.has('before') ? lines.filter((line) => line._id < params.get('before')) : lines;
+  return respond(200, { activity: older.slice(-ACTIVITY_PAGE).reverse(), hasMore: older.length > ACTIVITY_PAGE });
+};
+
 // Someone else changing an event on the server while the app is open
 export const changeEvent = (eventId, change) => {
   const event = events.find((e) => e._id === eventId);
@@ -545,6 +588,14 @@ const route = (method, path, body, authed, params) => {
     return liveRoute(event, method, liveMatch[2], body);
   }
 
+  // /events/:id/activity
+  const activityMatch = path.match(/^\/events\/([^/]+)\/activity$/);
+  if (activityMatch) {
+    const event = events.find((e) => e._id === decodeURIComponent(activityMatch[1]) && isMember(e));
+    if (!event) return respond(404, { message: 'Event not found.' });
+    return activityRoute(event, params);
+  }
+
   // /events/:id/messages[/read]
   const chatMatch = path.match(/^\/events\/([^/]+)\/messages(?:\/(read))?$/);
   if (chatMatch) {
@@ -654,6 +705,7 @@ const route = (method, path, body, authed, params) => {
 // options.handles replaces the starting payment handles ({ userId: handles });
 // options.noLocalEvents / options.discoverError change Discover's results;
 // options.chats replaces the starting chats ({ eventId: [messages] });
+// options.activity replaces the starting activity ({ eventId: [lines], oldest first });
 // options.chatSendError makes sending a message fail with that message;
 // options.chatSendsLost saves that many sends but loses their responses;
 // options.paymentOutcomes lists what each payment meets ('lost', or a status);
@@ -753,6 +805,8 @@ export const installFakeApi = (options = {}) => {
   live = options.liveEvent ? demoLive(options.friendShareEndsInMs) : {};
   chats = options.chats || demoChats();
   chatReads = options.chats ? {} : { '1': 'c003' };
+  activity = options.activity || demoActivity();
+  nextActivityId = 100;
   ledgers = demoLedger();
   handles = { ...demoHandles(), ...options.handles };
   holds = [];

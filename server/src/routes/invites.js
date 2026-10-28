@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
 const { colorForUser } = require('../colors');
 const realtime = require('../realtime/hub');
+const { record } = require('../activityLog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -59,6 +60,7 @@ router.post('/:code/join', async (req, res) => {
   if (event.removed.some((r) => r.user.equals(me._id))) throw new HttpError(403, REMOVED);
   // Everyone sees the new member, and your other devices see the event
   if (modifiedCount > 0) {
+    await record(event, me, 'joined');
     realtime.addMember(event._id, me._id);
     realtime.notifyEvent(event._id, 'event');
     realtime.notifyUsers([me._id]);
