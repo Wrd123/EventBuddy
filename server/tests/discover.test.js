@@ -209,12 +209,13 @@ describe('GET /api/discover/events', () => {
     await api().get('/api/discover/events').query({ lat: 33.7, lng: -84.4 }).expect(401);
   });
 
-  it('explains when no Ticketmaster key is set up', async () => {
+  it('says local events are unavailable, without setup instructions, when no Ticketmaster key is set', async () => {
     const original = config.ticketmasterApiKey;
     config.ticketmasterApiKey = '';
     try {
       const res = await getEvents({ lat: 33.749, lng: -84.388 }, undefined, 503);
-      assert.match(res.body.message, /aren't set up yet/);
+      assert.equal(res.body.message, "Local events aren't available on this server. You can still plan your own.");
+      assert.doesNotMatch(res.body.message, /API key/);
     } finally {
       config.ticketmasterApiKey = original;
     }

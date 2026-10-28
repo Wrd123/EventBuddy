@@ -390,6 +390,15 @@ describe('POST /api/auth/demo', () => {
     await tryDemo();
     assert.equal(await pruneDemoWorlds({ maxAgeMs: -1, maxWorlds: 100 }), 1);
     assert.equal(await User.countDocuments(), 0);
+    // Everything in it goes too, the picnic's schedule and costs included
+    const Expense = require('../src/models/Expense');
+    const Payment = require('../src/models/Payment');
+    const LocationShare = require('../src/models/LocationShare');
+    assert.equal(await Event.countDocuments(), 0);
+    assert.equal(await Expense.countDocuments(), 0);
+    assert.equal(await Payment.countDocuments(), 0);
+    assert.equal(await LocationShare.countDocuments(), 0);
+    assert.equal(await Message.countDocuments(), 0);
   });
 
   it('tells the app it is a demo account', async () => {

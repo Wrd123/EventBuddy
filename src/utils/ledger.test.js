@@ -61,6 +61,15 @@ describe('settleUp', () => {
     ]);
   });
 
+  // Documents the limit the comment and README describe, so neither can
+  // drift back to promising the fewest payments
+  it("can use more payments than strictly needed, but still within n - 1", () => {
+    const balances = [balance('A', 600), balance('B', 400), balance('C', -400), balance('D', -300), balance('E', -300)];
+
+    // C pays B $4 and D and E each pay A $3 would be three
+    expect(settleUp(balances)).toHaveLength(4);
+  });
+
   it('needs at most n - 1 payments and settles everyone exactly', () => {
     const balances = [balance('A', 7000), balance('B', -2500), balance('C', -3000), balance('D', -1500), balance('E', 0)];
     const payments = settleUp(balances);

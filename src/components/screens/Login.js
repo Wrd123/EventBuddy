@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Button } from '../common';
 import { Wordmark } from '../common/Header';
-import { isDemoAvailable } from '../../services/authService';
+import { useDemoAvailable } from '../../hooks/useDemoAvailable';
 
 const Login = () => {
   const { login, loginDemo } = useAppContext();
@@ -14,14 +14,8 @@ const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  // The server says whether it's a demo; only then is there a demo account
-  const [demo, setDemo] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    isDemoAvailable().then(available => !cancelled && setDemo(available));
-    return () => { cancelled = true; };
-  }, []);
+  // Only a demo server has a demo account
+  const demo = useDemoAvailable();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -70,7 +64,9 @@ const Login = () => {
               Try the demo
             </Button>
             <p className="text-sm text-muted text-center mt-2">
-              Signs you in as John, with friends, plans and chats ready to explore. It's your own copy, so change anything.
+              Signs you in as John, with made-up friends, plans and chats. It's your own private copy, so change
+              anything; it resets when the free server sleeps. EventBuddy never moves money; it only records what
+              you mark paid.
             </p>
             <div className="flex items-center mt-6 text-xs text-faint">
               <span className="flex-1 h-px bg-line" />

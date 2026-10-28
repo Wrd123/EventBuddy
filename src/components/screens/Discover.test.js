@@ -240,11 +240,11 @@ describe('Discover edge cases', () => {
   });
 
   it("shows the server's message when events can't load", async () => {
-    installFakeApi({ discoverError: "Local events aren't set up yet. Add a Ticketmaster API key on the server." }).logIn();
+    installFakeApi({ discoverError: "Local events aren't available on this server. You can still plan your own." }).logIn();
     renderAt('/discover');
 
     expect(await screen.findByText("Couldn't load events")).toBeInTheDocument();
-    expect(screen.getByText(/Add a Ticketmaster API key/)).toBeInTheDocument();
+    expect(screen.getByText(/You can still plan your own/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });

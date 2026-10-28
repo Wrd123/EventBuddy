@@ -5,6 +5,8 @@ const Event = require('../src/models/Event');
 const LocationShare = require('../src/models/LocationShare');
 const { isHappening } = require('../src/routes/live');
 const { seedDemoData, dayIn, DEMO_EVENT_IDS } = require('../src/seed/demoData');
+const Expense = require('../src/models/Expense');
+const { validateScheduleItem, validateExpense } = require('../src/validation');
 
 useTestDatabase();
 
@@ -252,6 +254,20 @@ describe('demo picnic', () => {
     assert.deepEqual(view.people.map((p) => p.name), ['Alex', 'Taylor', 'Jordan']);
     assert.equal(view.meetup.note, 'By the lake, near the dock');
     assert.equal(view.sharing, null);
+  });
+
+  it('has an afternoon planned and a little to settle up, all valid as if added in the app', async () => {
+    await seedDemoData();
+    const picnic = await Event.findById(DEMO_EVENT_IDS.picnic);
+    const expenses = await Expense.find({ event: picnic._id });
+
+    assert.ok(picnic.schedule.length >= 3);
+    for (const item of picnic.schedule) assert.equal(validateScheduleItem(item, picnic), '', item.activity);
+    assert.equal(expenses.length, 2);
+    for (const e of expenses) {
+      const fields = { ...e.toObject(), paidBy: e.paidBy.user.toString(), shares: e.shares.map((x) => ({ user: x.user.toString(), amountCents: x.amountCents })) };
+      assert.equal(validateExpense(fields, picnic), '', e.description);
+    }
   });
 
   it("is dated by Atlanta's calendar, not the server's UTC clock", async () => {

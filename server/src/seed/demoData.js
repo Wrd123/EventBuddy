@@ -52,6 +52,14 @@ const DEMO_EVENT_IDS = {
   picnic: new mongoose.Types.ObjectId('000000000000000000000004')
 };
 
+// Shares of amountCents split equally among the named demo users. Same rule
+// as the app: leftover cents go to the first people listed.
+const equalShares = (users, amountCents, names) => {
+  const base = Math.floor(amountCents / names.length);
+  const extra = amountCents % names.length;
+  return names.map((name, i) => ({ user: users[name]._id, name: users[name].name, amountCents: base + (i < extra ? 1 : 0) }));
+};
+
 // users: { me, Alex, Taylor, ... } as created below; ids: the world's event
 // ids. Map positions are filled in, so the demo map works without looking
 // anything up.
@@ -151,9 +159,9 @@ const demoChat = (users, ids) => {
   return { messages, read };
 };
 
-// A picnic happening today, so live locations can be tried right away:
-// three friends are already sharing where they are in the park and Taylor
-// has set a meetup point.
+// A picnic happening today, so a visitor lands on something live: three
+// friends are already sharing where they are in the park, Taylor has set a
+// meetup point, and there's an afternoon planned and a little to settle up.
 const PARK = { lat: 33.7851, lng: -84.3738 };
 
 // "Today" is the calendar day in Atlanta, where the picnic is. A hosted
@@ -173,6 +181,21 @@ const demoPicnic = (users, ids, today) => {
   const color = (name) => DEMO_FRIENDS.find((f) => f.name === name)?.color || ORGANIZER_COLOR;
   const member = (name) => ({ user: users[name]._id, name: users[name].name, color: color(name) });
   const until = new Date(now + 6 * 60 * 60 * 1000);
+  const who = (name) => ({ user: users[name]._id, name: users[name].name });
+  const going = (...names) => names.map(who);
+  const item = (startTime, endTime, activity, location, attendees) =>
+    ({ date: todayISO, startTime, endTime, activity, location, attendees, createdBy: users.Taylor._id });
+  const everyone = ['Taylor', 'me', 'Alex', 'Jordan'];
+  const expense = (description, amountCents, payer) => ({
+    event: ids.picnic,
+    description,
+    amountCents,
+    date: todayISO,
+    paidBy: who(payer),
+    splitType: 'equal',
+    shares: equalShares(users, amountCents, everyone),
+    createdBy: users[payer]._id
+  });
   const share = (name, lat, lng, minutes) =>
     ({ event: ids.picnic, user: users[name]._id, until, lat, lng, accuracy: 12, positionAt: minutesAgo(minutes) });
 
@@ -187,8 +210,13 @@ const demoPicnic = (users, ids, today) => {
     location: 'Piedmont Park, Atlanta, GA',
     geo: { for: 'Piedmont Park, Atlanta, GA', ...PARK },
     description: 'Blankets, snacks and frisbee by the lake',
-    members: ['Taylor', 'me', 'Alex', 'Jordan'].map(member),
-    schedule: [],
+    members: everyone.map(member),
+    schedule: [
+      item('12:00', '13:00', 'Set up by the lake', 'By the dock', going(...everyone)),
+      item('13:00', '14:30', 'Picnic lunch', 'Lakeside lawn', going(...everyone)),
+      item('15:00', '16:30', 'Frisbee', 'Active Oval', going('Alex', 'Jordan')),
+      item('18:00', '19:00', 'Sunset walk', 'Lake Clara Meer loop', going('Taylor', 'me'))
+    ],
     meetup: {
       lat: 33.7857,
       lng: -84.3741,
@@ -206,19 +234,18 @@ const demoPicnic = (users, ids, today) => {
     // Hasn't moved or opened the app in a while: shown as last seen
     share('Jordan', 33.7832, -84.3768, 25)
   ];
-  return { event, shares };
+  const expenses = [
+    expense('Snacks & drinks', 4860, 'Taylor'),
+    expense('Blanket & frisbee', 2400, 'me')
+  ];
+  return { event, shares, expenses };
 };
 
 // Festival money: who paid for what, and one payment already settled
 const demoLedger = (users, ids) => {
   const event = ids.festival;
   const who = (name) => ({ user: users[name]._id, name: users[name].name });
-  const equally = (amountCents, ...names) => {
-    // Same rule as the app: leftover cents go to the first people listed
-    const base = Math.floor(amountCents / names.length);
-    const extra = amountCents % names.length;
-    return names.map((name, i) => ({ ...who(name), amountCents: base + (i < extra ? 1 : 0) }));
-  };
+  const equally = (amountCents, ...names) => equalShares(users, amountCents, names);
   const expense = (description, amountCents, date, payer, shares) => ({
     event, description, amountCents, date, paidBy: who(payer), splitType: 'equal', shares, createdBy: users[payer]._id
   });
@@ -261,6 +288,7 @@ const insertDemoWorld = async ({ users: accounts, eventIds, passwordHash, demoWo
   const picnic = demoPicnic(users, eventIds, today);
   await Event.insertMany([picnic.event]);
   await LocationShare.insertMany(picnic.shares);
+  await Expense.insertMany(picnic.expenses);
   return users.me;
 };
 

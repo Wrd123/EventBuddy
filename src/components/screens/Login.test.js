@@ -40,6 +40,14 @@ describe('Login', () => {
     expect(JSON.parse(signIn[1].body)).toEqual({ today: todayISO() });
   });
 
+  it('says the demo is temporary and never moves money', async () => {
+    installFakeApi({ demo: true });
+    renderLogin();
+
+    await screen.findByRole('button', { name: 'Try the demo' });
+    expect(screen.getByText(/resets when the free server sleeps/)).toHaveTextContent('EventBuddy never moves money');
+  });
+
   it("doesn't offer the demo on a real server", async () => {
     installFakeApi();
     renderLogin();

@@ -36,9 +36,12 @@ export const computeBalances = (members, expenses, payments) => {
   return [...people.values()];
 };
 
-// The fewest payments that bring everyone to zero: repeatedly match whoever
-// owes the most with whoever is owed the most. n people never need more
-// than n - 1 payments. Ties break by name so the list doesn't reshuffle.
+// A short list of payments that brings everyone to zero: repeatedly match
+// whoever owes the most with whoever is owed the most. n people never need
+// more than n - 1 payments. It isn't always the fewest possible (owed $6
+// and $4, owing $4, $3 and $3 gives four where three would do); finding the
+// true minimum is a much harder search, and a list this short is plenty.
+// Ties break by name so the list doesn't reshuffle.
 // -> [{ from: { user, name }, to: { user, name }, amountCents }]
 export const settleUp = (balances) => {
   const byAmount = (a, b) => b.amount - a.amount || a.name.localeCompare(b.name);

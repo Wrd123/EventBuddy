@@ -171,6 +171,15 @@
   to { background-position: -30% 0; }
 }
 
+/* The wake screen's bar: a segment sliding across, for a wait of unknown
+   length */
+@keyframes eb-wake-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+.wake-bar { animation: eb-wake-slide 1.4s ease-in-out infinite; }
+
 @keyframes eb-sheet-up {
   from { transform: translateY(100%); }
 }
@@ -246,5 +255,11 @@
   .skeleton {
     animation: none;
     background-image: none;
+  }
+  /* A still, full, dimmed bar instead of one stuck at the edge */
+  .wake-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
   }
 }

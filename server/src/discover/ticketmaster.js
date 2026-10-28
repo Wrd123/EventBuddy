@@ -98,8 +98,10 @@ const nowForApi = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 // from/to (optional, "YYYY-MM-DD"): only events starting on those days, in
 // the venue's own time zone. Otherwise everything from now on.
 const searchNearby = async ({ lat, lng, radiusMiles, category, from, to }) => {
+  // Visitors see this, so it says what they can do rather than how to
+  // configure the server (the README covers TICKETMASTER_API_KEY)
   if (!config.ticketmasterApiKey) {
-    throw new HttpError(503, "Local events aren't set up yet. Add a Ticketmaster API key on the server.");
+    throw new HttpError(503, "Local events aren't available on this server. You can still plan your own.");
   }
 
   const key = `${lat},${lng},${radiusMiles},${category},${from || ''},${to || ''}`;

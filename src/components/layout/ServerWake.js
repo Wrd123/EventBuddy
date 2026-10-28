@@ -12,6 +12,7 @@ import { checkHealth } from '../../services/authService';
 // even when offline.
 const ENABLED = process.env.REACT_APP_WAKE_SCREEN === 'true';
 const SLOW_AFTER_S = 90;
+const README_URL = 'https://github.com/Wrd123/EventBuddy#readme';
 
 const ServerWake = ({ children, enabled = ENABLED, showAfterMs = 1500, retryMs = 2000 }) => {
   const [ready, setReady] = useState(!enabled);
@@ -58,17 +59,21 @@ const ServerWake = ({ children, enabled = ENABLED, showAfterMs = 1500, retryMs =
         EventBuddy's demo runs on a free server that sleeps when no one's using it.
         Starting it again usually takes under a minute.
       </p>
+      {/* There's no telling how far along the server is, so the bar only
+          shows that it's still working rather than inventing progress */}
       <div className="w-full max-w-[14rem] h-1.5 rounded-full bg-surface overflow-hidden mb-2" aria-hidden="true">
-        <div
-          className="h-full rounded-full bg-accent transition-[width] duration-1000 ease-linear"
-          style={{ width: `${Math.min(95, (seconds / 60) * 100)}%` }}
-        />
+        <div className="wake-bar h-full w-1/3 rounded-full bg-accent" />
       </div>
       <p className="text-sm text-faint">
         {seconds < SLOW_AFTER_S
           ? `${seconds} second${seconds === 1 ? '' : 's'}`
           : 'Taking longer than usual. The app opens as soon as the server is up.'}
       </p>
+      {seconds >= SLOW_AFTER_S && (
+        <a href={README_URL} target="_blank" rel="noopener noreferrer" className="mt-4 text-sm font-semibold text-accent-soft underline underline-offset-4">
+          Read about EventBuddy while you wait
+        </a>
+      )}
     </div>
   );
 };

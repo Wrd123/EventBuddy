@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Button, Field } from '../common';
 import { Wordmark } from '../common/Header';
 import { MIN_PASSWORD_LENGTH, newPasswordProblem } from '../../utils/password';
+import { useDemoAvailable } from '../../hooks/useDemoAvailable';
 
 const Register = () => {
   const { register } = useAppContext();
@@ -18,6 +19,8 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // On the demo server an account lasts only until it restarts
+  const demo = useDemoAvailable();
 
   const handleChange = (e) => {
     setFormData({
@@ -58,6 +61,13 @@ const Register = () => {
           <h1 className="text-3xl font-extrabold tracking-tight mb-2">Join <Wordmark /></h1>
           <p className="text-muted">Plan with your friends in one place</p>
         </div>
+
+        {demo && (
+          <p className="bg-raised border border-line text-muted text-sm px-4 py-3 rounded-xl mb-4">
+            This is a demo server: accounts and everything in them are deleted whenever it restarts. Use a password
+            you don't use anywhere else.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
