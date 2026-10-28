@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, receiveMessage, settle, poke, openSockets, presence, changeEvent } from '../../testUtils/fakeApi';
+import { installFakeApi, receiveMessage, settle, poke, openSockets, presence, changeEvent, holdNext } from '../../testUtils/fakeApi';
 import MainLayout from '../layout/MainLayout';
 
 const renderAt = (path) =>
@@ -121,6 +121,121 @@ describe('Group chat', () => {
     expect(url).toBe('/api/events/1/messages?after=c005');
     // And it's read straight away, since the chat is open
     await waitFor(() => expect(requests('PUT', '/api/events/1/messages/read')).toHaveLength(2));
+  });
+
+  describe('while scrolled up', () => {
+    const reads = () => requests('PUT', '/api/events/1/messages/read').map(([, o]) => JSON.parse(o.body).lastRead);
+
+    // jsdom has no layout, so the log's size and position are set by hand:
+    // 1000px of messages in a 400px view
+    const scrollTo = (scrollTop) => {
+      const log = screen.getByRole('log', { name: 'Messages' });
+      Object.defineProperty(log, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(log, 'clientHeight', { value: 400, configurable: true });
+      log.scrollTop = scrollTop;
+      fireEvent.scroll(log);
+      return log;
+    };
+
+    const openScrolledUp = async () => {
+      renderAt('/events/1/chat');
+      await screen.findByText('I can grab snacks too.');
+      await waitFor(() => expect(reads()).toEqual(['c005']));
+      scrollTo(100);
+    };
+
+    it("doesn't mark a new message read, and offers to jump to it", async () => {
+      await openScrolledUp();
+
+      const late = receiveMessage('1', { user: 'u3', name: 'Taylor', text: 'Running 10 minutes late!' });
+      checkForNewMessages();
+      await screen.findByText('Running 10 minutes late!');
+      await settle();
+
+      expect(reads()).toEqual(['c005']);
+      const jump = screen.getByRole('button', { name: 'New messages' });
+      fireEvent.click(jump);
+
+      const log = screen.getByRole('log', { name: 'Messages' });
+      expect(log.scrollTop).toBe(1000);
+      // The pill is gone, so focus stays in the conversation
+      expect(log).toHaveFocus();
+      await waitFor(() => expect(reads()).toEqual(['c005', late._id]));
+      expect(screen.queryByRole('button', { name: 'New messages' })).not.toBeInTheDocument();
+    });
+
+    it('marks it read once you scroll back down to it', async () => {
+      await openScrolledUp();
+
+      const late = receiveMessage('1', { user: 'u3', name: 'Taylor', text: 'Running 10 minutes late!' });
+      checkForNewMessages();
+      await screen.findByText('Running 10 minutes late!');
+      scrollTo(560);
+
+      await waitFor(() => expect(reads()).toEqual(['c005', late._id]));
+      expect(screen.queryByRole('button', { name: 'New messages' })).not.toBeInTheDocument();
+    });
+
+    it('takes you down to a message you send', async () => {
+      await openScrolledUp();
+
+      sendMessage('On my way');
+
+      expect(screen.getByRole('log', { name: 'Messages' }).scrollTop).toBe(1000);
+      await waitFor(() => expect(screen.queryByText('Sending...')).not.toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'New messages' })).not.toBeInTheDocument();
+    });
+
+    it("offers to jump when a friend's message arrives just before one of yours", async () => {
+      await openScrolledUp();
+
+      receiveMessage('1', { user: 'u3', name: 'Taylor', text: 'Running 10 minutes late!' });
+      receiveMessage('1', { user: 'u1', name: 'John Doe', text: 'Sent from my other phone' });
+      checkForNewMessages();
+      await screen.findByText('Sent from my other phone');
+
+      expect(screen.getByRole('button', { name: 'New messages' })).toBeInTheDocument();
+      expect(reads()).toEqual(['c005']);
+    });
+
+    it('stays unread when the app comes back on screen while scrolled up', async () => {
+      await openScrolledUp();
+      receiveMessage('1', { user: 'u3', name: 'Taylor', text: 'Running 10 minutes late!' });
+      checkForNewMessages();
+      await screen.findByText('Running 10 minutes late!');
+
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      fireEvent(document, new Event('visibilitychange'));
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      checkForNewMessages();
+      await settle();
+
+      expect(reads()).toEqual(['c005']);
+    });
+  });
+
+  it('waits until the app is back on screen to mark a message read', async () => {
+    const setVisibility = (state) => Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+    renderAt('/events/1/chat');
+    await screen.findByText('I can grab snacks too.');
+    await waitFor(() => expect(requests('PUT', '/api/events/1/messages/read')).toHaveLength(1));
+
+    // A check that set off while on screen lands after the app was put away
+    receiveMessage('1', { user: 'u3', name: 'Taylor', text: 'Running 10 minutes late!' });
+    const release = holdNext('GET', '/events/1/messages');
+    checkForNewMessages();
+    setVisibility('hidden');
+    try {
+      await release();
+      await screen.findByText('Running 10 minutes late!');
+      expect(requests('PUT', '/api/events/1/messages/read')).toHaveLength(1);
+
+      setVisibility('visible');
+      checkForNewMessages();
+      await waitFor(() => expect(requests('PUT', '/api/events/1/messages/read')).toHaveLength(2));
+    } finally {
+      setVisibility('visible');
+    }
   });
 
   it('shows a message once even if polling also returns it', async () => {

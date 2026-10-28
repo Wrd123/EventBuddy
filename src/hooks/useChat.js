@@ -65,16 +65,17 @@ export const useChat = (eventId) => {
 
   usePolling(poll, POLL_MS, { eventId, what: 'chat' });
 
-  // Seeing the newest message marks the chat read, so it stops counting as
-  // unread on the Groups tab
-  const newestId = state.messages.at(-1)?._id;
-  useEffect(() => {
-    if (!newestId || markedRead.current === newestId || !isVisible()) return;
-    markedRead.current = newestId;
-    chatService.markChatRead(eventId, newestId).catch(() => {
-      markedRead.current = null; // try again with the next message
+  // The screen calls this once someone has actually seen a message (the
+  // newest, scrolled into view), so it stops counting as unread on the
+  // Groups tab. Arriving isn't enough: they may be scrolled up reading
+  // older ones, or the app may be in the background.
+  const markSeen = useCallback((messageId) => {
+    if (!messageId || markedRead.current === messageId || !isVisible()) return;
+    markedRead.current = messageId;
+    chatService.markChatRead(eventId, messageId).catch(() => {
+      markedRead.current = null; // try again when it's next seen
     });
-  }, [eventId, newestId]);
+  }, [eventId]);
 
   const deliver = useCallback(async (tempId, text) => {
     try {
@@ -118,5 +119,5 @@ export const useChat = (eventId) => {
     }
   }, [eventId, loadingEarlier]);
 
-  return { ...state, pending, send, retry, discard, loadEarlier, loadingEarlier };
+  return { ...state, pending, send, retry, discard, loadEarlier, loadingEarlier, markSeen };
 };

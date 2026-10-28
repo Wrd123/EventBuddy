@@ -1,5 +1,5 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
-import { Send } from 'lucide-react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { ArrowDown, Send } from 'lucide-react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
 import { AvatarStack, Skeleton, SkeletonScreen } from '../common';
@@ -11,6 +11,7 @@ import { usePresence } from '../../hooks/usePresence';
 import { layoutChat } from '../../utils/chat';
 import { listNames } from '../../utils/map';
 import { tap } from '../../services/haptics';
+import { isVisible } from '../../hooks/usePolling';
 
 // For someone who has left the event since they wrote
 const FORMER_MEMBER_COLOR = '#64748b';
@@ -96,12 +97,22 @@ const Conversation = ({ event, chat }) => {
   // Distance from the bottom before older messages were added above, so the
   // view doesn't jump when they appear
   const keepPosition = useRef(null);
+  // Someone else wrote while you were scrolled up
+  const [hasUnseen, setHasUnseen] = useState(false);
+  const { markSeen } = chat;
 
   const items = layoutChat(chat.messages, currentUser?._id);
   const colorOf = (userId) => event.members.find(m => m.user === userId)?.color || FORMER_MEMBER_COLOR;
 
   const oldestId = chat.messages[0]?._id;
-  const newestKey = `${chat.messages.at(-1)?._id}-${chat.pending.length}`;
+  const newestId = chat.messages.at(-1)?._id;
+  const newestRef = useRef(newestId);
+  newestRef.current = newestId;
+  const newestKey = `${newestId}-${chat.pending.length}`;
+  // The newest message the last check ended on, so a batch that ends with
+  // your own send still counts someone else's message before it
+  const seenUpTo = useRef(newestId);
+  const sentCount = useRef(chat.pending.length);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -111,15 +122,60 @@ const Conversation = ({ event, chat }) => {
     }
   }, [oldestId]);
 
-  // Follow new messages, unless you've scrolled up to read older ones
+  // Follow new messages, unless you've scrolled up to read older ones.
+  // Sending something takes you down to it, as in any chat app.
   useLayoutEffect(() => {
     const el = scrollRef.current;
+    if (chat.pending.length > sentCount.current) {
+      atBottom.current = true;
+      setHasUnseen(false);
+    }
+    sentCount.current = chat.pending.length;
     if (el && atBottom.current) el.scrollTop = el.scrollHeight;
-  }, [newestKey]);
+  }, [newestKey, chat.pending.length]);
+
+  // The newest message counts as seen only when it's in view; otherwise
+  // the pill offers to jump to it
+  useEffect(() => {
+    if (!newestId) return;
+    const previous = seenUpTo.current;
+    seenUpTo.current = newestId;
+    if (atBottom.current) {
+      markSeen(newestId);
+      return;
+    }
+    const arrived = previous ? chat.messages.filter(m => m._id > previous) : chat.messages;
+    if (arrived.some(m => m.sender.user !== currentUser?._id)) setHasUnseen(true);
+  }, [newestId, chat.messages, currentUser, markSeen]);
+
+  // Coming back to the app with the latest already in view: it's seen now
+  useEffect(() => {
+    const onVisible = () => {
+      if (isVisible() && atBottom.current) markSeen(newestRef.current);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [markSeen]);
+
+  const reachedBottom = () => {
+    setHasUnseen(false);
+    markSeen(newestId);
+  };
 
   const handleScroll = () => {
     const el = scrollRef.current;
+    const wasAtBottom = atBottom.current;
     atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+    if (atBottom.current && !wasAtBottom) reachedBottom();
+  };
+
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    el.scrollTop = el.scrollHeight;
+    atBottom.current = true;
+    reachedBottom();
+    // The pill goes away under the finger; keep focus in the conversation
+    el.focus({ preventScroll: true });
   };
 
   const loadEarlier = () => {
@@ -131,35 +187,47 @@ const Conversation = ({ event, chat }) => {
   const nothingYet = chat.messages.length === 0 && chat.pending.length === 0;
 
   return (
-    <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-3" role="log" aria-label="Messages">
-      {chat.hasMore && (
-        <div className="text-center mb-3">
-          <button onClick={loadEarlier} disabled={chat.loadingEarlier} className="chip tap text-sm">
-            {chat.loadingEarlier ? 'Loading...' : 'Load earlier messages'}
-          </button>
-        </div>
-      )}
-
-      {nothingYet && (
-        <div className="h-full flex flex-col items-center justify-center text-center px-6">
-          <p className="font-semibold mb-1">No messages yet</p>
-          <p className="text-sm text-muted">Start planning with everyone going to {event.name}.</p>
-        </div>
-      )}
-
-      {items.map(item =>
-        item.kind === 'day' ? (
-          <div key={item.key} className="flex justify-center my-3">
-            <span className="glass text-xs text-muted px-3 py-1 rounded-full">{item.label}</span>
+    <div className="relative flex-1 min-h-0 flex flex-col">
+      <div ref={scrollRef} onScroll={handleScroll} tabIndex={-1} className="flex-1 overflow-y-auto px-4 py-3 focus:outline-none" role="log" aria-label="Messages">
+        {chat.hasMore && (
+          <div className="text-center mb-3">
+            <button onClick={loadEarlier} disabled={chat.loadingEarlier} className="chip tap text-sm">
+              {chat.loadingEarlier ? 'Loading...' : 'Load earlier messages'}
+            </button>
           </div>
-        ) : (
-          <MessageRow key={item.key} item={item} color={colorOf(item.message.sender.user)} />
-        )
-      )}
+        )}
 
-      {chat.pending.map(p => (
-        <PendingRow key={p.tempId} pending={p} onRetry={() => chat.retry(p.tempId)} onDiscard={() => chat.discard(p.tempId)} />
-      ))}
+        {nothingYet && (
+          <div className="h-full flex flex-col items-center justify-center text-center px-6">
+            <p className="font-semibold mb-1">No messages yet</p>
+            <p className="text-sm text-muted">Start planning with everyone going to {event.name}.</p>
+          </div>
+        )}
+
+        {items.map(item =>
+          item.kind === 'day' ? (
+            <div key={item.key} className="flex justify-center my-3">
+              <span className="glass text-xs text-muted px-3 py-1 rounded-full">{item.label}</span>
+            </div>
+          ) : (
+            <MessageRow key={item.key} item={item} color={colorOf(item.message.sender.user)} />
+          )
+        )}
+
+        {chat.pending.map(p => (
+          <PendingRow key={p.tempId} pending={p} onRetry={() => chat.retry(p.tempId)} onDiscard={() => chat.discard(p.tempId)} />
+        ))}
+      </div>
+
+      {hasUnseen && (
+        <button
+          onClick={jumpToLatest}
+          className="bg-raised border border-line absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 h-11 px-4 rounded-full text-sm font-semibold text-fg shadow-lg transition-transform active:scale-95"
+        >
+          <ArrowDown size={16} aria-hidden="true" />
+          New messages
+        </button>
+      )}
     </div>
   );
 };
