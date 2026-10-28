@@ -5,14 +5,14 @@
 ## State
 
 - **Git, when this note was written:**
-  - `main` and GitHub's `main` are both at `45390d63`, with Phases 4a (pokes) and 4b (who's here now). The user pushed it on 27 Oct 2026.
-  - **The fixes for Codex's review of `45390d63` are on the branch `fix-realtime-expiry`**: WS-1, sockets now close when their token expires, and L-1, the map's share-expiry clock. See `docs/SECURITY_REVIEW.md`.
-  - The only local branch besides that one is `main`.
+  - `main` and GitHub's `main` are both at `41d05175`: Phases 4a (pokes) and 4b (who's here now), plus the fixes for Codex's review of `45390d63` (WS-1, sockets close when their token expires, and L-1, the map's share-expiry clock; see `docs/SECURITY_REVIEW.md`). The user pushed it on 27 Oct 2026, and CI passed.
   - Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting any of this.
 - **Deployed on Render:**
-  - The live site matches `acae73de`.
+  - Both services run `41d05175`. The web app had been current, but the API was stuck on `f2e16a0` until a manual deploy on 27 Oct 2026 (see below).
   - **The Content Security Policy is live**, checked by the user on 27 Oct 2026: the headers are there, and the app and map work under them.
 - **Render needs a redeploy** of both services after each push.
+  - **The API doesn't deploy itself.** Until 27 Oct 2026 it was still on `f2e16a0` from 24 Oct, 63 commits behind `main`: every push since had deployed only the web app, so none of the security fixes were live on the API. Its **Auto-Deploy** setting (Settings → Build & Deploy) needs checking by the user.
+  - After a deploy, check the live API itself, not the dashboard: `/api/health` should carry `Cache-Control: no-store`, and `POST /api/auth/logout` with no login should answer 401.
   - **A change to `render.yaml` itself (headers, environment) also needs a Blueprint sync** in the Render dashboard: Blueprints → Manual Sync.
   - A redeploy alone doesn't re-read `render.yaml`, which is why the policy first went out missing.
 - **The map** uses OpenFreeMap's Liberty style, darkened. The map screen's bottom sheet no longer gets covered by the map (see Decisions).
@@ -125,7 +125,9 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
    - **Hardening backlog from Codex's review:**
      - a per-socket budget for queued inbound messages. The 1 kB frame limit and the socket cap don't bound how many small messages queue up.
      - a check of what Origin the iPhone app's WebView really sends. It must be in `CLIENT_ORIGIN`, so don't assume it sends none.
-   - **Render last deployed `2842a117`** (according to the log the user shared with Codex), which predates Phase 4. Deploying needs a Blueprint sync, then both services redeployed.
+   - **Deployed and checked live on 27 Oct 2026:**
+     - The socket connects (`101` in the browser).
+     - The API sends `Cache-Control: no-store`, logout answers 401, a socket from another site gets 403, and a 200 kB body gets 413.
    - Each gets tests, the strict build and the `reviewer` subagent before it's committed, plus screenshots for the user before any UI commit.
    - Plan the first part in plan mode, per `CLAUDE.md`.
 3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.
