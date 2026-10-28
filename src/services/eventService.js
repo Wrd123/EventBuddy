@@ -89,7 +89,8 @@ const paymentPath = (eventId, paymentId) =>
 
 export const getLedger = (eventId) => apiRequest(expensePath(eventId));
 
-// expense: { description, amountCents, date, paidBy, splitType, shares: [{ user, amountCents }] }
+// expense: { clientId, description, amountCents, date, paidBy, splitType, shares: [{ user, amountCents }] }.
+// Retries reuse the clientId, so a lost response can't add it twice.
 export const addExpense = async (eventId, expense) =>
   (await apiRequest(expensePath(eventId), { method: 'POST', body: expense })).expense;
 

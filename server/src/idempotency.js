@@ -1,5 +1,5 @@
-// Creates that are safe to retry. The app gives each new message or payment
-// an id of its own (clientId) and sends the same id again when it retries.
+// Creates that are safe to retry. The app gives each new message, payment or
+// expense an id of its own (clientId) and sends the same id again when it retries.
 // If the first try was saved but its response got lost (a dropped signal, a
 // server waking up), the retry gets that saved record back instead of making
 // a second one. Sending the same text twice on purpose still works, because

@@ -171,8 +171,22 @@ const moneyRoute = (event, method, kind, id, body) => {
       shares: body.shares.map((s) => ({ ...withName(event, s.user), amountCents: s.amountCents }))
     };
     if (method === 'POST') {
+      // A retry with the same clientId gets the saved expense back, and a
+      // different expense under it is refused, like the real API
+      const saved = body.clientId && ledger.expenses.find((e) => e.clientId === body.clientId);
+      if (saved) {
+        const fields = (e) => JSON.stringify([e.description, e.amountCents, e.date, e.splitType, e.paidBy.user ?? e.paidBy,
+          e.shares.map((x) => [x.user, x.amountCents])]);
+        const same = fields(saved) === fields(body);
+        return same ? respond(200, { expense: saved }) : respond(409, { message: 'That request was already used for something else.' });
+      }
+      // options.expenseOutcomes: what each new expense meets, in order.
+      // 'lost' saves it but the response never arrives; a status fails it.
+      const outcome = fakeOptions.expenseOutcomes?.shift();
+      if (typeof outcome === 'number') return respond(outcome, { message: 'Something went wrong. Please try again.' });
       const expense = { ...stored, _id: `x${nextItemId++}`, createdBy: demoUser._id };
       ledger.expenses.unshift(expense);
+      if (outcome === 'lost') return Promise.reject(new TypeError('Network request failed'));
       return respond(201, { expense });
     }
     const index = ledger.expenses.findIndex((e) => e._id === id);
@@ -643,6 +657,7 @@ const route = (method, path, body, authed, params) => {
 // options.chatSendError makes sending a message fail with that message;
 // options.chatSendsLost saves that many sends but loses their responses;
 // options.paymentOutcomes lists what each payment meets ('lost', or a status);
+// options.expenseOutcomes does the same for each new expense;
 // A stand-in for the real-time socket (services/realtime.js), installed as
 // global.WebSocket. It never connects unless options.realtime is set, like a
 // network that blocks sockets, so polling works exactly as it always has.

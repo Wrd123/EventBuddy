@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { ISO_DATE } = require('./Event');
+const { clientIdIndex } = require('../idempotency');
 
 // Money is stored as whole cents. Decimal dollars drift in floating point
 // (0.1 + 0.2 !== 0.3), and split totals have to add up exactly.
@@ -36,10 +37,14 @@ const expenseSchema = new mongoose.Schema(
     // How the shares were chosen; the shares themselves are always stored
     splitType: { type: String, enum: ['equal', 'exact'], default: 'equal' },
     shares: [shareSchema],
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // The app's own id for this new expense, so a retry can't add it twice
+    clientId: { type: String }
   },
   { timestamps: true }
 );
+
+clientIdIndex(expenseSchema, { event: 1, createdBy: 1 });
 
 expenseSchema.set('toJSON', {
   transform: (doc, ret) => {

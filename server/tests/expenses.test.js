@@ -127,6 +127,130 @@ describe('POST /api/events/:id/expenses', () => {
   });
 });
 
+describe('retrying an expense', () => {
+  const stored = (eventId) => Expense.countDocuments({ event: eventId });
+
+  it('returns the saved expense when a retry repeats its clientId', async () => {
+    const { organizer, member, eventId } = await setup();
+    const body = dinner(organizer, member, { clientId: 'dinner-tap' });
+
+    const first = await addExpense(member.auth, eventId, body).expect(201);
+    const again = await addExpense(member.auth, eventId, body).expect(200);
+
+    assert.equal(again.body.expense._id, first.body.expense._id);
+    assert.equal(await stored(eventId), 1);
+  });
+
+  it('saves one expense when two tries race', async () => {
+    const { organizer, member, eventId } = await setup();
+    const body = dinner(organizer, member, { clientId: 'twice' });
+
+    const results = await Promise.all([addExpense(member.auth, eventId, body), addExpense(member.auth, eventId, body)]);
+
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 201]);
+    assert.equal(results[0].body.expense._id, results[1].body.expense._id);
+    assert.equal(await stored(eventId), 1);
+  });
+
+  it('refuses a clientId reused for a different expense', async () => {
+    const { organizer, member, eventId } = await setup();
+    await addExpense(member.auth, eventId, dinner(organizer, member, { clientId: 'reused' })).expect(201);
+
+    const res = await addExpense(member.auth, eventId, dinner(organizer, member, {
+      clientId: 'reused',
+      amountCents: 12000,
+      shares: [{ user: organizer.user._id, amountCents: 6000 }, { user: member.user._id, amountCents: 6000 }]
+    })).expect(409);
+
+    assert.equal(res.body.message, 'That request was already used for something else.');
+    assert.equal(await stored(eventId), 1);
+  });
+
+  it("keeps one person's clientId apart from another's", async () => {
+    const { organizer, member, eventId } = await setup();
+    const body = dinner(organizer, member, { clientId: 'same-id' });
+
+    await addExpense(member.auth, eventId, body).expect(201);
+    await addExpense(organizer.auth, eventId, body).expect(201);
+
+    assert.equal(await stored(eventId), 2);
+  });
+
+  it('keeps the same clientId in another event apart', async () => {
+    const { organizer, member, eventId } = await setup();
+    const { body: other } = await api()
+      .post('/api/events')
+      .set('Authorization', organizer.auth)
+      .send({ name: 'Second trip', startDate: '2099-07-01', endDate: '2099-07-02' })
+      .expect(201);
+    await api().post(`/api/invites/${other.event.inviteCode}/join`).set('Authorization', member.auth).expect(200);
+    const body = dinner(organizer, member, { clientId: 'same-id', date: '2099-07-01' });
+
+    await addExpense(member.auth, eventId, body).expect(201);
+    await addExpense(member.auth, other.event._id, body).expect(201);
+
+    assert.equal(await stored(eventId), 1);
+    assert.equal(await stored(other.event._id), 1);
+  });
+
+  it('adds every expense sent without a clientId, as older apps do', async () => {
+    const { organizer, member, eventId } = await setup();
+
+    await addExpense(member.auth, eventId, dinner(organizer, member)).expect(201);
+    await addExpense(member.auth, eventId, dinner(organizer, member)).expect(201);
+
+    assert.equal(await stored(eventId), 2);
+  });
+
+  it('rejects a clientId that is not a short plain id', async () => {
+    const { organizer, member, eventId } = await setup();
+
+    await addExpense(member.auth, eventId, dinner(organizer, member, { clientId: 'has spaces' })).expect(400);
+    await addExpense(member.auth, eventId, dinner(organizer, member, { clientId: { $ne: null } })).expect(400);
+    assert.equal(await stored(eventId), 0);
+  });
+
+  it('refuses a retry once the saved expense was edited, since the app then knows it saved', async () => {
+    const { organizer, member, eventId } = await setup();
+    const body = dinner(organizer, member, { clientId: 'edited-first' });
+    const { body: { expense } } = await addExpense(member.auth, eventId, body).expect(201);
+    await api().patch(ledgerPath(eventId, expense._id)).set('Authorization', member.auth)
+      .send({ ...body, description: 'Late dinner' }).expect(200);
+
+    await addExpense(member.auth, eventId, body).expect(409);
+    assert.equal(await stored(eventId), 1);
+  });
+
+  // The deleted record is gone, so a retry that late can't be told from a
+  // new expense. Retries follow their original within seconds.
+  it('adds a retry again once the saved expense was deleted', async () => {
+    const { organizer, member, eventId } = await setup();
+    const body = dinner(organizer, member, { clientId: 'deleted-first' });
+    const { body: { expense } } = await addExpense(member.auth, eventId, body).expect(201);
+    await api().delete(ledgerPath(eventId, expense._id)).set('Authorization', member.auth).expect(204);
+
+    await addExpense(member.auth, eventId, body).expect(201);
+    assert.equal(await stored(eventId), 1);
+  });
+
+  it('returns a saved retry even after a change that would now refuse it', async () => {
+    const { organizer, member, eventId } = await setup();
+    const body = dinner(organizer, member, { clientId: 'before-leaving' });
+    const first = await addExpense(organizer.auth, eventId, body).expect(201);
+    // The member settles up and leaves, so the expense names someone who
+    // is no longer in the event, and adding it fresh would be refused
+    await api().post(paymentsPath(eventId)).set('Authorization', member.auth)
+      .send({ from: member.user._id, to: organizer.user._id, amountCents: 5000, date: '2099-06-01' }).expect(201);
+    await api().delete(`/api/events/${eventId}/members/${member.user._id}`).set('Authorization', member.auth).expect(204);
+    await addExpense(organizer.auth, eventId, { ...body, clientId: 'fresh' }).expect(400);
+
+    const again = await addExpense(organizer.auth, eventId, body).expect(200);
+
+    assert.equal(again.body.expense._id, first.body.expense._id);
+    assert.equal(await stored(eventId), 1);
+  });
+});
+
 describe('GET /api/events/:id/expenses', () => {
   it('returns expenses and payments, newest first', async () => {
     const { organizer, member, eventId } = await setup();

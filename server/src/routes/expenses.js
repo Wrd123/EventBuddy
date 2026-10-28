@@ -87,15 +87,38 @@ expenses.get('/', async (req, res) => {
   res.json({ expenses: expenseList, payments: paymentList });
 });
 
+// Whether a saved expense is the one these fields describe, for telling a
+// retry from a clientId reused for something else
+const sameExpense = (fields) => (saved) =>
+  saved.description === fields.description &&
+  saved.amountCents === fields.amountCents &&
+  saved.date === fields.date &&
+  saved.splitType === fields.splitType &&
+  String(saved.paidBy.user) === String(fields.paidBy) &&
+  Array.isArray(fields.shares) &&
+  saved.shares.length === fields.shares.length &&
+  saved.shares.every((s, i) => String(s.user) === String(fields.shares[i].user) && s.amountCents === fields.shares[i].amountCents);
+
 expenses.post('/', ledgerChange(async (req, res) => {
   const event = await findVisibleEvent(req.params.id, req.user);
   const fields = expenseFields(req.body);
+  const key = { event: event._id, createdBy: req.user._id, clientId: readClientId(req.body) };
+
+  // A retry of an expense that was already saved gets it back, even if
+  // something since would stop it being added now (the payer left, say).
+  // Checked under the lock, so a retry racing its original waits for it.
+  if (key.clientId !== undefined) {
+    const saved = await findExisting(Expense, key, sameExpense(fields));
+    if (saved) return res.json({ expense: saved });
+  }
 
   const error = validateExpense(fields, event);
   if (error) throw new HttpError(400, error);
 
-  const expense = await Expense.create({ ...toStored(fields, event), event: event._id, createdBy: req.user._id });
-  res.status(201).json({ expense });
+  const { record: expense, created } = await createOnce(
+    Expense, key, { ...toStored(fields, event), event: event._id, createdBy: req.user._id }, sameExpense(fields)
+  );
+  res.status(created ? 201 : 200).json({ expense });
 }));
 
 expenses.patch('/:expenseId', ledgerChange(async (req, res) => {

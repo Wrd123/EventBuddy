@@ -228,6 +228,85 @@ describe('Expenses', () => {
     expect(screen.getByText('$360.00', { selector: 'span' })).toBeInTheDocument();
   });
 
+  describe('adding an expense that might not have saved', () => {
+    const addDinner = (amount = '60') => {
+      fillForm({ 'What was it for': 'Dinner', 'Amount ($)': amount });
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
+    };
+    const expensePosts = () => global.fetch.mock.calls
+      .filter(([url, init]) => url.endsWith('/events/1/expenses') && init?.method === 'POST')
+      .map(([, init]) => JSON.parse(init.body));
+
+    it('retries with the same id, so the expense is added once', async () => {
+      installFakeApi({ expenseOutcomes: ['lost'] }).logIn();
+      await openExpenses();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+      addDinner();
+      expect(await screen.findByText("We couldn't confirm that saved. Try again; it won't be added twice.")).toBeInTheDocument();
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add expense' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(await screen.findByText('Dinner')).toBeInTheDocument();
+      expect(screen.getAllByText('Dinner')).toHaveLength(1);
+      const [first, retry] = expensePosts();
+      expect(first.clientId).toBeTruthy();
+      expect(retry.clientId).toBe(first.clientId);
+    });
+
+    it('explains that the first try saved when the retry was changed', async () => {
+      installFakeApi({ expenseOutcomes: ['lost'] }).logIn();
+      await openExpenses();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+      addDinner();
+      await screen.findByText(/We couldn't confirm that saved/);
+      addDinner('70');
+
+      expect(await screen.findByText('Your first try was saved. Close this to see it, and edit it there if anything changed.')).toBeInTheDocument();
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+
+      expect(await screen.findByText('Dinner')).toBeInTheDocument();
+      expect(screen.getByText('$360.00', { selector: 'span' })).toBeInTheDocument();
+    });
+
+    it('shows the saved expense when the sheet is closed instead of retried', async () => {
+      installFakeApi({ expenseOutcomes: ['lost'] }).logIn();
+      await openExpenses();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+      addDinner();
+      await screen.findByText(/We couldn't confirm that saved/);
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+
+      expect(await screen.findByText('Dinner')).toBeInTheDocument();
+    });
+
+    it("shows the server's message when it gives a definite no", async () => {
+      installFakeApi({ expenseOutcomes: [400] }).logIn();
+      await openExpenses();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+      addDinner();
+
+      expect(await within(screen.getByRole('dialog')).findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+    });
+
+    it('gives each new expense its own id', async () => {
+      await openExpenses();
+
+      for (let i = 0; i < 2; i += 1) {
+        fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+        addDinner();
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      }
+
+      expect(await screen.findAllByText('Dinner')).toHaveLength(2);
+      const [first, second] = expensePosts();
+      expect(second.clientId).not.toBe(first.clientId);
+    });
+  });
+
   it('splits by exact amounts', async () => {
     await openExpenses();
 

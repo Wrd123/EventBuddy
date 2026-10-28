@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Button, Sheet } from '../common';
 import { useAppContext } from '../../context/AppContext';
 import * as eventService from '../../services/eventService';
 import { formatCents, parseDollars, centsToInput, splitEqually } from '../../utils/money';
 import { todayISO } from '../../utils/dates';
+import { newClientId, mightHaveSaved } from '../../utils/clientId';
 
 // Bottom sheet for adding (expense is null) or editing an expense.
 // Splits equally among chosen members, or by exact amounts per person.
@@ -33,6 +34,12 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // One id for every try at adding this expense, so a retry after a lost
+  // response gets the saved one back instead of adding it twice
+  const clientId = useRef(null);
+  if (!expense && clientId.current === null) clientId.current = newClientId();
+  // A try that may have been saved even though it seemed to fail
+  const unconfirmed = useRef(false);
 
   const set = (field) => (e) => setFields(prev => ({ ...prev, [field]: e.target.value }));
   const toggle = (user) => setIncluded(prev => {
@@ -59,6 +66,22 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
     return { shares: exactCents.filter(s => s.amountCents > 0) };
   };
 
+  // Adding can fail in a way that leaves it unclear whether it saved. The
+  // retry is safe either way; if the fields changed since, the server
+  // refuses the same id for a different expense, which means the first try
+  // did save.
+  const errorText = (err) => {
+    if (expense) return err.message;
+    if (mightHaveSaved(err)) {
+      unconfirmed.current = true;
+      return "We couldn't confirm that saved. Try again; it won't be added twice.";
+    }
+    if (err.status === 409 && unconfirmed.current) {
+      return 'Your first try was saved. Close this to see it, and edit it there if anything changed.';
+    }
+    return err.message;
+  };
+
   const run = async (action) => {
     setError('');
     setIsSaving(true);
@@ -66,7 +89,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
       await action();
       onSaved();
     } catch (err) {
-      setError(err.message);
+      setError(errorText(err));
       setIsSaving(false);
     }
   };
@@ -84,8 +107,12 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
     const body = { description, amountCents, date: fields.date, paidBy: fields.paidBy, splitType: fields.splitType, shares };
     run(() => (expense
       ? eventService.updateExpense(event._id, expense._id, body)
-      : eventService.addExpense(event._id, body)));
+      : eventService.addExpense(event._id, { ...body, clientId: clientId.current })));
   };
+
+  // After a try that may have saved, closing reads the list again, so an
+  // expense whose response was lost shows up straight away
+  const close = () => (unconfirmed.current ? onSaved() : onClose());
 
   const handleDelete = () => {
     if (!confirmingDelete) return setConfirmingDelete(true);
@@ -101,7 +128,7 @@ const ExpenseForm = ({ event, expense, onClose, onSaved }) => {
       as="form"
       title={expense ? 'Edit expense' : 'Add expense'}
       onSubmit={handleSubmit}
-      onClose={onClose}
+      onClose={close}
       className="p-4 max-h-full overflow-y-auto"
     >
 
