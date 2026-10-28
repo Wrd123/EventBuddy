@@ -29,6 +29,25 @@ const checkForNewMessages = () => fireEvent(document, new Event('visibilitychang
 
 beforeEach(() => localStorage.clear());
 
+const NOTE = "Demo friends are simulated. At the picnic, they chat, move and add costs while you're here.";
+
+describe('Chat demo note', () => {
+  it('tells a demo visitor the friends are simulated', async () => {
+    installFakeApi({ demoAccount: true }).logIn();
+    renderAt('/events/1/chat');
+
+    expect(await screen.findByText(NOTE)).toBeInTheDocument();
+  });
+
+  it("doesn't say so to a real account", async () => {
+    installFakeApi().logIn();
+    renderAt('/events/1/chat');
+
+    await screen.findByLabelText('Message');
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+});
+
 describe('Groups', () => {
   beforeEach(() => installFakeApi().logIn());
 

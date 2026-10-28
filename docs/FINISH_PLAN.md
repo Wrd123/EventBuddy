@@ -24,7 +24,7 @@ The scope stays the same: a $0 portfolio showcase for friends planning trips, wi
    - *Edit:* `record` is awaited before the response, so the `event` poke that follows always finds the new line, and a failed record never fails the write. ~~No timeout.~~ Reversed on 28 Oct after Codex's review of the 4c plan: the wait is bounded at 2 s, because expense and payment routes record inside the per-event ledger lock. A line that lands later pokes `event` itself.
    - *Edit:* if a fresh newest page doesn't overlap the pages already loaded (more than a page arrived while away), it replaces the list instead of leaving a gap.
    - If this grows much beyond that, defer it rather than lower the bar.
-4. **4d, scripted demo friends.**
+4. **4d, scripted demo friends.** Built 28 Oct on `demo-friends` (see `docs/HANDOFF.md`).
    - Labelled as simulated, and only inside the visitor's own demo world.
    - A small fixed script through the normal routes and pokes.
    - Stops when the owner leaves, never runs twice after a reconnect, and never touches another world.

@@ -41,6 +41,28 @@ const pin = (name) => screen.findByRole('button', { name });
 
 beforeEach(() => localStorage.clear());
 
+const NOTE = "Demo friends are simulated. At the picnic, they chat, move and add costs while you're here.";
+
+describe('Map demo note', () => {
+  beforeEach(() => localStorage.setItem('eventbuddy_place', JSON.stringify(ATLANTA)));
+
+  it('tells a demo visitor the friends on the map are simulated', async () => {
+    installFakeApi({ liveEvent: true, demoAccount: true }).logIn();
+    renderAt('/map');
+
+    await pin('Friend: Alex');
+    expect(within(screen.getByRole('region', { name: 'Live at Picnic in the Park' })).getByText(NOTE)).toBeInTheDocument();
+  });
+
+  it("doesn't say so to a real account", async () => {
+    installFakeApi({ liveEvent: true }).logIn();
+    renderAt('/map');
+
+    await pin('Friend: Alex');
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+});
+
 describe('Map', () => {
   beforeEach(() => {
     localStorage.setItem('eventbuddy_place', JSON.stringify(ATLANTA));

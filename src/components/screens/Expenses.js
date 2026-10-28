@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Copy, Pencil, Plus, X } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import Header from '../common/Header';
-import { Button, Skeleton, SkeletonScreen } from '../common';
+import { Button, DemoFriendsNote, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import ExpenseForm from './ExpenseForm';
 import { useEvent, EVENT_POLL_MS } from '../../hooks/useEvent';
@@ -174,6 +174,7 @@ const Expenses = () => {
           />
 
           {ledger.expenses.length > 0 && <Balances balances={balances} me={me} />}
+          <DemoFriendsNote />
 
           <section>
             <div className="flex justify-between items-center mb-3">

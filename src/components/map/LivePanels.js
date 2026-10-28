@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Flag, Navigation, Radio } from 'lucide-react';
-import { Button, Sheet, useSheet } from '../common';
+import { Button, DemoFriendsNote, Sheet, useSheet } from '../common';
 import { agoText, directionsUrl, shareDurations, untilText } from '../../utils/live';
 import { tracksInBackground } from '../../services/locationTracker';
 
@@ -63,6 +63,7 @@ export const LiveBar = ({ event, live, trackingError, onShare, onSetMeetup }) =>
           {live.meetup ? 'Move meetup' : 'Set meetup'}
         </Button>
       </div>
+      <DemoFriendsNote className="mt-3" />
     </section>
   );
 };

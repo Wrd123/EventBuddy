@@ -441,6 +441,7 @@ module.exports = {
   seedDemoData,
   createDemoWorld,
   demoWorldUserId,
+  idInWorld,
   pruneDemoWorlds,
   dayIn,
   DEMO_LOGIN,

@@ -14,6 +14,9 @@ const userSchema = new mongoose.Schema(
     // share an event with them (see GET /api/events/:id/payment-handles).
     // Set on accounts in a private demo world (see seed/demoData.js)
     demoWorld: { type: String, index: true },
+    // How far a private demo world's scripted friends have got in their
+    // story, on the world's John (see realtime/demoFriends.js)
+    demoScriptStep: Number,
     // Goes up on logout and password change. Every login token carries the
     // number it was issued with, and a token with an older one is refused,
     // so ending a session ends it on the server, not just on the phone.
@@ -44,6 +47,7 @@ userSchema.set('toJSON', {
     // The app only needs to know it's a demo account (no password to change)
     ret.isDemo = Boolean(ret.demoWorld);
     delete ret.demoWorld;
+    delete ret.demoScriptStep;
     delete ret.sessionVersion;
     delete ret.__v;
     return ret;

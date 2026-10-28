@@ -4,7 +4,7 @@ A phone app for planning trips, festivals and nights out with friends: one place
 
 Built end to end by me: React front end, Express and MongoDB API, and a native iPhone app (Capacitor) that keeps sharing your location with your friends while the phone is locked.
 
-**[Try the live demo](https://eventbuddy-exic.onrender.com)** and tap **Try the demo** to look around as John, in your own copy of the demo, so change anything you like. It runs on a free server that sleeps when idle, so the first visit can take up to a minute to wake it.
+**[Try the live demo](https://eventbuddy-exic.onrender.com)** and tap **Try the demo** to look around as John, in your own copy of the demo, so change anything you like. Open the picnic and three of John's friends, simulated and labelled as such, chat, move on the map and add a cost while you watch. It runs on a free server that sleeps when idle, so the first visit can take up to a minute to wake it.
 
 | Home | Event | Live map | Group chat | Split costs |
 |---|---|---|---|---|
@@ -86,7 +86,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet with MapLibre vector tiles from OpenFreeMap (free, keyless) |
 | iPhone | Capacitor 7, background geolocation, native HTTP, haptics |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt, `ws` for real-time pokes |
-| Testing | Jest and Testing Library (511 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (396 tests) |
+| Testing | Jest and Testing Library (521 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (416 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look
@@ -106,6 +106,7 @@ flowchart LR
 - **One bottom sheet for every dialog.** Each sheet traps focus, closes on Escape or a downward drag, switches the screen behind it off for screen readers and taps, and gives focus back to whatever opened it. Screens slide in like a native stack, and every animation respects Reduce Motion.
 - **Demo mode instead of production infrastructure.** For a showcase, an in-memory database is cheaper and safer than a real one: no stored personal data and nothing to clean up.
 - **Every demo visitor gets a private world.** Tapping **Try the demo** creates a fresh copy of John, his friends, their events, chat and costs, so nothing one visitor adds shows up for the next. Every id in a world is derived from a random tag carried in the login token, so when the free server sleeps and wakes with an empty database, a saved login rebuilds the same world. Worlds expire after a day and at most 300 are kept, which bounds memory no matter how often someone taps the button. The picnic is placed on the visitor's own date, so it's happening "today" in any time zone, with an afternoon planned, a little to settle up and friends already on the map.
+- **The demo's friends are API clients.** A visitor alone in a demo world would never see anything happen in real time, so when they open the picnic, Alex, Taylor and Jordan play a short fixed story: a chat, a cost added, a plan, a walk to the meetup point, with the first change on screen within seconds. Each beat is an ordinary request to the API's own routes, made over loopback with that friend's login, so the friends can do only what a member can, and every access check, validation, ledger lock, activity line and poke runs exactly as it does for a person. Nothing in the routes is duplicated for them. The story runs only in the visitor's own world. One loop per world plays it in order, and nothing new starts once the visitor leaves. Each beat is claimed on the visitor's account before it runs, so it's tried at most once and a later visit carries on rather than replaying. Every screen where the friends' messages, positions or costs appear says they're simulated.
 
 ## Project structure
 
@@ -125,7 +126,7 @@ EventBuddy/
 │   ├── src/
 │   │   ├── routes/          # auth, events, schedule, expenses, messages, live, activity, map, discover
 │   │   ├── models/          # Mongoose models
-│   │   ├── realtime/        # WebSocket hub: who's subscribed to what, and the pokes
+│   │   ├── realtime/        # WebSocket hub (who's subscribed to what, the pokes) and the demo's scripted friends
 │   │   ├── discover/        # Ticketmaster and OpenStreetMap clients with caching
 │   │   └── seed/            # Demo data
 │   └── tests/               # API tests

@@ -1,14 +1,14 @@
 # Handoff: where EventBuddy stands (28 Oct 2026)
 
 `CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what's done, what's next, and the traps.
-- **`docs/FINISH_PLAN.md` sets the order of work now.** Items 1 and 2 are done and deployed. Item 3, the compact activity feed (Phase 4c), is done and committed but not pushed. **Item 4, scripted demo friends (Phase 4d), is next.**
-- `docs/PHASE_4_PLAN.md` is the plan for Phase 4. Its 4a, 4b and 4c parts are built; where the build departed from it, this note says so.
+- **`docs/FINISH_PLAN.md` sets the order of work now.** Items 1 to 3 are done and pushed. **Item 4, scripted demo friends (Phase 4d), is built on `demo-friends`** (see What was done). **Item 5, the abuse backlog, is next.**
+- `docs/PHASE_4_PLAN.md` is the plan for Phase 4. All four parts are built; where the build departed from it, this note says so.
 
 ## State
 
 - **Git:**
-  - GitHub's `main` is at `54dc0977` (the last handoff) if the user pushed it.
-  - **`activity-feed`** (local only) has 4c (`fc591c4a`) and this handoff on top. Local `main` is behind it. The user pushes it with `git push origin activity-feed:main`.
+  - GitHub's `main` is at `8179c337` (4c and the last handoff), confirmed on 28 Oct.
+  - **`demo-friends`** (local only), branched from `8179c337`, has 4d. Local `main` is still at `54dc0977`, behind both. The user pushes with `git push origin demo-friends:main`.
   - The user pushes with `git push origin <branch>:main`, so **local `main` can lag behind**. Bring it level with `git switch main && git merge --ff-only origin/main` (or the branch), and check `git rev-list --left-right --count origin/main...main` before trusting this.
   - CI wasn't checked for the 28 Oct pushes. Ask the user to look at the Actions tab.
 - **Deployed on Render:**
@@ -18,7 +18,7 @@
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 396 server tests, 511 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 417 server tests, 521 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -31,7 +31,7 @@
   - the darkened Liberty map in WKWebView
   - **the socket from the iPhone app:** what Origin its WebView sends. It must be in `CLIENT_ORIGIN`.
 - **Branches:**
-  - Locally: `main`, `activity-feed` (4c, not pushed), plus `expense-retry`, `chat-read` and `demo-polish`. Those three are already in GitHub's `main`, so `git branch -d` can tidy them once local `main` has caught up.
+  - Locally: `main`, `demo-friends` (4d), plus `activity-feed`, `expense-retry`, `chat-read` and `demo-polish`. Those four are already in GitHub's `main`, so `git branch -d` can tidy them once local `main` has caught up.
   - `origin/phase-3b` still exists on GitHub. Deleting it would be a push, so leave it to the user.
   - `.git/config` has three harmless stale `vscode-merge-base` lines. The sandbox can't edit that file.
 - **Local servers:**
@@ -42,7 +42,7 @@
 
 ## Waiting on the user
 
-- **Push `activity-feed`** (`git push origin activity-feed:main`), then redeploy the API for it. Check: a new demo world's picnic page shows "Recent activity" with "Taylor set the meetup point" on top.
+- **Push `demo-friends`** (`git push origin demo-friends:main`), then redeploy the API for it (and for 4c, if that hasn't been done). Check: Try the demo, open the picnic, and within ~15 s "Alex added Ice cream ($18.00)" appears and John's "Owed" drops by $4.50.
 - **Redeploy `eventbuddy-api` for `4da7140a`**, if it hasn't been done. Without it, the live picnic has no schedule or costs, and Discover's not-configured message is the old one.
   - Check: a new demo world's "Picnic in the Park" should have 4 schedule items.
 - **Turn on Auto-Deploy for `eventbuddy-api`** (Settings → Build & Deploy), so this stops being a manual step.
@@ -86,6 +86,19 @@
   - EventDetails shows "Recent activity" under Who's going: the newest two lines, each truncated to one line. See all (only when there are more than two) opens `ActivitySheet` with Show earlier. The sheet closes for good when access goes.
   - Payments read "Alex recorded a payment of $80.00 to you" (or "from"). That avoids "a/an $80" and names whoever tapped Mark paid.
 - **Checked live** on the isolated API and production build: a new line arrived by poke within 1.5 s, deleting its expense removed it, there were no CSP errors, and 125% text still keeps one line each. The user saw screenshots.
+
+**Finish plan, item 4: Phase 4d, scripted demo friends (28 Oct, on `demo-friends`).** The plan was revised after Codex's review, built by Sonnet subagents, checked by Claude, and reviewed by the `reviewer` subagent, whose findings were all fixed.
+- **`server/src/realtime/demoFriends.js`:** when a private world's John first subscribes to his picnic, Alex, Taylor and Jordan play a 7-beat `SCRIPT`: Jordan's chat and pin, Alex's $18 ice cream and his chat about it, Taylor at the dock, Jordan closer, Jordan going to the sunset walk, Taylor's "Group photo" plan, Jordan at the meetup point. The waits are 5, 10 and 15 s, then 20–40 s.
+  - **The friends are API clients:** `fetch` to `hub.localUrl()` with `signToken` tokens, so every route check, lock, activity line and poke runs as for a person. A friend's token can't rebuild a pruned world.
+  - **Lifecycle:** one awaited loop per world (`sessions`). `stop` is synchronous: it aborts the in-flight request and ends simulated presence, and no new request starts after it. A stop during a claim hands the beat back.
+  - **Progress:** `demoScriptStep` on John's User doc, claimed before each beat, so each beat is tried at most once and a later visit resumes.
+  - **Truthfulness:** a beat stops at its first failed request.
+  - **When it stops:** once the story is told, the friends stay here until John leaves. It stops on the hub's `'left'` (after the grace, logout or expiry), when John leaves the picnic, when the picnic is deleted, and when John's account is gone.
+  - **Departures from the plan:** Jordan *resumes* position updates rather than starting to share, because the seed already has him sharing (Codex caught it). `ids.me` and the `SCRIPT` export were dropped.
+- **`hub.js`:** `hubEvents` (`'subscribed'`, `'left'`, emitted through a try/catch), `state.simulated` kept apart from `memberships` (`presenceOf` reports the union; `dropFromEvent` prunes both), and `simulatePresence`, `endSimulatedPresence` and `localUrl`.
+- **App:** `DemoFriendsNote` ("Demo friends are simulated. At the picnic, they chat, move and add costs while you're here.") for `isDemo`, on EventDetails (under Recent activity), GroupChat (under Here now), the map's LiveBar and Expenses (under Balances). The user saw screenshots.
+- **Checked live** on `rt-api-4150` plus the `rt-web-3999` production build: all 7 beats arrived by poke, the balance moved, there were no CSP errors, and no friend request was refused. The final review fixes (stop ordering, claim rollback, the caption's wording) came after that run and are covered by tests only.
+- **Tests:** `server/tests/demoFriends.test.js` (21). Its cleanup hook is registered before `useTestDatabase()`, so stories stop before each wipe. Not covered: `'left'` through token expiry (it shares `endPresence` with logout, which is tested).
 
 **Security review** (Claude and Codex independently, then fixes with tests). `docs/SECURITY_REVIEW.md` is the full record.
 
@@ -179,17 +192,14 @@ Follow `docs/FINISH_PLAN.md`, in order:
 1. ~~Correctness~~ (done).
 2. ~~The demo and copy pass~~ (done).
 3. ~~4c, compact~~ (done, see What was done).
-4. **4d. Next** (notes below). Plan it in plan mode first.
-5. **The abuse backlog:** a per-visitor demo budget and a socket queue budget.
+4. ~~4d~~ (built, see What was done).
+5. **The abuse backlog (next):** a per-visitor demo budget and a socket queue budget.
 6. **Playwright against a real API, the Simulator pass, and the user's physical-iPhone location check.**
 7. **Rehearse and package.**
 
-Notes for the Phase 4 items:
+Notes for what's ahead:
 
-1. **Phase 4d, scripted demo friends** (`server/src/realtime/demoFriends.js`, see the plan and finish-plan item 4). Label them as simulated. The friends can show as here by joining `state.memberships` the way an arriving socket does.
-   - They should act through the same models plus `record` (from `activityLog.js`) and `notifyEvent`, so their actions land in the feed and poke like a person's. Money writes must go through `withEventLock`.
-   - Only inside the visitor's own demo world, stopping when the owner leaves, never twice after a reconnect. Never for real accounts; a test guards that.
-2. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form, the Liberty map, and now the socket and its Origin.
+1. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form, the Liberty map, and now the socket and its Origin.
    - `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox.
    - Open the Simulator panel (`attach`) before building.
 

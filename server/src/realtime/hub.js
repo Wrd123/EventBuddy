@@ -18,11 +18,14 @@
 // Presence is the one thing beyond pokes: user ids, sent only to the
 // event's own subscribers, which says no more than "this member has the app
 // open". The socket is only open while the app is on screen, so being
-// connected is what being here means.
+// connected is what being here means. A private demo world's scripted
+// friends can be "here" too, kept apart from real connections so that
+// ending the pretence never ends anyone's real presence (see demoFriends.js).
 //
 // Everything is in this process's memory, which fits the single instance
 // Render runs. A second instance would need pub/sub (Redis, say) so a change
 // on one reaches sockets held by the other.
+const { EventEmitter } = require('events');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { WebSocketServer, WebSocket } = require('ws');
@@ -60,6 +63,21 @@ const LIMITS = {
 
 let state = null;
 
+// What happens at the hub, for code that reacts to it (the demo friends).
+// 'subscribed' (user, eventId): a socket joined an event's screen.
+// 'left' (userId): someone really stopped being here, past the grace.
+const emitter = new EventEmitter();
+
+// A listener that throws must never break the hub, which runs outside
+// Express where an error would take the whole API down
+const announce = (name, ...args) => {
+  try {
+    emitter.emit(name, ...args);
+  } catch (err) {
+    console.error(`A real-time listener failed (${name}):`, err.message);
+  }
+};
+
 // Bumped whenever who may see what changes: a member removed or added, a
 // login ended, someone's presence ending. A check that was waiting on the
 // database while it changed is run again, so it can't add back what was
@@ -92,9 +110,12 @@ const checked = async (check) => {
 const subscribersOf = (eventId) => state.subscribers.get(eventId) || new Set();
 
 // Members of the event who are here: memberships holds the events of
-// everyone with the app open (or who closed it moments ago)
-const presenceOf = (eventId) =>
-  [...state.memberships].filter(([, events]) => events.has(eventId)).map(([userId]) => userId);
+// everyone with the app open (or who closed it moments ago), and simulated
+// those of a demo world's scripted friends
+const presenceOf = (eventId) => {
+  const here = (map) => [...map].filter(([, ids]) => ids.has(eventId)).map(([userId]) => userId);
+  return [...new Set([...here(state.memberships), ...here(state.simulated)])];
+};
 
 const sendPresence = (eventId, to = subscribersOf(eventId)) => {
   const message = { type: 'presence', eventId, userIds: presenceOf(eventId) };
@@ -110,6 +131,7 @@ const endPresence = (userId) => {
   clearTimeout(state.leaving.get(userId));
   state.leaving.delete(userId);
   events.forEach((eventId) => sendPresence(eventId));
+  announce('left', userId);
 };
 
 // After the grace, if they haven't come back, they're no longer here
@@ -121,6 +143,7 @@ const leaveLater = (userId) => {
     const events = state.memberships.get(userId) || new Set();
     state.memberships.delete(userId);
     events.forEach((eventId) => sendPresence(eventId));
+    announce('left', userId);
   }, state.limits.leaveGraceMs));
 };
 
@@ -238,6 +261,7 @@ const subscribe = async (ws, eventId) => {
   state.subscribers.get(eventId).add(ws);
   send(ws, { type: 'subscribed', eventId });
   sendPresence(eventId, [ws]);
+  announce('subscribed', ws.user, eventId);
 };
 
 const handle = async (ws, data, isBinary) => {
@@ -320,7 +344,7 @@ const attach = (server, { limits = {}, origins = config.clientOrigin } = {}) => 
 
   state = {
     wss, server, onUpgrade, heartbeat, limits: merged,
-    users: new Map(), subscribers: new Map(), memberships: new Map(), leaving: new Map()
+    users: new Map(), subscribers: new Map(), memberships: new Map(), leaving: new Map(), simulated: new Map()
   };
 };
 
@@ -364,9 +388,11 @@ const dropFromEvent = (eventId, userIds) => {
     EVERYTHING.forEach((what) => send(ws, { type: 'changed', eventId: id, what }));
     unsubscribe(ws, id);
   });
-  // Nor are they here for it any more
-  state.memberships.forEach((events, userId) => {
-    if (!leaving || leaving.has(userId)) events.delete(id);
+  // Nor are they here for it any more, really or pretending
+  [state.memberships, state.simulated].forEach((map) => {
+    map.forEach((ids, userId) => {
+      if (!leaving || leaving.has(userId)) ids.delete(id);
+    });
   });
   if (leaving) sendPresence(id);
 };
@@ -379,6 +405,36 @@ const addMember = (eventId, userId) => {
   const id = String(eventId);
   state.memberships.get(String(userId))?.add(id);
   sendPresence(id);
+};
+
+// Scripted friends are here for an event, or no longer. They live apart from
+// real connections, so ending one can't end a real person's presence.
+const simulatePresence = (userIds, eventId) => {
+  if (!state) return;
+  const id = String(eventId);
+  userIds.map(String).forEach((userId) => {
+    if (!state.simulated.has(userId)) state.simulated.set(userId, new Set());
+    state.simulated.get(userId).add(id);
+  });
+  sendPresence(id);
+};
+
+const endSimulatedPresence = (userIds, eventId) => {
+  if (!state) return;
+  const id = String(eventId);
+  userIds.map(String).forEach((userId) => {
+    const ids = state.simulated.get(userId);
+    ids?.delete(id);
+    if (ids?.size === 0) state.simulated.delete(userId);
+  });
+  sendPresence(id);
+};
+
+// Where the attached server can be reached from this machine, for code that
+// calls the API's own routes; null while it isn't listening
+const localUrl = () => {
+  const address = state?.server.address();
+  return address && typeof address === 'object' ? `http://127.0.0.1:${address.port}` : null;
 };
 
 // Closes every socket of these people: their login ended. They stop being
@@ -409,5 +465,6 @@ const pokeOnSuccess = (what) => (req, res, next) => {
 };
 
 module.exports = {
-  attach, close, notifyEvent, notifyUsers, dropFromEvent, addMember, closeUsers, pokeOnSuccess, PATH, ENDED, REPLACED
+  attach, close, notifyEvent, notifyUsers, dropFromEvent, addMember, closeUsers, pokeOnSuccess,
+  hubEvents: emitter, simulatePresence, endSimulatedPresence, localUrl, PATH, ENDED, REPLACED
 };

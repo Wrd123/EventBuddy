@@ -4,6 +4,7 @@ export { default as Avatar } from './Avatar';
 export { default as AvatarStack } from './AvatarStack';
 export { default as Button } from './Button';
 export { default as ErrorBoundary } from './ErrorBoundary';
+export { default as DemoFriendsNote } from './DemoFriendsNote';
 export { default as EventArt } from './EventArt';
 export { default as EventCard } from './EventCard';
 export { default as EventCover } from './EventCover';

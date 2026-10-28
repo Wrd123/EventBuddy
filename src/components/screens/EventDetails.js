@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, MessageCircle, Wallet, Map, MapPin, Plus, ExternalLink, Pencil } from 'lucide-react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
-import { ActivityLine, ActivitySheet, Avatar, EventCover, PhotoBackdrop, Skeleton, SkeletonScreen } from '../common';
+import { ActivityLine, ActivitySheet, Avatar, DemoFriendsNote, EventCover, PhotoBackdrop, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import InviteSheet from '../common/InviteSheet';
 import MemberSheet from '../common/MemberSheet';
@@ -344,9 +344,9 @@ const EventContent = ({ event, here, onInvite, onMember, activity, me, onSeeActi
 };
 
 // The newest two lines of what's been happening, with the rest a tap away.
-// Nothing at all until there's something to show.
+// Nothing but the demo note until there's something to show.
 const RecentActivity = ({ activity, members, me, onSeeAll }) => {
-  if (activity.status !== 'ready' || activity.items.length === 0) return null;
+  if (activity.status !== 'ready' || activity.items.length === 0) return <DemoFriendsNote className="mb-7" />;
   return (
     <section className="mb-7">
       <div className="flex items-baseline justify-between mb-2">
@@ -366,6 +366,7 @@ const RecentActivity = ({ activity, members, me, onSeeAll }) => {
           <ActivityLine key={line._id} line={line} members={members} me={me} compact />
         ))}
       </ul>
+      <DemoFriendsNote className="mt-2" />
     </section>
   );
 };

@@ -18,6 +18,8 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+const NOTE = "Demo friends are simulated. At the picnic, they chat, move and add costs while you're here.";
+
 describe('event page', () => {
   it('shows unread messages and your balance on the buttons', async () => {
     installFakeApi().logIn();
@@ -25,6 +27,21 @@ describe('event page', () => {
 
     expect(await screen.findByRole('button', { name: 'Chat, 2 unread' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Expenses, Owe $150.00' })).toBeInTheDocument();
+  });
+
+  it('tells a demo visitor the friends are simulated, even with no activity yet', async () => {
+    installFakeApi({ demoAccount: true }).logIn();
+    renderAt('/events/1');
+
+    expect(await screen.findByText(NOTE)).toBeInTheDocument();
+  });
+
+  it("doesn't say so to a real account", async () => {
+    installFakeApi().logIn();
+    renderAt('/events/1');
+
+    await screen.findByRole('button', { name: 'Chat, 2 unread' });
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
   });
 
   it('marks who organized the event', async () => {

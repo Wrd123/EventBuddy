@@ -25,6 +25,8 @@ const openExpenses = async () => {
   await screen.findByText('Airbnb');
 };
 
+const NOTE = "Demo friends are simulated. At the picnic, they chat, move and add costs while you're here.";
+
 const section = (title) => screen.getByRole('heading', { name: title }).closest('section');
 
 const fillForm = (fields) => {
@@ -34,6 +36,17 @@ const fillForm = (fields) => {
 };
 
 describe('Expenses', () => {
+  it("doesn't show the demo note to a real account", async () => {
+    await openExpenses();
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  it('shows the demo note to a demo account', async () => {
+    installFakeApi({ demoAccount: true }).logIn();
+    await openExpenses();
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+  });
+
   it('shows the total, budget, your balance and who pays whom', async () => {
     await openExpenses();
 

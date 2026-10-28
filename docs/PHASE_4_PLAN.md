@@ -2,7 +2,7 @@
 
 Worked out on 27 Oct 2026. The user agreed the direction and chose the scripted demo friends (4d).
 
-**Status:** 4a (pokes) and 4b (who's here now) are built, deployed and checked live. 4c (the activity feed) is built in the compact form from `docs/FINISH_PLAN.md` and committed (`fc591c4a`, not yet pushed). 4d is next. `docs/HANDOFF.md` lists where each part departed from this plan. Check the code before following a detail here, since things have moved.
+**Status:** 4a (pokes) and 4b (who's here now) are built, deployed and checked live. 4c (the activity feed) is built in the compact form from `docs/FINISH_PLAN.md` and pushed. 4d (scripted demo friends) is built on the `demo-friends` branch, revised after Codex's review: the friends act through the real routes over loopback, the story starts when the visitor opens the picnic, and presence is simulated apart from real connections. `docs/HANDOFF.md` lists where each part departed from this plan. Check the code before following a detail here, since things have moved.
 
 ## Why
 

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { ArrowDown, Send } from 'lucide-react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import Header from '../common/Header';
-import { AvatarStack, Skeleton, SkeletonScreen } from '../common';
+import { AvatarStack, DemoFriendsNote, Skeleton, SkeletonScreen } from '../common';
 import NotFound from './NotFound';
 import { useEvent } from '../../hooks/useEvent';
 import { useChat } from '../../hooks/useChat';
@@ -50,6 +50,7 @@ const GroupChat = () => {
         </span>
       </Link>
       <HereNow event={event} here={here} />
+      <DemoFriendsNote className="shrink-0 px-4 py-2 border-b border-line" />
 
       <Conversation event={event} chat={chat} />
       <Composer eventName={event.name} onSend={chat.send} />

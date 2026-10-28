@@ -3,6 +3,7 @@ const { connectDatabase, disconnectDatabase } = require('./db');
 const { seedDemoData, DEMO_LOGIN } = require('./seed/demoData');
 const { port, demoMode, isProduction } = require('./config');
 const realtime = require('./realtime/hub');
+const demoFriends = require('./realtime/demoFriends');
 
 const start = async () => {
   const inMemory = await connectDatabase();
@@ -22,9 +23,11 @@ const start = async () => {
   });
   // Real-time pokes share the API's port, at /api/socket
   realtime.attach(server);
+  const stopDemoFriends = demoFriends.install();
 
   // Close cleanly on Ctrl+C or when the host stops the process
   const shutdown = async () => {
+    stopDemoFriends();
     realtime.close();
     server.close();
     await disconnectDatabase();
