@@ -36,17 +36,7 @@
 
 ## Waiting on the user
 
-- **F-1, measuring the proxy count.** The API now has `GET /api/debug/request-ip`, which exists only while `SHOW_REQUEST_IP=true`. It returns the caller's own `ip`, `forwardedFor`, `connectedFrom` and the current `trustProxy`. The user was asked to:
-  1. Push `main`, and wait for the API's deploy.
-  2. Set `SHOW_REQUEST_IP=true` on the API service in Render.
-  3. Open `https://<api>.onrender.com/api/debug/request-ip` and send back the three values. They may write `ME` in place of their own IP.
-  4. Remove `SHOW_REQUEST_IP` again.
-
-  To find the right `TRUST_PROXY`, count positions:
-  - `connectedFrom` is position 0.
-  - The addresses in `forwardedFor` are positions 1, 2, … counting from the right.
-
-  `TRUST_PROXY` is the position of their real IP. For example, `forwardedFor: "ME, 104.x"` gives 2. Set it in `render.yaml`; the user then needs a **Blueprint sync**. Also add the limiter test that F-1 in `docs/SECURITY_REVIEW.md` asks for. Removing the debug route afterwards is optional, since it's off by default.
+- **F-1 is resolved.** It was measured on Render on 27 Oct 2026, and `TRUST_PROXY=3` is right (see `docs/SECURITY_REVIEW.md`). The user was asked to remove `SHOW_REQUEST_IP` from the API afterwards. Check that it's gone: `/api/debug/request-ip` should answer 404.
 - **CI:** the user hasn't reported the Actions tab yet.
 
 ## What was done: the security review
@@ -64,7 +54,7 @@ Claude and Codex each reviewed the app independently. Findings were checked agai
 
 ## Still open
 
-- **F-1:** `TRUST_PROXY=3` in `render.yaml`. If fewer proxies sit in front of the API, a forged `X-Forwarded-For` escapes the login rate limit. The measurement is under way (see Waiting on the user). A per-address demo limit (the rest of C2) waits on this.
+- **C2's per-address demo limit** can go ahead now that F-1 confirmed `req.ip` is the visitor's real address.
 - **D1:** React Router is upgraded to 7, and the audit reports it clean. `maplibre-gl` stays on 5.x, whose advisory isn't reachable here, because 6.x can't be bundled by CRA (see `docs/SECURITY_REVIEW.md`). Upgrade it along with moving off CRA, for example to Vite in phase 5.
 - **Known limit:** a logged-out demo token works again if the hosted demo restarts empty and rebuilds that world. Accepted, and documented in `User.js`.
 
@@ -98,16 +88,15 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 | 2 | The design system, and every screen rebuilt on it | Done |
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done |
 | 3b | Loading skeletons and pull-to-refresh | Done |
-| — | Security review and fixes | Done, except F-1 |
+| — | Security review and fixes | Done, F-1 included |
 | 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now, and scripted demo friends | 4a on `main`; 4b on `phase-4b-presence`; 4c and 4d next (see `docs/PHASE_4_PLAN.md`) |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
 ## What comes next
 
-1. **Finish F-1** as soon as the user sends the measured values (see Waiting on the user).
-2. **Phase 4.** Follow `docs/PHASE_4_PLAN.md`:
-   - **4a is built** on `phase-4a-realtime`. Where it departs from the plan:
+1. **Phase 4.** Follow `docs/PHASE_4_PLAN.md`:
+   - **4a is built** and on `main`. Where it departs from the plan:
      - no `setupProxy.js`, since CRA's `proxy` already forwards WebSockets;
      - pruning a demo world doesn't close its sockets;
      - the chats list keeps its own 15 s poll;
@@ -115,7 +104,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
      - meetup changes poke both `live` and `event`.
 
      Deploying it needs a **Blueprint sync**, for `wss://*.onrender.com` in `connect-src`. After the deploy, the user checks the live site's console for a socket blocked by the policy.
-   - **4b is built** on `phase-4b-presence`:
+   - **4b is built** and on `main`:
      - Presence is "has a logged-in socket", with a 5 s grace on leaving.
      - It's ids only, sent only to the event's subscribers.
      - The hub learns each online person's events when their first socket logs in, and keeps them current through `dropFromEvent` and `addMember`.
@@ -130,7 +119,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
      - The API sends `Cache-Control: no-store`, logout answers 401, a socket from another site gets 403, and a 200 kB body gets 413.
    - Each gets tests, the strict build and the `reviewer` subagent before it's committed, plus screenshots for the user before any UI commit.
    - Plan the first part in plan mode, per `CLAUDE.md`.
-3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.
+2. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.
    - `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox.
    - Open the Simulator panel (`attach`) before building.
 

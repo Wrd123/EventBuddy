@@ -26,7 +26,7 @@ The serious finding was on the client: **a member's display name could run as co
 | S1 | A member's name could run as HTML in the live map's caption | High | **Fixed** on branch `fix-map-tooltip-xss` |
 | S2 | Logging out didn't invalidate a login token that was already copied | Medium | **Fixed** on branch `fix-map-tooltip-xss` |
 | S3 | Six-character and common passwords were accepted, and there was no way to change a password | Medium | **Fixed** on branch `fix-map-tooltip-xss` |
-| F-1 | `TRUST_PROXY=3` can let the login rate limit be sidestepped | Medium if the host has fewer than 3 proxies | Open; a switched-off address check is in place to measure it |
+| F-1 | `TRUST_PROXY=3` can let the login rate limit be sidestepped | Medium if the host has fewer than 3 proxies | **Resolved**: measured on Render on 27 Oct 2026, and 3 is the right count |
 | R1 | At startup, a late profile reply could show the previous account after switching accounts | Medium (correctness and privacy) | **Fixed** on branch `review-fixes-2` |
 | R2 | A late "session expired" reply for an old login logged out the new one | Low | **Fixed** on branch `review-fixes-2` |
 | R3 | A request body over 100 kB returned 500 instead of 413 | Low | **Fixed** on branch `review-fixes-2` |
@@ -95,6 +95,8 @@ The serious finding was on the client: **a member's display name could run as co
 **Fix:** set `TRUST_PROXY` to the verified hop count (often 1), and confirm `req.ip` matches the client's address. Getting it wrong on the low side is safe. Consider also limiting attempts per email address.
 
 **Tests:** the test suite turns rate limits off, so it should gain one test that runs the limiter with a fixed proxy setting.
+
+**Result (27 Oct 2026):** the measured chain is the visitor, then Cloudflare (`104.22.x`), then Render's internal network (`10.x`), then a local proxy (`::1`) in front of Node. That's three hops, so `TRUST_PROXY=3` picks the visitor's own address, and anything a client adds to `X-Forwarded-For` lands to the left of it, where it's ignored. No change was needed. `server/tests/app.test.js` now runs the real limiter behind that chain. It fails with a higher count, and the per-address demo limit that waited on F-1 (C2) can now go ahead.
 
 **Measuring it:** the API has `GET /api/debug/request-ip`, which exists only while `SHOW_REQUEST_IP=true`. It shows a caller their own address chain (`forwardedFor`, `connectedFrom`) and the `ip` the current setting picks, so the hop count comes from the real deployment rather than a guess. Turn it on, open it once, set `TRUST_PROXY`, then turn it off. It's covered by `server/tests/app.test.js`.
 

@@ -12,7 +12,7 @@ const { createDemoWorld, pruneDemoWorlds, dayIn } = require('../seed/demoData');
 const { createConcurrencyLimit } = require('../concurrencyLimit');
 const realtime = require('../realtime/hub');
 
-const { isTest, bcryptRounds } = config;
+const { bcryptRounds } = config;
 
 const router = express.Router();
 
@@ -23,7 +23,8 @@ const attemptLimiter = rateLimit({
   limit: 20,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  skip: () => isTest,
+  // Off in tests, unless a test builds an app to check the limit itself
+  skip: (req) => !req.app.get('rateLimits'),
   message: { message: 'Too many attempts. Please wait a few minutes and try again.' }
 });
 

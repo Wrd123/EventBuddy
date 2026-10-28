@@ -53,3 +53,31 @@ describe('the request address check', () => {
     assert.ok(res.body.connectedFrom);
   });
 });
+
+// The login limit, run for real (the rest of the suite skips it) behind the
+// proxy chain measured on Render on 27 Oct 2026, with TRUST_PROXY=3 as in
+// render.yaml. Node is reached from a local proxy, behind Render's internal
+// network, behind Cloudflare, which adds the visitor's address:
+//   X-Forwarded-For: <anything the client sent>, visitor, Cloudflare, Render
+// So the visitor's address decides the bucket, and whatever a client puts
+// in front of it doesn't. Each test uses its own addresses, since the
+// limiter's counts are shared by every app in this process.
+describe('the login limit behind Render', () => {
+  const behindRender = createApp({ trustProxy: 3, rateLimits: true });
+  const attempt = (visitor, claimed) => request(behindRender)
+    .post('/api/auth/login')
+    .set('X-Forwarded-For', [claimed, visitor, '104.22.118.35', '10.29.98.5'].filter(Boolean).join(', '))
+    .send({ email: 'nobody@example.com', password: 'wrong-password' });
+
+  it('stops a visitor after 20 attempts, whatever they claim to be', async () => {
+    for (let i = 0; i < 20; i += 1) await attempt('203.0.113.7', `198.51.100.${i}`).expect(401);
+    const refused = await attempt('203.0.113.7', '198.51.100.99').expect(429);
+    assert.equal(refused.body.message, 'Too many attempts. Please wait a few minutes and try again.');
+  });
+
+  it('counts each visitor on their own', async () => {
+    for (let i = 0; i < 20; i += 1) await attempt('203.0.113.8').expect(401);
+    await attempt('203.0.113.8').expect(429);
+    await attempt('203.0.113.9').expect(401);
+  });
+});

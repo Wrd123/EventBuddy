@@ -13,10 +13,16 @@ const config = require('./config');
 const { clientOrigin, demoMode } = config;
 
 // Builds the Express app without starting it, so tests can call it directly.
-// Tests can also set the proxy settings, which otherwise come from config.
-const createApp = ({ trustProxy = config.trustProxy, showRequestIp = config.showRequestIp } = {}) => {
+// Tests can also set the proxy settings, which otherwise come from config,
+// and switch the login limit back on (rateLimits), which tests otherwise skip.
+const createApp = ({
+  trustProxy = config.trustProxy,
+  showRequestIp = config.showRequestIp,
+  rateLimits = !config.isTest
+} = {}) => {
   const app = express();
   app.set('trust proxy', trustProxy);
+  app.set('rateLimits', rateLimits);
 
   app.use(helmet());
   // Answers are about one person (their plans, chats, money, where friends

@@ -29,7 +29,9 @@ services:
       - key: MONGOMS_DOWNLOAD_DIR
         value: /opt/render/project/src/server/.mongodb-binaries
       # Proxy hops in front of the app, so login limits see the visitor's
-      # address. Erring high only matters to someone faking the header.
+      # address. Measured on 27 Oct 2026: a local proxy, Render's internal
+      # network and Cloudflare. If Render's setup changes, measure again
+      # (SHOW_REQUEST_IP, see docs/SECURITY_REVIEW.md F-1).
       - key: TRUST_PROXY
         value: "3"
       # The web app's address, e.g. https://eventbuddy.onrender.com
