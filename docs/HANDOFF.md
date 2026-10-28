@@ -1,13 +1,14 @@
 # Handoff: where EventBuddy stands (28 Oct 2026)
 
 `CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what's done, what's next, and the traps.
-- **`docs/FINISH_PLAN.md` sets the order of work now.** Items 1 and 2 are done and deployed; **item 3, the compact activity feed (Phase 4c), is next**.
-- `docs/PHASE_4_PLAN.md` is the plan for Phase 4. Its 4a and 4b parts are built; where the build departed from it, this note says so.
+- **`docs/FINISH_PLAN.md` sets the order of work now.** Items 1 and 2 are done and deployed. Item 3, the compact activity feed (Phase 4c), is done and committed but not pushed. **Item 4, scripted demo friends (Phase 4d), is next.**
+- `docs/PHASE_4_PLAN.md` is the plan for Phase 4. Its 4a, 4b and 4c parts are built; where the build departed from it, this note says so.
 
 ## State
 
 - **Git:**
-  - GitHub's `main` is at `4da7140a` (the demo pass), plus this note's commit once it's pushed.
+  - GitHub's `main` is at `54dc0977` (the last handoff) if the user pushed it.
+  - **`activity-feed`** (local only) has 4c (`fc591c4a`) and this handoff on top. Local `main` is behind it. The user pushes it with `git push origin activity-feed:main`.
   - The user pushes with `git push origin <branch>:main`, so **local `main` can lag behind**. Bring it level with `git switch main && git merge --ff-only origin/main` (or the branch), and check `git rev-list --left-right --count origin/main...main` before trusting this.
   - CI wasn't checked for the 28 Oct pushes. Ask the user to look at the Actions tab.
 - **Deployed on Render:**
@@ -17,7 +18,7 @@
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 373 server tests, 484 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 396 server tests, 511 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -30,7 +31,7 @@
   - the darkened Liberty map in WKWebView
   - **the socket from the iPhone app:** what Origin its WebView sends. It must be in `CLIENT_ORIGIN`.
 - **Branches:**
-  - Locally: `main`, plus `expense-retry`, `chat-read` and `demo-polish`. All three are already in GitHub's `main`, so `git branch -d` can tidy them once local `main` has caught up.
+  - Locally: `main`, `activity-feed` (4c, not pushed), plus `expense-retry`, `chat-read` and `demo-polish`. Those three are already in GitHub's `main`, so `git branch -d` can tidy them once local `main` has caught up.
   - `origin/phase-3b` still exists on GitHub. Deleting it would be a push, so leave it to the user.
   - `.git/config` has three harmless stale `vscode-merge-base` lines. The sandbox can't edit that file.
 - **Local servers:**
@@ -41,6 +42,7 @@
 
 ## Waiting on the user
 
+- **Push `activity-feed`** (`git push origin activity-feed:main`), then redeploy the API for it. Check: a new demo world's picnic page shows "Recent activity" with "Taylor set the meetup point" on top.
 - **Redeploy `eventbuddy-api` for `4da7140a`**, if it hasn't been done. Without it, the live picnic has no schedule or costs, and Discover's not-configured message is the old one.
   - Check: a new demo world's "Picnic in the Park" should have 4 schedule items.
 - **Turn on Auto-Deploy for `eventbuddy-api`** (Settings → Build & Deploy), so this stops being a manual step.
@@ -68,6 +70,22 @@
   - "A short list of payments" in the README and `ledger.js`. A test pins the greedy method's 4-where-3-would-do case.
   - The README says US dollars only, times local to the event, and money moves in the payment apps.
   - Discover's not-configured message no longer mentions API keys.
+
+**Finish plan, item 3: Phase 4c, the compact activity feed (28 Oct, committed as `fc591c4a`, not pushed).** The plan was revised after a Codex review before building, and the `reviewer` subagent checked the diff.
+- **Server:**
+  - `models/Activity.js`: `kind` is an enum, and `data` is a strict sub-schema (title, description, amount, from/to, changed field names), so a position or meetup note can't be stored. An empty `data` isn't stored at all, so `joined` lines arrive without one. The 30-day TTL is only housekeeping; reads don't filter on it.
+  - `activityLog.js`: `record`, `follow` and `forget` all go through `bounded()`, which waits at most `timing.waitMs` (2 s), logs failures and never throws. A line that lands late pokes `event` itself. **This reverses the finish plan's "No timeout"**, because expense and payment routes record inside the ledger lock.
+  - **Lines follow their subject:** deleting an expense, payment or plan removes its line, and renaming or re-pricing one updates it. Accepted and documented: a line that lands after the deadline can outlive a delete made in that window.
+  - **Only real changes count:** expense and payment creates only when `created`, joins only when `modifiedCount > 0`, event edits only for fields `isModified` before the save. Sharing counts only on a start: `live.js` deletes an expired leftover share, then `findOneAndUpdate` with `returnDocument: 'before'`, and it's a start when there was none or it had run out. That also stops a restart showing the old position. A start pokes `event` too.
+  - **Not recorded, on purpose:** organizer removals, Going, meetup clearing, schedule location edits.
+  - `GET /api/events/:id/activity?before=<id>` (`routes/activity.js`): 20 a page, newest first, members only.
+  - The demo seed gives each world a picnic history (joins, Taylor's four plans, both expenses, three shares starting, the meetup at its `setAt`) and three festival lines. The prune deletes them.
+- **App:**
+  - `utils/activity.js`: the sentences, plus `mergeNewest`, `appendOlder` and `clearFeed`. The fresh newest page is the truth for its range. A page that doesn't reach the loaded lines replaces the list. The tail's `hasMore` survives refreshes. `gen` drops an older page asked for before a replace.
+  - `hooks/useActivity.js`: a 404 means access is lost. It clears the lines and calls `freshness.changed()`, so nothing on its way can restore them. Other failures keep what's shown.
+  - EventDetails shows "Recent activity" under Who's going: the newest two lines, each truncated to one line. See all (only when there are more than two) opens `ActivitySheet` with Show earlier. The sheet closes for good when access goes.
+  - Payments read "Alex recorded a payment of $80.00 to you" (or "from"). That avoids "a/an $80" and names whoever tapped Mark paid.
+- **Checked live** on the isolated API and production build: a new line arrived by poke within 1.5 s, deleting its expense removed it, there were no CSP errors, and 125% text still keeps one line each. The user saw screenshots.
 
 **Security review** (Claude and Codex independently, then fixes with tests). `docs/SECURITY_REVIEW.md` is the full record.
 
@@ -138,6 +156,7 @@ Each was checked against the code first, and each got a test that fails on the o
 - **No pull to refresh on Chat, Map, the forms or Profile.**
 - **Logging out ends the login on every device.** There's one session version per person, not per device.
 - **No rules about digits or symbols in passwords.** Length and the common-password list are the rule.
+- **The activity feed (28 Oct):** two lines plus See all; organizer removals aren't announced; a line follows its subject (deleted with it, updated with it) rather than being strict history; the write waits at most 2 s; payments say "recorded a payment". The user approved these with the plan.
 
 ## The roadmap
 
@@ -150,7 +169,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done |
 | 3b | Loading skeletons and pull-to-refresh | Done |
 | — | Security review and fixes | Done, F-1 included |
-| 4 | Real time: pokes, who's here now, an activity feed, scripted demo friends | 4a and 4b done and deployed; 4c (compact) and 4d follow the finish plan's first two items |
+| 4 | Real time: pokes, who's here now, an activity feed, scripted demo friends | 4a and 4b deployed; 4c committed, not pushed; 4d next |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
@@ -159,35 +178,18 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 Follow `docs/FINISH_PLAN.md`, in order:
 1. ~~Correctness~~ (done).
 2. ~~The demo and copy pass~~ (done).
-3. **4c, compact. Next** (notes below). Plan it in plan mode first.
-4. **4d** (notes below).
+3. ~~4c, compact~~ (done, see What was done).
+4. **4d. Next** (notes below). Plan it in plan mode first.
 5. **The abuse backlog:** a per-visitor demo budget and a socket queue budget.
 6. **Playwright against a real API, the Simulator pass, and the user's physical-iPhone location check.**
 7. **Rehearse and package.**
 
 Notes for the Phase 4 items:
 
-1. **Phase 4c, the activity feed** ("Taylor set the meetup point"). Plan it in plan mode first, per `CLAUDE.md`; `docs/PHASE_4_PLAN.md` § 4c is the starting point. The finish plan changes it:
-   - a compact entry on EventDetails (one or two lines plus See all) instead of five rows;
-   - no meetup note or coordinates;
-   - `record` awaited and never failing the write;
-   - the list replaced when a fresh page doesn't overlap.
-   - **Server:**
-     - `models/Activity.js` (`{ event, actor, kind, data, createdAt }`, indexed by `{ event, _id }`, with a 30-day TTL).
-     - A `record(event, user, kind, data)` called beside each poke.
-     - `GET /api/events/:id/activity?before=<id>`, members only through `findVisibleEvent`, 20 per page, paged by id like chat.
-     - Seed the demo data with a short, believable history that matches what's there now. The picnic now has its schedule (set up by the lake, lunch, frisbee, sunset walk) and two expenses: Taylor's Snacks & drinks and John's Blanket & frisbee.
-   - **Where to record:**
-     - Most writes under `/api/events/:id/...` already pass through `pokeOnSuccess` in `routes/events.js`, but recording needs the route's own details (an item's title, an amount), so `record` belongs in each route.
-     - Joins and removals go through `routes/invites.js` and the members route in `routes/events.js`, beside `addMember` and `dropFromEvent`.
-     - After recording, poke `event`, so EventDetails (which listens to `event` and `chat`) reads the feed again.
-   - **App:**
-     - `utils/activity.js` turns a kind into a sentence, with money through `utils/money.js`, and gets a unit test.
-     - A compact "Recent activity" entry on EventDetails (the newest one or two), and "See all" opens the shared `Sheet` with paging.
-     - Names are user input, so render text only and test a name with markup in it, like the GroupChat "Here now" test.
-   - **Then:** both suites, `CI=true npm run build`, the `reviewer` subagent, screenshots to the user before committing, and a commit on its own branch.
-2. **Phase 4d, scripted demo friends** (`server/src/realtime/demoFriends.js`, see the plan). Label them as simulated. The friends can show as here by joining `state.memberships` the way an arriving socket does, and should act through the same routes or models with `notifyEvent`/`record`. Never for real accounts.
-3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form, the Liberty map, and now the socket and its Origin.
+1. **Phase 4d, scripted demo friends** (`server/src/realtime/demoFriends.js`, see the plan and finish-plan item 4). Label them as simulated. The friends can show as here by joining `state.memberships` the way an arriving socket does.
+   - They should act through the same models plus `record` (from `activityLog.js`) and `notifyEvent`, so their actions land in the feed and poke like a person's. Money writes must go through `withEventLock`.
+   - Only inside the visitor's own demo world, stopping when the owner leaves, never twice after a reconnect. Never for real accounts; a test guards that.
+2. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form, the Liberty map, and now the socket and its Origin.
    - `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox.
    - Open the Simulator panel (`attach`) before building.
 
@@ -244,6 +246,8 @@ Notes for the Phase 4 items:
   - `friendShareEndsInMs` sets when Alex's live share ends; `moveFriend(eventId, user, { lat, lng })` moves him.
   - Jest 27 here has no `advanceTimersByTimeAsync`, and a zero-delay timer created inside `advanceTimersByTime(0)` doesn't fire. Advance a few milliseconds instead.
   - `holdNext`, `delayNext` and `failNext(method, path, status)` for slow and failing requests.
+  - Activity: event 1 starts with three lines by Alex (joined, Arctic Monkeys, the Airbnb). `addActivity(eventId, { kind, data, actor })`, `removeActivity(eventId, id)`, and `activity: { eventId: [lines, oldest first] }` to replace them (`{}` for none). `failNext('GET', '/events/1/activity', 404)` cuts off only the feed.
+- **Activity on the server:** the feed only reads again on an `event` poke (or the 60 s safety poll), so a new kind of line needs a route that pokes `event`. Tests can shorten `timing.waitMs` from `activityLog.js` and stub `Activity.create` with `t.mock.method`.
   - `changeEvent` and `removeEvent` simulate another person's edits.
   - Options include `demoAccount` (a demo account, with no password form) and failure options such as `stopShareFails` and `paymentOutcomes`.
   - `POST /auth/password` accepts the current password `password`, and refuses `password1` as common.

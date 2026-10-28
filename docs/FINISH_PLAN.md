@@ -16,12 +16,12 @@ The scope stays the same: a $0 portfolio showcase for friends planning trips, wi
    - Fix the settle-up claim. `settleUp` is greedy and isn't always the fewest payments (owed $6/$4, owing $4/$3/$3 gives 4 payments where 3 would do), so the README and the comment should say "a short list of payments". Don't build a minimum solver.
    - Take the "Add a Ticketmaster API key" setup sentence (`server/src/discover/ticketmaster.js`) out of what visitors see.
    - *Edit:* times and currency get one README line ("times are local to the event; US dollars only") and tests only where a real bug turns up. No general time-zone work.
-3. **4c, the activity feed, in its compact form.**
+3. **4c, the activity feed, in its compact form.** Done 28 Oct (`fc591c4a`).
    - On EventDetails, one or two lines plus **See all**, which opens the shared `Sheet`. It doesn't compete with the four actions.
    - Actors come from the server, and everything renders as text.
    - No coordinates and no meetup note in the history.
    - Removed members get 404.
-   - *Edit:* `record` is awaited before the response, so the `event` poke that follows always finds the new line, and a failed record never fails the write. No timeout.
+   - *Edit:* `record` is awaited before the response, so the `event` poke that follows always finds the new line, and a failed record never fails the write. ~~No timeout.~~ Reversed on 28 Oct after Codex's review of the 4c plan: the wait is bounded at 2 s, because expense and payment routes record inside the per-event ledger lock. A line that lands later pokes `event` itself.
    - *Edit:* if a fresh newest page doesn't overlap the pages already loaded (more than a page arrived while away), it replaces the list instead of leaving a gap.
    - If this grows much beyond that, defer it rather than lower the bar.
 4. **4d, scripted demo friends.**
