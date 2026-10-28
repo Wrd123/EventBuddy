@@ -98,6 +98,7 @@ Each was checked against the code first, and each got a test that fails on the o
 - the organizer can't leave; they delete the event
 - freshness uses polling. Phase 4 adds WebSockets that only *poke* the app to read again, with polling kept as the fallback (see `docs/PHASE_4_PLAN.md`)
 - **Phase 4 includes scripted demo friends**, so a reviewer alone in a demo world sees real time happen. The user chose this on 27 Oct 2026.
+- **The finish plan (adopted 27 Oct 2026):** finish the core journey before adding to it, in the order in `docs/FINISH_PLAN.md`. 4c comes after the two correctness fixes and the demo pass, in a compact form, and 4d stays.
 - no React Query; the small `freshness.js` rule is deliberate
 - the map's bottom panel is not a Sheet
 - expense and schedule forms close instantly after saving
@@ -118,14 +119,28 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done |
 | 3b | Loading skeletons and pull-to-refresh | Done |
 | — | Security review and fixes | Done, F-1 included |
-| 4 | Real time: pokes, who's here now, an activity feed, scripted demo friends | 4a and 4b done and deployed; **4c next**, then 4d |
+| 4 | Real time: pokes, who's here now, an activity feed, scripted demo friends | 4a and 4b done and deployed; 4c (compact) and 4d follow the finish plan's first two items |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
 ## What comes next
 
-1. **Phase 4c, the activity feed** ("Taylor set the meetup point"). Plan it in plan mode first, per `CLAUDE.md`; `docs/PHASE_4_PLAN.md` § 4c is the starting point.
-   - **Server:**
+Follow `docs/FINISH_PLAN.md`, in order:
+1. **Correctness:** retry-safe expense creates (on branch `expense-retry`), then chat marked read only up to what you've seen.
+2. **The demo and copy pass:** the temporary-sample notice, a picnic with a schedule and ledger, an honest startup state, the settle-up wording, and no Ticketmaster setup sentence for visitors.
+3. **4c, compact** (notes below).
+4. **4d** (notes below).
+5. **The abuse backlog:** a per-visitor demo budget and a socket queue budget.
+6. **Playwright against a real API, the Simulator pass, and the user's physical-iPhone location check.**
+7. **Rehearse and package.**
+
+Notes for the Phase 4 items:
+
+1. **Phase 4c, the activity feed** ("Taylor set the meetup point"). Plan it in plan mode first, per `CLAUDE.md`; `docs/PHASE_4_PLAN.md` § 4c is the starting point. The finish plan changes it:
+   - a compact entry on EventDetails (one or two lines plus See all) instead of five rows;
+   - no meetup note or coordinates;
+   - `record` awaited and never failing the write;
+   - the list replaced when a fresh page doesn't overlap.   - **Server:**
      - `models/Activity.js` (`{ event, actor, kind, data, createdAt }`, indexed by `{ event, _id }`, with a 30-day TTL).
      - A `record(event, user, kind, data)` called beside each poke.
      - `GET /api/events/:id/activity?before=<id>`, members only through `findVisibleEvent`, 20 per page, paged by id like chat.
@@ -136,16 +151,16 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
      - After recording, poke `event`, so EventDetails (which listens to `event` and `chat`) reads the feed again.
    - **App:**
      - `utils/activity.js` turns a kind into a sentence, with money through `utils/money.js`, and gets a unit test.
-     - A "Recent activity" section on EventDetails shows the newest 5, and "See all" opens the shared `Sheet` with paging.
+     - A compact "Recent activity" entry on EventDetails (the newest one or two), and "See all" opens the shared `Sheet` with paging.
      - Names are user input, so render text only and test a name with markup in it, like the GroupChat "Here now" test.
    - **Then:** both suites, `CI=true npm run build`, the `reviewer` subagent, screenshots to the user before committing, and a commit on its own branch.
-2. **Phase 4d, scripted demo friends** (`server/src/realtime/demoFriends.js`, see the plan). The friends can show as here by joining `state.memberships` the way an arriving socket does, and should act through the same routes or models with `notifyEvent`/`record`. Never for real accounts.
+2. **Phase 4d, scripted demo friends** (`server/src/realtime/demoFriends.js`, see the plan). Label them as simulated. The friends can show as here by joining `state.memberships` the way an arriving socket does, and should act through the same routes or models with `notifyEvent`/`record`. Never for real accounts.
 3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form, the Liberty map, and now the socket and its Origin.
    - `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox.
    - Open the Simulator panel (`attach`) before building.
 
 **Later:**
-- Optimistic creates for expenses and schedule items, once there's a server `clientId` for both.
+- Optimistic creates for expenses and schedule items, once there's a server `clientId` for both (expenses get theirs in finish-plan item 1).
 - The sheets need a check with a real phone keyboard, enlarged text and VoiceOver on a device.
 
 ## Traps

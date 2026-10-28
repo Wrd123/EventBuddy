@@ -2,7 +2,7 @@
 
 Worked out on 27 Oct 2026. The user agreed the direction and chose the scripted demo friends (4d).
 
-**Status:** 4a (pokes) and 4b (who's here now) are built, deployed and checked live; `docs/HANDOFF.md` lists where they departed from this plan. **4c (the activity feed) is next**, then 4d. Check the code before following a detail here, since things have moved.
+**Status:** 4a (pokes) and 4b (who's here now) are built, deployed and checked live; `docs/HANDOFF.md` lists where they departed from this plan. 4c (the activity feed) and 4d now follow the first two items of `docs/FINISH_PLAN.md`, and 4c is built in the compact form described there. Check the code before following a detail here, since things have moved.
 
 ## Why
 
@@ -123,6 +123,12 @@ Why:
 - **A "Recent activity" section on EventDetails** shows the newest 5. "See all" opens the shared `Sheet` with paging.
   - It's rendered as text only.
   - Names are user input, so add a test with markup in a name, like `MapCanvas.tooltip.test.js`.
+
+**Changed by the finish plan:**
+- EventDetails gets a compact entry (the newest one or two lines plus See all), not five rows.
+- `meetup_set` keeps no note and no coordinates.
+- `record` is awaited before the response, so the poke after it finds the new line, and a failed record never fails the write.
+- A fresh newest page that doesn't overlap what's loaded replaces the list, so there's no gap.
 
 **Seed:** give the demo data (`server/src/seed/demoData.js`) a short, believable history.
 
