@@ -103,7 +103,7 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
      - the events list hears `events` pokes but keeps its 30 s pace;
      - meetup changes poke both `live` and `event`.
 
-     Deploying it needs a **Blueprint sync**, for `wss://*.onrender.com` in `connect-src`. After the deploy, the user checks the live site's console for a socket blocked by the policy.
+     It's deployed: the Blueprint sync added `wss://*.onrender.com` to `connect-src`, and the live socket connects.
    - **4b is built** and on `main`:
      - Presence is "has a logged-in socket", with a 5 s grace on leaving.
      - It's ids only, sent only to the event's subscribers.
