@@ -1,6 +1,8 @@
 # Phase 4 plan: real time
 
-Worked out on 27 Oct 2026 and not started yet. The user agreed the direction and chose the scripted demo friends (4d). Check the code before following a detail here, since things may have moved.
+Worked out on 27 Oct 2026. The user agreed the direction and chose the scripted demo friends (4d).
+
+**Status:** 4a (pokes) and 4b (who's here now) are built, deployed and checked live; `docs/HANDOFF.md` lists where they departed from this plan. **4c (the activity feed) is next**, then 4d. Check the code before following a detail here, since things have moved.
 
 ## Why
 

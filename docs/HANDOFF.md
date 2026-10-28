@@ -1,61 +1,90 @@
 # Handoff: where EventBuddy stands (27 Oct 2026)
 
-`CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what was just finished, what's waiting on the user, what comes next, and the traps to avoid. The next big piece, Phase 4, has its own plan in `docs/PHASE_4_PLAN.md`.
+`CLAUDE.md` has the stack, commands, conventions and the permission boundaries. This note covers what's done, what's next (**Phase 4c, the activity feed**), and the traps. `docs/PHASE_4_PLAN.md` is the plan for Phase 4. Its 4a and 4b parts are built; where the build departed from it, this note says so.
 
 ## State
 
-- **Git, when this note was written:**
-  - `main` and GitHub's `main` are both at `41d05175`: Phases 4a (pokes) and 4b (who's here now), plus the fixes for Codex's review of `45390d63` (WS-1, sockets close when their token expires, and L-1, the map's share-expiry clock; see `docs/SECURITY_REVIEW.md`). The user pushed it on 27 Oct 2026, and CI passed.
-  - Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting any of this.
-- **Deployed on Render:**
-  - Both services run `41d05175`. The web app had been current, but the API was stuck on `f2e16a0` until a manual deploy on 27 Oct 2026 (see below).
-  - **The Content Security Policy is live**, checked by the user on 27 Oct 2026: the headers are there, and the app and map work under them.
-- **Render needs a redeploy** of both services after each push.
-  - **The API doesn't deploy itself.** Until 27 Oct 2026 it was still on `f2e16a0` from 24 Oct, 63 commits behind `main`: every push since had deployed only the web app, so none of the security fixes were live on the API. Its **Auto-Deploy** setting (Settings → Build & Deploy) needs checking by the user.
-  - After a deploy, check the live API itself, not the dashboard: `/api/health` should carry `Cache-Control: no-store`, and `POST /api/auth/logout` with no login should answer 401.
-  - **A change to `render.yaml` itself (headers, environment) also needs a Blueprint sync** in the Render dashboard: Blueprints → Manual Sync.
-  - A redeploy alone doesn't re-read `render.yaml`, which is why the policy first went out missing.
-- **The map** uses OpenFreeMap's Liberty style, darkened. The map screen's bottom sheet no longer gets covered by the map (see Decisions).
-- **CI for the pushed commits hasn't been checked.** `gh` can't reach GitHub from the sandbox (see Traps), so ask the user to look at the Actions tab.
-- **Tests (on `fix-realtime-expiry`):** 360 server tests, 468 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Git:** `main` and GitHub's `main` are at `4e413b19`, plus this note's own commit once it's merged and pushed. CI passed for everything up to `41d05175`. The user checked the Actions tab on 27 Oct 2026. Check `git status` and `git rev-list --left-right --count origin/main...main` before trusting this.
+- **Deployed on Render (checked live on 27 Oct 2026):**
+  - Both services run Phase 4, the expiry fixes and every earlier security fix.
+  - The socket connects (`101` in the browser), under the Content Security Policy.
+  - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
+  - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
+- **Tests:** 362 server tests, 468 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
-- **`npm audit --omit=dev`:** the server reports nothing. The app reports only `maplibre-gl` (see D1).
-  - `react-scripts` is a dev dependency, so CRA's dev-server advisories (`webpack-dev-server`, `proxy-addr`, `websocket-driver` and the rest) only show in the full `npm audit`.
+- **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
+  - `react-scripts` is a dev dependency, so CRA's dev-server advisories only show in the full `npm audit`.
   - None of it ships in the built site.
 - **Not checked on a device:**
   - the iOS build, haptics and pull-to-refresh in WKWebView
   - the sheets with a real keyboard, enlarged text or VoiceOver
   - the Profile password form
   - the darkened Liberty map in WKWebView
+  - **the socket from the iPhone app:** what Origin its WebView sends. It must be in `CLIENT_ORIGIN`.
 - **Branches:**
-  - All merged local branches are deleted.
+  - Only `main` locally.
   - `origin/phase-3b` still exists on GitHub. Deleting it would be a push, so leave it to the user.
-  - `.git/config` has three harmless stale `vscode-merge-base` lines for deleted branches. The sandbox can't edit that file.
-- **No test servers are running**, and the `build-csp` and `web-3999-pentest` launch entries are removed. Start a fresh isolated API as described under Traps when one is needed.
+  - `.git/config` has three harmless stale `vscode-merge-base` lines. The sandbox can't edit that file.
+- **Local servers:**
+  - None of Claude's are running.
+  - `.claude/launch.json` (gitignored) has `rt-api-4150`, an isolated demo API, and `rt-web-3999`, the production build served with the real headers against it. Rebuild first with `INLINE_RUNTIME_CHUNK=false REACT_APP_API_URL=http://localhost:4150/api npm run build`.
+  - A stray API process may still be running from the 4a session (PID 66908, no port). The user was told `kill 66908` stops it.
 
 ## Waiting on the user
 
-- **F-1 is resolved.** It was measured on Render on 27 Oct 2026, and `TRUST_PROXY=3` is right (see `docs/SECURITY_REVIEW.md`). The user was asked to remove `SHOW_REQUEST_IP` from the API afterwards. Check that it's gone: `/api/debug/request-ip` should answer 404.
-- **CI:** the user hasn't reported the Actions tab yet.
+- **Turn on Auto-Deploy for `eventbuddy-api`** (Settings → Build & Deploy). Until 27 Oct 2026 the API had sat on `f2e16a0` from 24 Oct, 63 commits behind, because pushes only deployed the web app.
+- That's all. F-1 is resolved (see below).
 
-## What was done: the security review
+## What was done
 
-Claude and Codex each reviewed the app independently. Findings were checked against the code, then fixed with tests. `docs/SECURITY_REVIEW.md` is the full write-up and the record of what's fixed and what's open.
+**Security review** (Claude and Codex independently, then fixes with tests). `docs/SECURITY_REVIEW.md` is the full record.
 
 | | What changed | Where |
 |---|---|---|
-| S1 | A member's name could run as code in the map's friend captions, because Leaflet treats string tooltips as HTML. Captions are now text nodes. | `components/map/MapCanvas.js`, `MapCanvas.tooltip.test.js` (real Leaflet) |
-| S2 | Logout ends the session on the server. Each user has a `sessionVersion` and every token carries `sv`. Logout and password changes bump it, which logs out every device. Tokens without `sv` count as 0. | `server/src/middleware/auth.js`, `models/User.js`, `POST /api/auth/logout`, `Profile.js` (`useLogOut`) |
-| S3 | Passwords need at least 8 characters. A local common-password list is refused, and so is a password equal to the email or username. `POST /api/auth/password` and a Profile form, hidden for demo accounts (`user.isDemo`). | `server/src/validation.js`, `commonPasswords.js`, `routes/auth.js`, `utils/password.js` |
-| R1, R2 | Late auth answers from an older login are ignored. `api.js` only treats a 401 as session-ended for the token still stored. A 401 for a token being replaced by a password change waits for the change's answer. | `services/api.js`, `context/AppContext.js` (startup check) |
-| R3, H1, C2 | Oversized bodies get 413. Every API response is `Cache-Control: no-store`. At most 5 demo worlds are built at once; more get a 503. | `middleware/errorHandler.js`, `app.js`, `concurrencyLimit.js` |
-| CSP | A strict policy for the web page, plus `nosniff` and a referrer policy. Scripts and styles come only from the app itself, with nothing inline. | `render.yaml` `headers`, `scripts/serve-build.js`, `scripts/serve-build.test.js` |
+| S1 | Map captions are text nodes, so a member's name can't run as code | `components/map/MapCanvas.js`, `MapCanvas.tooltip.test.js` |
+| S2 | Logout and password changes bump the user's `sessionVersion`, ending every token they hold | `middleware/auth.js`, `models/User.js`, `routes/auth.js` |
+| S3 | 8+ characters, a local common-password list, not the email or username, and a Profile form to change it | `validation.js`, `commonPasswords.js`, `utils/password.js` |
+| R1, R2 | Late auth answers from an older login are ignored | `services/api.js`, `context/AppContext.js` |
+| R3, H1, C2 | 413 for oversized bodies, `no-store` everywhere, at most 5 demo worlds built at once | `errorHandler.js`, `app.js`, `concurrencyLimit.js` |
+| CSP | A strict page policy with nothing inline, now allowing `wss://*.onrender.com` | `render.yaml`, `scripts/serve-build.*` |
+| F-1 | Measured on Render: Cloudflare → Render's network → a local proxy, so `TRUST_PROXY=3` is right. A test runs the real login limit behind that chain. | `render.yaml` comment, `server/tests/app.test.js` |
+
+**Phase 4a, pokes** (`server/src/realtime/hub.js`, `src/services/realtime.js`, `src/hooks/usePolling.js`). One WebSocket per login at `/api/socket`, open only while the app is on screen.
+- It never carries data: `{type:'changed', eventId, what}` makes the app run the REST read it already polls with.
+- How it's secured:
+  - The login is the first message (never the URL), checked by the shared `authenticate()`.
+  - Subscribing goes through `findVisibleEvent`.
+  - Removal, deletion, logout and password changes take access away at once.
+- Limits: 1 kB messages, 5 sockets per person, 20 subscriptions and 20 refusals per socket, 500 sockets in all.
+- Polling slows to 60 s for a topic once the server confirms its subscription, and returns, with a catch-up read, when the socket drops or comes back.
+- Departures from the plan:
+  - no `setupProxy.js`, since CRA's `proxy` already forwards WebSockets;
+  - pruning a demo world doesn't close sockets;
+  - the chats list keeps its own 15 s poll;
+  - the events list hears `events` pokes but keeps its 30 s pace;
+  - meetup changes poke both `live` and `event`;
+  - EventDetails' summary listens to `event` and `chat`.
+
+**Phase 4b, who's here now** (`usePresence(eventId)`). A member is here while they have a logged-in socket.
+- The hub sends `{type:'presence', eventId, userIds}` to that event's subscribers only:
+  - on subscribe,
+  - when someone arrives,
+  - and 5 s after their last socket closes. Logging out or a token running out ends it at once.
+- Where it shows: a `go` dot on avatars in Who's going, a "Here now: …" line under the chat header, and "Here now •" on the map's friend panel. The user saw screenshots.
+
+**Fixes from Codex's review of `45390d63`:**
+- **WS-1:** a socket now closes when its token expires, and nothing is sent to it after that.
+- **L-1:** the map hides an expired share on time; `useLive` uses the current clock.
+
+Each was checked against the code first, and each got a test that fails on the old code.
 
 ## Still open
 
 - **C2's per-address demo limit** can go ahead now that F-1 confirmed `req.ip` is the visitor's real address.
-- **D1:** React Router is upgraded to 7, and the audit reports it clean. `maplibre-gl` stays on 5.x, whose advisory isn't reachable here, because 6.x can't be bundled by CRA (see `docs/SECURITY_REVIEW.md`). Upgrade it along with moving off CRA, for example to Vite in phase 5.
+- **D1:** `maplibre-gl` stays on 5.x, because 6.x can't be bundled by CRA; its advisory isn't reachable here. Upgrade it along with moving off CRA (Vite, in phase 5).
+- **Socket hardening backlog** (from Codex): a budget for queued inbound messages per socket, and the iPhone WebView's real Origin (see State).
+- **The map's first fit can tuck a friend's pin under the bottom sheet's edge.** It was there before Phase 4, and was found during the 4b screenshots.
 - **Known limit:** a logged-out demo token works again if the hosted demo restarts empty and rebuilds that world. Accepted, and documented in `User.js`.
 
 ## Decisions already made (don't reopen them)
@@ -89,37 +118,29 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
 | 3 | Feel: transitions, draggable sheets, optimistic UI, haptics, with D5, D1 and D4 | Done |
 | 3b | Loading skeletons and pull-to-refresh | Done |
 | — | Security review and fixes | Done, F-1 included |
-| 4 | Real time: WebSockets for chat and locations, an activity feed ("Taylor set the meetup point"), who's in the app now, and scripted demo friends | 4a on `main`; 4b on `phase-4b-presence`; 4c and 4d next (see `docs/PHASE_4_PLAN.md`) |
+| 4 | Real time: pokes, who's here now, an activity feed, scripted demo friends | 4a and 4b done and deployed; **4c next**, then 4d |
 | 5 | Engineering: TypeScript, Playwright, Lighthouse and accessibility scores, Sentry, a keep-awake ping | Planned |
 | 6 | Day-of mode, the signature feature: during an event, one screen with where everyone is, what's next and who owes what. Then a README case study and a demo video | Planned |
 
 ## What comes next
 
-1. **Phase 4.** Follow `docs/PHASE_4_PLAN.md`:
-   - **4a is built** and on `main`. Where it departs from the plan:
-     - no `setupProxy.js`, since CRA's `proxy` already forwards WebSockets;
-     - pruning a demo world doesn't close its sockets;
-     - the chats list keeps its own 15 s poll;
-     - the events list hears `events` pokes but keeps its 30 s pace;
-     - meetup changes poke both `live` and `event`.
-
-     It's deployed: the Blueprint sync added `wss://*.onrender.com` to `connect-src`, and the live socket connects.
-   - **4b is built** and on `main`:
-     - Presence is "has a logged-in socket", with a 5 s grace on leaving.
-     - It's ids only, sent only to the event's subscribers.
-     - The hub learns each online person's events when their first socket logs in, and keeps them current through `dropFromEvent` and `addMember`.
-     - `usePresence(eventId)` gives the others who are here.
-   - Build 4c (the activity feed) and 4d (scripted demo friends) next, each on its own branch. 4d's friends can show as here by joining `state.memberships` the way a socket does.
-   - **The map's first fit can put a friend's pin right under the bottom sheet's edge.** That was there before 4b; found during the 4b screenshots.
-   - **Hardening backlog from Codex's review:**
-     - a per-socket budget for queued inbound messages. The 1 kB frame limit and the socket cap don't bound how many small messages queue up.
-     - a check of what Origin the iPhone app's WebView really sends. It must be in `CLIENT_ORIGIN`, so don't assume it sends none.
-   - **Deployed and checked live on 27 Oct 2026:**
-     - The socket connects (`101` in the browser).
-     - The API sends `Cache-Control: no-store`, logout answers 401, a socket from another site gets 403, and a 200 kB body gets 413.
-   - Each gets tests, the strict build and the `reviewer` subagent before it's committed, plus screenshots for the user before any UI commit.
-   - Plan the first part in plan mode, per `CLAUDE.md`.
-2. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form and the Liberty map. It can come before or after Phase 4, as the user prefers.
+1. **Phase 4c, the activity feed** ("Taylor set the meetup point"). Plan it in plan mode first, per `CLAUDE.md`; `docs/PHASE_4_PLAN.md` § 4c is the starting point.
+   - **Server:**
+     - `models/Activity.js` (`{ event, actor, kind, data, createdAt }`, indexed by `{ event, _id }`, with a 30-day TTL).
+     - A `record(event, user, kind, data)` called beside each poke.
+     - `GET /api/events/:id/activity?before=<id>`, members only through `findVisibleEvent`, 20 per page, paged by id like chat.
+     - Seed the demo data with a short, believable history.
+   - **Where to record:**
+     - Most writes under `/api/events/:id/...` already pass through `pokeOnSuccess` in `routes/events.js`, but recording needs the route's own details (an item's title, an amount), so `record` belongs in each route.
+     - Joins and removals go through `routes/invites.js` and the members route in `routes/events.js`, beside `addMember` and `dropFromEvent`.
+     - After recording, poke `event`, so EventDetails (which listens to `event` and `chat`) reads the feed again.
+   - **App:**
+     - `utils/activity.js` turns a kind into a sentence, with money through `utils/money.js`, and gets a unit test.
+     - A "Recent activity" section on EventDetails shows the newest 5, and "See all" opens the shared `Sheet` with paging.
+     - Names are user input, so render text only and test a name with markup in it, like the GroupChat "Here now" test.
+   - **Then:** both suites, `CI=true npm run build`, the `reviewer` subagent, screenshots to the user before committing, and a commit on its own branch.
+2. **Phase 4d, scripted demo friends** (`server/src/realtime/demoFriends.js`, see the plan). The friends can show as here by joining `state.memberships` the way an arriving socket does, and should act through the same routes or models with `notifyEvent`/`record`. Never for real accounts.
+3. **iOS check** in the Simulator: sheets, transitions, skeletons, pull-to-refresh, haptics, the Profile password form, the Liberty map, and now the socket and its Origin.
    - `xcodebuild`, `xcrun` and `npx cap` may need to run outside the sandbox.
    - Open the Simulator panel (`attach`) before building.
 
@@ -150,12 +171,29 @@ The goal: a reviewer opens EventBuddy and sees senior-level work. The user judge
   - **Driving a pull:** dispatch `TouchEvent`s with `new Touch(...)` on `.overscroll-y-contain`.
   - **The first screenshot after a tab change can come out blank** while the route transition runs. Take it again.
 - **A hidden Browser pane or a background tab pauses `requestAnimationFrame`.** Bring the tab to the front before judging the map or animations.
+- **Render deploys:**
+  - **The API doesn't deploy itself** (see Waiting on the user). After a push, check the live API itself, not the dashboard:
+    - `/api/health` should carry `Cache-Control: no-store`;
+    - `POST /api/auth/logout` with no login should answer 401;
+    - a WebSocket handshake to `/api/socket` should get `101`, or `403` with a foreign Origin.
+
+    `curl` reaches `eventbuddy-api.onrender.com` when the command allows that domain.
+  - **A change to `render.yaml` itself (headers, environment) also needs a Blueprint sync**: Blueprints → Manual Sync. A redeploy alone doesn't re-read it.
+  - Any API restart wipes the hosted demo worlds.
+- **A second person for live real-time checks:**
+  - A background browser tab counts as hidden, so its socket closes.
+  - Use a small Node script instead: one that registers through the API and keeps a `ws` socket open, run with `run_in_background` and stopped with `TaskStop`.
+  - Register the test accounts from inside the page or the script, so their tokens never pass through the conversation.
+  - Usernames need at least 3 characters. Event types are `music-festival`, `concert`, `outdoor`, `group-travel`, `sports` and `arts`.
 - **The real-time socket** (`server/src/realtime/hub.js`, `src/services/realtime.js`):
   - It only pokes. Screens pass a topic to `usePolling(fn, ms, { eventId, what })`.
   - A topic with an event slows polling to 60 s once the server confirms that subscription (`subscribed`; a `denied` one keeps its pace). So **any new write that changes what a screen shows needs a poke**, and anything that changes with time alone (a share running out) has to be handled on the phone, as `useLive` does. Writes under `/api/events/:id/...` get one from `pokeOnSuccess` in `routes/events.js`. Anything else needs a call to `notifyEvent` or `notifyUsers`.
-  - The hub is one per process. The supertest suites never attach it, so pokes there do nothing.
+  - The hub is one per process. The supertest suites never attach it, so pokes there do nothing. `server/tests/realtime.test.js` attaches it to a real server with a real `ws` client: reuse its `logIn`, `subscribe`, `poke` and `assertHeardNothing` (a barrier, not a timed wait).
+  - Hub checks that wait on the database go through `checked()`, which reruns them if `accessChanges` moved meanwhile. Anything new that grants or removes access, or ends presence, must bump it.
+  - Rate limits are off in tests. `createApp({ rateLimits: true })` switches the login limit back on for a test.
 - **The fake API in app tests** (`src/testUtils/fakeApi.js`):
-  - Its `WebSocket` never connects unless `installFakeApi({ realtime: true })`, so older tests keep 4 s polling. With it: `poke(eventId, what)`, `dropSocket(code)` and `openSockets()`.
+  - Its `WebSocket` never connects unless `installFakeApi({ realtime: true })`, so older tests keep 4 s polling. With it: `poke(eventId, what)`, `presence(eventId, userIds)`, `dropSocket(code)`, `openSockets()`, and `deniedEvents: [...]` to refuse subscriptions.
+  - `friendShareEndsInMs` sets when Alex's live share ends; `moveFriend(eventId, user, { lat, lng })` moves him.
   - Jest 27 here has no `advanceTimersByTimeAsync`, and a zero-delay timer created inside `advanceTimersByTime(0)` doesn't fire. Advance a few milliseconds instead.
   - `holdNext`, `delayNext` and `failNext(method, path, status)` for slow and failing requests.
   - `changeEvent` and `removeEvent` simulate another person's edits.
