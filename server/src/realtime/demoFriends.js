@@ -28,7 +28,8 @@
 //
 // It runs only for the world's own John, only in demo mode, and only when he
 // opens that world's picnic. Once the story is told, the friends stay here
-// with nothing more to do. It stops when he is really gone (see the hub's
+// with nothing more to do, checking now and then that the world is still
+// the one they told it in. It stops when he is really gone (see the hub's
 // 'left'), leaves the picnic, or the world is pruned.
 const User = require('../models/User');
 const Event = require('../models/Event');
@@ -40,7 +41,9 @@ const realtime = require('./hub');
 // The wait before the n-th beat of a session is leadMs[n] if there is one
 // (so even a returning visitor sees something within seconds), else a random
 // time between minMs and maxMs. Tests shorten all of it.
-const timing = { leadMs: [5000, 10000, 15000], minMs: 20000, maxMs: 40000, requestMs: 5000 };
+// toldCheckMs is how often a session whose story is told checks that its
+// world is still the one it told it in.
+const timing = { leadMs: [5000, 10000, 15000], minMs: 20000, maxMs: 40000, requestMs: 5000, toldCheckMs: 60000 };
 
 const FRIENDS = ['Alex', 'Taylor', 'Jordan'];
 
@@ -162,10 +165,10 @@ const stop = (session) => {
   if (sessions.get(session.ownerId) === session) sessions.delete(session.ownerId);
 };
 
-// Resolves after ms (never, for Infinity), or as soon as the session stops
+// Resolves after ms, or as soon as the session stops or is woken
 const pause = (session, ms) => new Promise((resolve) => {
+  clearTimeout(session.timer);
   session.wake = resolve;
-  if (ms === Infinity) return;
   session.timer = setTimeout(resolve, ms);
   session.timer.unref();
 });
@@ -243,18 +246,36 @@ const run = async (session) => {
     );
     if (session.stopped) {
       // Stopped while claiming: hand the beat back, so the next visit plays
-      // it rather than skipping, say, the ice cream
-      if (before) await User.updateOne({ _id: owner }, { $inc: { demoScriptStep: -1 } });
+      // it rather than skipping, say, the ice cream. Only if nobody has
+      // claimed since: a session that replaced this one may already have,
+      // and undoing its claim would play a beat twice. Then this beat is
+      // skipped, which "at most once" allows.
+      if (before) {
+        const claimed = (before.demoScriptStep || 0) + 1;
+        await User.updateOne({ _id: owner, demoScriptStep: claimed }, { $inc: { demoScriptStep: -1 } });
+      }
       return;
     }
     if (!before) {
       if (!(await User.exists({ _id: owner }))) return;
       // The story is told. The friends stay here as long as John does,
-      // rather than all vanishing together while he watches.
+      // rather than all vanishing together while he watches. Every so
+      // often, and whenever he opens the picnic again, the checks above run
+      // again: they end the session if the picnic went or he left it, and
+      // a world that was pruned and rebuilt (same ids, its story not yet
+      // told) gets its story from the start.
       session.told = true;
-      await pause(session, Infinity);
-      return;
+      const idle = pause(session, timing.toldCheckMs);
+      // Only this wait can be cut short by John opening the picnic, never
+      // the lead before a beat that follows it
+      session.recheck = session.wake;
+      await idle;
+      session.recheck = null;
+      n = -1;
+      continue;
     }
+
+    session.told = false;
 
     await playBeat(session, before.demoScriptStep || 0, picnic, ids);
   }
@@ -265,10 +286,15 @@ const start = (user, eventId) => {
   if (!config.demoMode || !tag || !demoWorldUserId(tag).equals(user._id)) return;
   if (eventId !== idInWorld(tag, 'event:picnic').toString()) return;
   const ownerId = user._id.toString();
-  if (sessions.has(ownerId)) return;
+  const existing = sessions.get(ownerId);
+  if (existing) {
+    // A told story checks its world again now: it may have been rebuilt
+    existing.recheck?.();
+    return;
+  }
 
   const session = {
-    ownerId, tag, picnicId: eventId, stopped: false, told: false, timer: null, wake: null,
+    ownerId, tag, picnicId: eventId, stopped: false, told: false, timer: null, wake: null, recheck: null,
     controller: new AbortController(), here: [], tokens: {}
   };
   sessions.set(ownerId, session);

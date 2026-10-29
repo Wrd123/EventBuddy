@@ -8,7 +8,7 @@
 
 - **Git:**
   - GitHub's `main` is at `8179c337` (4c and the last handoff), confirmed on 28 Oct.
-  - **`demo-friends`** (local only), branched from `8179c337`, has 4d. Local `main` is still at `54dc0977`, behind both. The user pushes with `git push origin demo-friends:main`.
+  - **`demo-friends`** (local only), branched from `8179c337`, has 4d (`ebf770cf`) and the fixes for Codex's review of it on top. Local `main` is still at `54dc0977`, behind both. The user pushes with `git push origin demo-friends:main`.
   - The user pushes with `git push origin <branch>:main`, so **local `main` can lag behind**. Bring it level with `git switch main && git merge --ff-only origin/main` (or the branch), and check `git rev-list --left-right --count origin/main...main` before trusting this.
   - CI wasn't checked for the 28 Oct pushes. Ask the user to look at the Actions tab.
 - **Deployed on Render:**
@@ -18,7 +18,7 @@
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 417 server tests, 521 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 423 server tests, 521 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -98,7 +98,11 @@
 - **`hub.js`:** `hubEvents` (`'subscribed'`, `'left'`, emitted through a try/catch), `state.simulated` kept apart from `memberships` (`presenceOf` reports the union; `dropFromEvent` prunes both), and `simulatePresence`, `endSimulatedPresence` and `localUrl`.
 - **App:** `DemoFriendsNote` ("Demo friends are simulated. At the picnic, they chat, move and add costs while you're here.") for `isDemo`, on EventDetails (under Recent activity), GroupChat (under Here now), the map's LiveBar and Expenses (under Balances). The user saw screenshots.
 - **Checked live** on `rt-api-4150` plus the `rt-web-3999` production build: all 7 beats arrived by poke, the balance moved, there were no CSP errors, and no friend request was refused. The final review fixes (stop ordering, claim rollback, the caption's wording) came after that run and are covered by tests only.
-- **Tests:** `server/tests/demoFriends.test.js` (21). Its cleanup hook is registered before `useTestDatabase()`, so stories stop before each wipe. Not covered: `'left'` through token expiry (it shares `endPresence` with logout, which is tested).
+- **Fixes from Codex's review of `ebf770cf` (29 Oct):**
+  - **P2:** a stopped session's hand-back of an unplayed beat could undo a replacement session's claim, replaying a beat (a duplicate Group photo; schedule POSTs have no retry id). The hand-back now only happens if `demoScriptStep` is still the value its claim set; otherwise the beat is skipped.
+  - **P2:** a finished session waited forever, so a world pruned and rebuilt with the same ids never got its story, and a deleted picnic or a John who left went unnoticed. A told session now re-runs the loop's checks every `toldCheckMs` (60 s), and at once when John opens the picnic again: a rebuilt world (counter back at 0) gets its story, and anything else invalid ends the session.
+  - "Never undoes a claim made by the session that replaced it" and the four "after the story is told" tests fail when the old code is put back. "Hands the beat back when nobody has claimed since" guards against making the condition too strict.
+- **Tests:** `server/tests/demoFriends.test.js` (27). Its cleanup hook is registered before `useTestDatabase()`, so stories stop before each wipe. Not covered: `'left'` through token expiry (it shares `endPresence` with logout, which is tested).
 
 **Security review** (Claude and Codex independently, then fixes with tests). `docs/SECURITY_REVIEW.md` is the full record.
 

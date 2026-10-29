@@ -463,6 +463,130 @@ describe('access', () => {
   });
 });
 
+// Holds the result of the first beat claim (the database write itself goes
+// through) until released
+const holdFirstClaim = (t) => {
+  const original = User.findOneAndUpdate;
+  let release;
+  let reached;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const held = { reached: new Promise((resolve) => { reached = resolve; }), release: () => release() };
+  let used = false;
+  t.mock.method(User, 'findOneAndUpdate', function claim(...args) {
+    const query = original.apply(this, args);
+    if (used) return query;
+    used = true;
+    return query.exec().then((result) => {
+      reached();
+      return gate.then(() => result);
+    });
+  });
+  return held;
+};
+
+const groupPhotos = async (world) =>
+  (await Event.findById(world.picnic)).schedule.filter((item) => item.activity === 'Group photo').length;
+
+describe('a claim that lands after its session stopped', () => {
+  it('hands the beat back when nobody has claimed since', async (t) => {
+    const world = await makeWorld();
+    await User.updateOne({ _id: world.john._id }, { demoScriptStep: 4 });
+    const held = holdFirstClaim(t);
+    const ws = await logIn(world.person);
+    await subscribe(ws, world.picnic.toString());
+    await within(held.reached, 'the claim');
+    assert.equal(await stepOf(world), 5);
+
+    ws.terminate();
+    await ended(world);
+    held.release();
+    await until(async () => (await stepOf(world)) === 4, 'the beat to be handed back');
+  });
+
+  it('never undoes a claim made by the session that replaced it', async (t) => {
+    const world = await makeWorld();
+    await User.updateOne({ _id: world.john._id }, { demoScriptStep: 4 });
+    const held = holdFirstClaim(t);
+    const handBack = t.mock.method(User, 'updateOne');
+    const first = await logIn(world.person);
+    await subscribe(first, world.picnic.toString());
+    await within(held.reached, 'the claim');
+    first.terminate();
+    await ended(world);
+
+    // A new session claims beat 5 and plays it, Taylor's Group photo
+    const second = await logIn(world.person);
+    await subscribe(second, world.picnic.toString());
+    await until(async () => (await groupPhotos(world)) === 1, 'the replacement to plan the photo');
+    held.release();
+    await until(() => handBack.mock.callCount() > 0, 'the old session to try handing its beat back');
+
+    await until(async () => (await stepOf(world)) === 7, 'the story to end');
+    await finished(world);
+    assert.equal(await groupPhotos(world), 1);
+    assert.equal(await messagesIn(world, 'Found you all! 👋'), 1);
+  });
+});
+
+describe('after the story is told', () => {
+  const tell = async (world) => {
+    const ws = await logIn(world.person);
+    await subscribe(ws, world.picnic.toString());
+    await finished(world);
+    assert.equal(demoFriends.running(world.john._id), true);
+    return ws;
+  };
+  const checkOften = () => { demoFriends.timing.toldCheckMs = 30; };
+
+  it('tells a pruned and rebuilt world its story when John opens the picnic again', async () => {
+    const world = await makeWorld();
+    await tell(world);
+
+    assert.equal(await pruneDemoWorlds({ maxAgeMs: -60000, maxWorlds: 10 }), 1);
+    // His saved login rebuilds the same world, ids and all
+    await api().get('/api/events').set('Authorization', `Bearer ${world.person.token}`).expect(200);
+    assert.equal(await stepOf(world), 0);
+
+    // Only opening the picnic wakes the told session: its own check is a minute away
+    const again = await logIn(world.person);
+    await subscribe(again, world.picnic.toString());
+    await until(async () => (await stepOf(world)) === 7, 'the rebuilt world to hear its story');
+    await finished(world);
+    assert.equal(await Expense.countDocuments({ event: world.picnic, description: 'Ice cream' }), 1);
+    assert.equal(await messagesIn(world, 'Found you all! 👋'), 1);
+  });
+
+  it('ends when Taylor deletes the picnic', async () => {
+    checkOften();
+    const world = await makeWorld();
+    await tell(world);
+    await api().delete(['/api/events', world.picnic].join('/')).set('Authorization', await world.tokenOf('Taylor')).expect(204);
+    await ended(world);
+  });
+
+  it('ends when John settles up and leaves the picnic', async () => {
+    checkOften();
+    const world = await makeWorld();
+    await tell(world);
+    // After the ice cream John is owed $1.35; Alex pays it and John goes
+    const auth = `Bearer ${world.person.token}`;
+    const url = (...rest) => ['/api/events', world.picnic, ...rest].join('/');
+    await api().post(url('payments')).set('Authorization', auth)
+      .send({ from: world.id('Alex').toString(), to: world.john._id.toString(), amountCents: 135, date: '2030-01-01' })
+      .expect(201);
+    await api().delete(url('members', world.john._id.toString())).set('Authorization', auth).expect(204);
+    await ended(world);
+  });
+
+  it('ends when the world is pruned', async () => {
+    checkOften();
+    const world = await makeWorld();
+    await tell(world);
+    assert.equal(await pruneDemoWorlds({ maxAgeMs: -60000, maxWorlds: 10 }), 1);
+    await ended(world);
+  });
+});
+
 describe('simulated presence', () => {
   it("never ends a real connection's presence", async () => {
     const user = await registerUser();
