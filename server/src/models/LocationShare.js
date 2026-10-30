@@ -14,7 +14,13 @@ const locationShareSchema = new mongoose.Schema({
   lng: { type: Number, default: null, min: -180, max: 180 },
   // Meters, as reported by the phone; shown as a fuzzier pin when large
   accuracy: { type: Number, default: null, min: 0 },
-  positionAt: { type: Date, default: null }
+  // When the fix was measured on the phone, worked out from its reported age
+  positionAt: { type: Date, default: null },
+  // The phone's sample number for this share, to put fixes in order: one
+  // that is not higher than the last stored is out of date
+  seq: { type: Number, default: null },
+  // When the server got the fix, kept apart from positionAt, when it was measured
+  receivedAt: { type: Date, default: null }
 });
 
 locationShareSchema.index({ event: 1, user: 1 }, { unique: true });

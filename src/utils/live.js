@@ -25,15 +25,63 @@ export const metersBetween = (a, b) => {
   return 2 * 6371000 * Math.asin(Math.sqrt(h));
 };
 
-// Send a new position after moving this far, or after this long anyway,
-// so friends see you move without draining the battery
-export const SEND_AFTER_METERS = 25;
+// How often a position goes to friends while you move. A walking friend
+// needs a fresh point every couple of seconds for the map to follow them;
+// it's a target, since a slow connection or a locked phone can delay it.
+export const SEND_EVERY_MS = 2000;
+// With the app out of sight, a longer target saves battery and data: nobody
+// is watching the pin move that closely from a locked phone
+export const SEND_EVERY_HIDDEN_MS = 10000;
+// Moving less than this isn't movement; it's the GPS wobbling
+export const MIN_MOVE_METERS = 3;
+// A fix's accuracy raises that bar, but only this far: indoors or in a
+// browser a fix can be 40 m out, and waiting for 40 m of walking would
+// leave a friend's pin behind for half a minute
+const MAX_MOVE_METERS = 15;
+// Standing still, a new fix still goes out this often, so friends can see
+// you're there and the share hasn't gone quiet
 export const SEND_AT_LEAST_EVERY_MS = 2 * MINUTE;
 
-export const shouldSend = (position, lastSent, now = Date.now()) =>
-  !lastSent ||
-  now - lastSent.at >= SEND_AT_LEAST_EVERY_MS ||
-  metersBetween(position, lastSent) >= SEND_AFTER_METERS;
+// Waits after a failed upload, in turn, never longer than the last
+const BACKOFF_MS = [4000, 8000, 16000, 30000];
+
+// Whether this fix is far enough from the last one sent to count as moving.
+// A fix is only a guess within its accuracy radius, so a still phone whose
+// readings drift inside that circle would otherwise look like it was walking
+// and send every couple of seconds for nothing.
+export const hasMoved = (fix, lastSent) =>
+  metersBetween(fix, lastSent) >= Math.max(MIN_MOVE_METERS, Math.min(fix.accuracy || 0, MAX_MOVE_METERS));
+
+// What to do with the newest fix: { send: true } now, { dueAt } (a time in
+// ms) when it should go once the interval is up, or { send: false }.
+// lastSent: { lat, lng, accuracy, at, measuredAt } of the last upload that
+// worked. fix.measuredAt is when the phone took the fix, versus lastSent.at,
+// when it was sent.
+export const nextSend = ({ fix, lastSent, now, hidden }) => {
+  if (!lastSent) return { send: true };
+  if (hasMoved(fix, lastSent)) {
+    // Moving: keep to the pace, so a burst of fixes doesn't become a burst
+    // of requests (the newest one waits for its turn)
+    const dueAt = lastSent.at + (hidden ? SEND_EVERY_HIDDEN_MS : SEND_EVERY_MS);
+    return now >= dueAt ? { send: true } : { dueAt };
+  }
+  // Still: only a fix the server hasn't seen, so a heartbeat never repeats
+  // an old spot as if it were new. With no new fix, friends' "updated … ago"
+  // keeps growing, which is the truth.
+  // A still phone may get no more location callbacks, so a new fix waits
+  // for its heartbeat on a timer rather than for one.
+  if ((fix.measuredAt ?? 0) <= (lastSent.measuredAt ?? 0)) return { send: false };
+  const dueAt = lastSent.at + SEND_AT_LEAST_EVERY_MS;
+  return now >= dueAt ? { send: true } : { dueAt };
+};
+
+// How long to wait after the nth failure in a row (1 for the first). A
+// server that asked us to wait (429 Retry-After) is obeyed when that's
+// longer, so we never hammer something that's already struggling.
+export const backoffMs = (failures, retryAfterSeconds) => {
+  const wait = BACKOFF_MS[Math.min(Math.max(failures, 1), BACKOFF_MS.length) - 1];
+  return Math.max(wait, (retryAfterSeconds || 0) * 1000);
+};
 
 // The choices for how long to share, as end times from now. "Until
 // midnight" only when that's at least an hour away.

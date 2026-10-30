@@ -281,6 +281,24 @@ describe('pokes', () => {
     await assertHeardNothing(ws, friend);
   });
 
+  it('tell the map about a stored position, but not one that was skipped', async () => {
+    const { organizer, friend, event } = await setup();
+    const { body } = await api().put(path(event, 'live', 'share')).set('Authorization', organizer.auth)
+      .send({ until: new Date(Date.now() + 3600000).toISOString() }).expect(200);
+    const ws = await logIn(friend);
+    await subscribe(ws, event._id);
+    const send = (seq, ageMs) => api().put(path(event, 'live', 'position')).set('Authorization', organizer.auth)
+      .send({ lat: 40.7, lng: -74, shareId: body.sharing.id, seq, ageMs }).expect(204);
+
+    await send(2, 0);
+    await ws.next(poke(event._id, 'live'), 'the live poke');
+    // Out of date, then too old: nothing was stored, so nothing to hear
+    await send(2, 0);
+    await send(1, 0);
+    await send(3, 2 * 60 * 1000 + 1);
+    await assertHeardNothing(ws, friend);
+  });
+
   it('tell your events when your payment handles change', async () => {
     const { organizer, friend, event } = await setup();
     const ws = await logIn(organizer);

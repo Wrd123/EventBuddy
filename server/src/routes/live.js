@@ -5,6 +5,7 @@
 // event sees the others who are sharing, and a meetup point anyone can set.
 // Only the latest position is stored, and sharing ends on its own.
 const express = require('express');
+const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 const LocationShare = require('../models/LocationShare');
 const { HttpError } = require('../errors');
@@ -16,9 +17,12 @@ const realtime = require('../realtime/hub');
 const { record } = require('../activityLog');
 
 const MAX_SHARE_MS = 24 * 60 * 60 * 1000;
+// A fix older than this is too stale to show as where someone is
+const MAX_FIX_AGE_MS = 2 * 60 * 1000;
 const MEETUP_LIFETIME_MS = 12 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_COLOR = '#64748b';
+const NOT_SHARING = "You're not sharing your location right now.";
 
 // Phones send a position every so often while moving; this is far above
 // that, and only stops a misbehaving client
@@ -69,9 +73,14 @@ const currentMeetup = (event) =>
 
 const router = express.Router({ mergeParams: true });
 
-// -> { sharing: { until } | null, people: [{ user, name, color, lat, lng,
-//      accuracy, positionAt, until }], meetup }
-// people is everyone else who's sharing and has sent a position
+// -> { sharing: { id, until, seq } | null, people: [{ user, share, name, color,
+//      lat, lng, accuracy, positionAt, until }], meetup }
+// people is everyone else who's sharing and has sent a position. id and share
+// name a share, which ends when sharing does, so a phone can tell a fix meant
+// for its old share from one for its new one. seq is the last fix number
+// stored, so a phone that lost count (reinstalled, or another device) can
+// carry on above it rather than have every fix dropped as out of date.
+const sharingOf = (share) => ({ id: share._id.toString(), until: share.until, seq: share.seq || 0 });
 router.get('/', async (req, res) => {
   const event = await findVisibleEvent(req.params.id, req.user);
   const shares = await activeShares(event);
@@ -83,6 +92,7 @@ router.get('/', async (req, res) => {
       const member = event.members.find((m) => m.user.equals(s.user));
       return {
         user: s.user,
+        share: s._id.toString(),
         name: member?.name || 'Former member',
         color: member?.color || FALLBACK_COLOR,
         lat: s.lat,
@@ -95,7 +105,7 @@ router.get('/', async (req, res) => {
     // Freshest first
     .sort((a, b) => b.positionAt - a.positionAt);
 
-  res.json({ sharing: mine ? { until: mine.until } : null, people, meetup: currentMeetup(event) });
+  res.json({ sharing: mine ? sharingOf(mine) : null, people, meetup: currentMeetup(event) });
 });
 
 // Start sharing, or change until when. Body: { until: ISO time }
@@ -123,14 +133,23 @@ router.put('/share', async (req, res) => {
   // sees none before it.
   const key = { event: event._id, user: req.user._id };
   await LocationShare.deleteOne({ ...key, until: { $lte: new Date() } });
-  const before = await LocationShare.findOneAndUpdate(key, { $set: { until } }, { upsert: true, returnDocument: 'before' });
+  // The share's id comes back either way: from the old document when there
+  // was one, or from the insert when this made it
+  const { value: before, lastErrorObject } = await LocationShare.findOneAndUpdate(
+    key,
+    { $set: { until } },
+    { upsert: true, returnDocument: 'before', includeResultMetadata: true }
+  );
+  const id = (before?._id || lastErrorObject.upserted).toString();
+  // Extending keeps the share, and its count of fixes, going
+  const seq = before && before.until > new Date() ? before.seq || 0 : 0;
   if (!before || before.until <= new Date()) {
     await record(event, req.user, 'sharing_started');
     // The map hears about every share change; the event page only needs
     // to hear about this one
     realtime.notifyEvent(event._id, 'event');
   }
-  res.json({ sharing: { until } });
+  res.json({ sharing: { id, until, seq } });
 });
 
 router.delete('/share', async (req, res) => {
@@ -139,19 +158,60 @@ router.delete('/share', async (req, res) => {
   res.status(204).end();
 });
 
-// Body: { lat, lng, accuracy? }. Only while sharing.
+// Body: { lat, lng, accuracy?, shareId?, seq?, ageMs? }. Only while sharing.
+//
+// shareId, seq and ageMs come all three or none. With them, the phone numbers
+// its fixes (seq, one higher each time, per share) and says how old each is
+// on its own clock (ageMs), so a fix that arrives late or out of order can
+// never replace a newer one, and the phone's time of day is never trusted.
+// Without them it's the older, unordered form.
 router.put('/position', positionLimiter, async (req, res) => {
   const event = await findVisibleEvent(req.params.id, req.user);
-  const { lat, lng, accuracy } = req.body;
+  const receivedAt = Date.now();
+  const { lat, lng, accuracy, shareId, seq, ageMs } = req.body;
   if (!isCoordinate(lat, 90) || !isCoordinate(lng, 180)) throw new HttpError(400, 'Invalid location.');
   const meters = typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy) : null;
+  const fix = { lat: round(lat), lng: round(lng), accuracy: meters };
 
+  const ordering = [shareId, seq, ageMs].filter((value) => value !== undefined).length;
+  if (ordering === 0) {
+    // No ordering guarantee: positionAt is when this arrived, and a late
+    // request can overwrite a newer one. It's here for older app builds and
+    // the demo friends' scripted requests.
+    const result = await LocationShare.updateOne(
+      { event: event._id, user: req.user._id, until: { $gt: new Date(receivedAt) } },
+      { $set: { ...fix, positionAt: new Date(receivedAt), receivedAt: new Date(receivedAt) } }
+    );
+    // The app stops sending when sharing ends; this catches the stragglers
+    if (result.matchedCount === 0) throw new HttpError(409, NOT_SHARING);
+    return res.status(204).end();
+  }
+
+  if (ordering !== 3) throw new HttpError(400, 'Send the share, number and age together.');
+  if (typeof shareId !== 'string' || !mongoose.isValidObjectId(shareId)) throw new HttpError(400, 'Invalid share.');
+  if (!Number.isSafeInteger(seq) || seq < 1) throw new HttpError(400, 'Invalid position number.');
+  if (typeof ageMs !== 'number' || !Number.isFinite(ageMs) || ageMs < 0) throw new HttpError(400, 'Invalid position age.');
+
+  // Too old to show: nothing is stored, so there's nothing to poke about
+  if (ageMs > MAX_FIX_AGE_MS) {
+    res.locals.noPoke = true;
+    return res.status(204).end();
+  }
+
+  const now = new Date(receivedAt);
+  const live = { _id: shareId, event: event._id, user: req.user._id, until: { $gt: now } };
   const result = await LocationShare.updateOne(
-    { event: event._id, user: req.user._id, until: { $gt: new Date() } },
-    { $set: { lat: round(lat), lng: round(lng), accuracy: meters, positionAt: new Date() } }
+    { ...live, $or: [{ seq: null }, { seq: { $lt: seq } }] },
+    { $set: { ...fix, positionAt: new Date(receivedAt - ageMs), receivedAt: now, seq } }
   );
-  // The app stops sending when sharing ends; this catches the stragglers
-  if (result.matchedCount === 0) throw new HttpError(409, "You're not sharing your location right now.");
+  if (result.matchedCount === 0) {
+    // A live share that wasn't updated has a seq at least this high, so this
+    // fix is out of date. Anything else is a share that has ended: stopping
+    // deletes the record and a new share gets a new id, so a late fix from
+    // the old one can't land in its replacement.
+    if (!(await LocationShare.exists(live))) throw new HttpError(409, NOT_SHARING);
+    res.locals.noPoke = true;
+  }
   res.status(204).end();
 });
 

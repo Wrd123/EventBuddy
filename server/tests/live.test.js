@@ -162,6 +162,144 @@ describe('sharing your location', () => {
   });
 });
 
+describe('ordered positions', () => {
+  // A share, and a helper that sends for it with the next sample number
+  const sharingFriend = async () => {
+    const world = await setup();
+    const { body } = await startSharing(world.friend.auth, world.event);
+    return { ...world, shareId: body.sharing.id };
+  };
+  const position = (shareId, seq, ageMs = 0, at = {}) => ({ lat: 33.78, lng: -84.37, shareId, seq, ageMs, ...at });
+  const stored = () => LocationShare.findOne().lean();
+
+  it('gives the share an id, which stays when you extend it', async () => {
+    const { friend, event, shareId } = await sharingFriend();
+    assert.match(shareId, /^[0-9a-f]{24}$/);
+
+    const extended = await startSharing(friend.auth, event, inHours(3));
+    assert.equal(extended.body.sharing.id, shareId);
+    assert.equal((await stored())._id.toString(), shareId);
+  });
+
+  it('gives a new id when starting again after an expired share', async () => {
+    const { friend, event, shareId } = await sharingFriend();
+    await LocationShare.updateOne({}, { until: new Date(Date.now() - 1000) });
+
+    const again = await startSharing(friend.auth, event);
+    assert.notEqual(again.body.sharing.id, shareId);
+    assert.equal(await LocationShare.countDocuments(), 1);
+  });
+
+  it('shows the ids in the live view', async () => {
+    const { organizer, friend, event, shareId } = await sharingFriend();
+    await sendPosition(friend.auth, event, position(shareId, 1));
+
+    assert.equal((await getLive(friend.auth, event)).sharing.id, shareId);
+    const [person] = (await getLive(organizer.auth, event)).people;
+    // And how far the phone's count has got, for a phone that lost it
+    await sendPosition(friend.auth, event, position(shareId, 7));
+    assert.equal((await getLive(friend.auth, event)).sharing.seq, 7);
+    assert.equal((await startSharing(friend.auth, event, inHours(3))).body.sharing.seq, 7);
+    assert.equal(person.share, shareId);
+  });
+
+  it('measures the position when the phone did, not when it arrived', async () => {
+    const { friend, event, shareId } = await sharingFriend();
+    const before = Date.now();
+    await sendPosition(friend.auth, event, position(shareId, 4, 5000));
+    const after = Date.now();
+
+    const share = await stored();
+    assert.equal(share.seq, 4);
+    assert.ok(share.positionAt.getTime() >= before - 5000 && share.positionAt.getTime() <= after - 5000);
+    assert.ok(share.receivedAt.getTime() >= before && share.receivedAt.getTime() <= after);
+  });
+
+  it('ignores a fix that is not newer than the last', async () => {
+    const { friend, event, shareId } = await sharingFriend();
+    await sendPosition(friend.auth, event, position(shareId, 5, 0, { lat: 10, lng: 20 }));
+    const first = await stored();
+
+    await sendPosition(friend.auth, event, position(shareId, 5, 0, { lat: 11, lng: 21 }));
+    await sendPosition(friend.auth, event, position(shareId, 3, 0, { lat: 12, lng: 22 }));
+
+    const share = await stored();
+    assert.deepEqual([share.lat, share.lng, share.seq], [10, 20, 5]);
+    assert.deepEqual(share.positionAt, first.positionAt);
+
+    await sendPosition(friend.auth, event, position(shareId, 6, 0, { lat: 13, lng: 23 }));
+    assert.deepEqual([(await stored()).lat, (await stored()).seq], [13, 6]);
+  });
+
+  it("doesn't let a stopped share's late fix touch the new one", async () => {
+    const { friend, event, shareId: oldId } = await sharingFriend();
+    await api().delete(`${live(event)}/share`).set('Authorization', friend.auth).expect(204);
+    const { body } = await startSharing(friend.auth, event);
+
+    const late = await sendPosition(friend.auth, event, position(oldId, 9), 409);
+    assert.equal(late.body.message, "You're not sharing your location right now.");
+    const share = await stored();
+    assert.equal(share._id.toString(), body.sharing.id);
+    assert.equal(share.lat, null);
+    assert.equal(share.seq, null);
+  });
+
+  it('ignores a fix that is too old to show', async () => {
+    const { friend, event, shareId } = await sharingFriend();
+
+    await sendPosition(friend.auth, event, position(shareId, 1, 2 * 60 * 1000 + 1));
+    assert.equal((await stored()).lat, null);
+    await sendPosition(friend.auth, event, position(shareId, 1, 2 * 60 * 1000));
+    assert.equal((await stored()).seq, 1);
+  });
+
+  it('refuses fields that are partial or invalid', async () => {
+    const { friend, event, shareId } = await sharingFriend();
+    const base = { lat: 33.78, lng: -84.37 };
+    const bad = [
+      { ...base, shareId },
+      { ...base, seq: 1 },
+      { ...base, ageMs: 0 },
+      { ...base, shareId, seq: 1 },
+      { ...base, seq: 1, ageMs: 0 },
+      position('not-an-id', 1),
+      position(null, 1),
+      position(shareId, 0),
+      position(shareId, -1),
+      position(shareId, 1.5),
+      position(shareId, '2'),
+      position(shareId, Number.MAX_SAFE_INTEGER + 1),
+      position(shareId, 1, -1),
+      position(shareId, 1, '5'),
+      position(shareId, 1, null),
+      // JSON has no NaN; this is what one turns into
+      position(shareId, 1, undefined, { ageMs: null })
+    ];
+    for (const body of bad) await sendPosition(friend.auth, event, body, 400);
+    const nan = await api().put(`${live(event)}/position`).set('Authorization', friend.auth)
+      .set('Content-Type', 'application/json').send('{"lat":1,"lng":1,"shareId":"' + shareId + '","seq":1,"ageMs":NaN}');
+    assert.equal(nan.status, 400);
+    assert.equal((await stored()).lat, null);
+  });
+
+  it('still takes positions with none of the three', async () => {
+    const { friend, event } = await sharingFriend();
+    const before = Date.now();
+    await sendPosition(friend.auth, event, { lat: 33.78, lng: -84.37, accuracy: 9 });
+
+    const share = await stored();
+    assert.deepEqual([share.lat, share.lng, share.accuracy, share.seq], [33.78, -84.37, 9, null]);
+    assert.ok(share.positionAt.getTime() >= before);
+    assert.deepEqual(share.receivedAt, share.positionAt);
+  });
+
+  it('is refused when you are not sharing', async () => {
+    const { friend, event } = await setup();
+    const res = await sendPosition(friend.auth, event, position('0'.repeat(24), 1), 409);
+    assert.equal(res.body.message, "You're not sharing your location right now.");
+  });
+});
+
 describe('the meetup point', () => {
   const setMeetup = (auth, event, body, status = 200) =>
     api().put(`${live(event)}/meetup`).set('Authorization', auth).send(body).expect(status);

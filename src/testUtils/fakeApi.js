@@ -119,9 +119,9 @@ const CATEGORY_TYPES = { music: ['concert', 'music-festival'], sports: ['sports'
 // fake's own objects (which it changes in place)
 // The body is copied now, as the server would send it, so a response held
 // back (holdNext) still has the data from when it was asked for
-const respond = (status, body) => {
+const respond = (status, body, headers = {}) => {
   const sent = JSON.stringify(body);
-  return Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(sent === undefined ? undefined : JSON.parse(sent)) });
+  return Promise.resolve({ ok: status < 400, status, headers: { get: (name) => headers[name] ?? null }, json: () => Promise.resolve(sent === undefined ? undefined : JSON.parse(sent)) });
 };
 
 // Event 1's money: Alex paid a $300 Airbnb, split with John
@@ -364,8 +364,9 @@ export const delayNext = (method, path) => {
 // Makes the next matching request fail, as if the server were down. For
 // testing that a failed refresh leaves what's on screen alone.
 let failures = [];
-export const failNext = (method, path, status = 503) => {
-  failures.push({ method, path, status });
+// retryAfter: seconds, sent as the Retry-After header (for a 429).
+export const failNext = (method, path, status = 503, { retryAfter } = {}) => {
+  failures.push({ method, path, status, retryAfter });
 };
 
 // A friend sending a new position, as a later read of the map will show
@@ -452,7 +453,7 @@ const demoLive = (shareEndsInMs = 3 * 60 * 60 * 1000) => ({
   '5': {
     sharing: null,
     people: [{
-      user: 'u2', name: 'Alex', color: '#3b82f6', lat: 33.7866, lng: -84.3727, accuracy: 10,
+      user: 'u2', name: 'Alex', color: '#3b82f6', share: 'share-alex', lat: 33.7866, lng: -84.3727, accuracy: 10,
       positionAt: minutesAgo(2), until: new Date(Date.now() + shareEndsInMs).toISOString()
     }],
     meetup: {
@@ -463,12 +464,14 @@ const demoLive = (shareEndsInMs = 3 * 60 * 60 * 1000) => ({
 });
 
 let live = {};
+let nextShareId = 1;
 
 const liveRoute = (event, method, action, body) => {
   const state = live[event._id] = live[event._id] || { sharing: null, people: [], meetup: null };
   if (!action && method === 'GET') return respond(200, state);
   if (action === 'share' && method === 'PUT') {
-    state.sharing = { until: body.until };
+    // Extending keeps the share's id; stopping and starting again is a new share
+    state.sharing = { id: state.sharing?.id || `share-${nextShareId++}`, until: body.until };
     return respond(200, { sharing: state.sharing });
   }
   if (action === 'share' && method === 'DELETE') {
@@ -481,7 +484,11 @@ const liveRoute = (event, method, action, body) => {
     return respond(204);
   }
   if (action === 'position' && method === 'PUT') {
-    return state.sharing ? respond(204) : respond(409, { message: "You're not sharing your location right now." });
+    // A fix for a share that has ended, or been replaced, is refused
+    if (!state.sharing || (body.shareId && body.shareId !== state.sharing.id)) {
+      return respond(409, { message: "You're not sharing your location right now." });
+    }
+    return respond(204);
   }
   if (action === 'meetup' && method === 'PUT') {
     state.meetup = { ...body, setBy: { user: demoUser._id, name: demoUser.name }, setAt: new Date().toISOString() };
@@ -832,8 +839,8 @@ export const installFakeApi = (options = {}) => {
     const path = url.replace(/^\/api/, '').split('?')[0];
     const failed = failures.findIndex((f) => f.method === method && f.path === path);
     if (failed !== -1) {
-      const [{ status }] = failures.splice(failed, 1);
-      return respond(status, { message: 'Service unavailable' });
+      const [{ status, retryAfter }] = failures.splice(failed, 1);
+      return respond(status, { message: 'Service unavailable' }, retryAfter === undefined ? {} : { 'Retry-After': String(retryAfter) });
     }
     const delayed = delays.findIndex((d) => d.method === method && d.path === path);
     if (delayed === -1) return serve(url, method, headers, body);

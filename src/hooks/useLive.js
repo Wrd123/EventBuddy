@@ -63,8 +63,8 @@ export const useLive = (eventId) => {
         return;
       }
       // Started on another device, or ended (stopped elsewhere, time up)
-      if (sharing && (mine?.eventId !== eventId || mine.until !== sharing.until)) {
-        setShare({ eventId, until: sharing.until });
+      if (sharing && (mine?.eventId !== eventId || mine.until !== sharing.until || mine.id !== sharing.id)) {
+        setShare({ eventId, until: sharing.until, id: sharing.id, seq: sharing.seq });
       } else if (!sharing && mine?.eventId === eventId) {
         setShare(null);
       }
@@ -97,7 +97,7 @@ export const useLive = (eventId) => {
     const sharing = await liveService.startSharing(eventId, until);
     freshness.changed();
     setState(prev => ({ ...prev, sharing }));
-    setShare({ eventId, until: new Date(sharing.until).toISOString() });
+    setShare({ eventId, until: new Date(sharing.until).toISOString(), id: sharing.id, seq: sharing.seq });
     load();
   }, [eventId, setShare, freshness, load]);
 

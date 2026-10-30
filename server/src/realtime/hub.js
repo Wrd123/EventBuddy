@@ -452,13 +452,14 @@ const closeUsers = (userIds, code = ENDED) => {
 // change has succeeded, poke the event's subscribers. A read changes
 // nothing, and neither does a refused change. what is the poke, or a
 // function of the request giving one, several, or null for a write nobody
-// else needs to hear about.
+// else needs to hear about. A route that succeeds without changing anything
+// (a stale upload it skipped) sets res.locals.noPoke to stay quiet.
 const pokeOnSuccess = (what) => (req, res, next) => {
   const whats = req.method === 'GET' ? [] : [].concat((typeof what === 'function' ? what(req) : what) || []);
   if (whats.length > 0) {
     const eventId = req.params.id;
     res.on('finish', () => {
-      if (res.statusCode < 400) whats.forEach((w) => notifyEvent(eventId, w));
+      if (res.statusCode < 400 && !res.locals.noPoke) whats.forEach((w) => notifyEvent(eventId, w));
     });
   }
   next();

@@ -31,7 +31,9 @@ const createApp = ({
     res.set('Cache-Control', 'no-store');
     next();
   });
-  app.use(cors({ origin: clientOrigin }));
+  // Retry-After is exposed so the phone app, which calls the API from
+  // another origin, can wait as long as a rate limit asks
+  app.use(cors({ origin: clientOrigin, exposedHeaders: ['Retry-After'] }));
   app.use(express.json({ limit: '100kb' }));
 
   // demo: whether the one-tap demo sign-in is available

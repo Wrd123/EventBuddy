@@ -307,7 +307,9 @@ describe('Map during an event', () => {
 
     // The phone's position goes to the event, and you appear on the map
     await waitFor(() => expect(requests('PUT', '/api/events/5/live/position')).toHaveLength(1));
-    expect(bodyOf(requests('PUT', '/api/events/5/live/position')[0])).toEqual({ lat: 33.7849, lng: -84.3735, accuracy: 8 });
+    expect(bodyOf(requests('PUT', '/api/events/5/live/position')[0])).toEqual({
+      lat: 33.7849, lng: -84.3735, accuracy: 8, shareId: expect.any(String), seq: 1, ageMs: expect.any(Number)
+    });
     expect(await pin('You: You')).toBeInTheDocument();
     expect(screen.getByText(/You're sharing your location until/)).toBeInTheDocument();
 
@@ -339,8 +341,8 @@ describe('Map during an event', () => {
     move(33.78490);
     await waitFor(() => expect(requests('PUT', '/api/events/5/live/position')).toHaveLength(1));
     move(33.78492); // about 2 m: not worth sending
-    move(33.78530); // about 45 m
-    await waitFor(() => expect(requests('PUT', '/api/events/5/live/position')).toHaveLength(2));
+    move(33.78530); // about 45 m, sent once 2 s have passed since the last
+    await waitFor(() => expect(requests('PUT', '/api/events/5/live/position')).toHaveLength(2), { timeout: 4000 });
     expect(bodyOf(requests('PUT', '/api/events/5/live/position')[1]).lat).toBe(33.7853);
   });
 

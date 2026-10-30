@@ -10,12 +10,22 @@ export const TOKEN_KEY = 'eventbuddy_token';
 
 // An error whose message is safe to show the user. status is the HTTP
 // status, or 0 when the server couldn't be reached at all.
+// retryAfterSeconds: how long the server asked us to wait (a 429's
+// Retry-After header), when it said.
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, retryAfterSeconds) {
     super(message);
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
+
+// Retry-After in seconds, or undefined when it's missing or isn't a plain
+// number (it can also be a date, which the server doesn't send)
+const retryAfterOf = (response) => {
+  const seconds = Number(response.headers?.get('Retry-After'));
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+};
 
 // Called when the server rejects our login token (expired or revoked), so
 // the app can drop the session instead of failing every request
@@ -84,7 +94,7 @@ const send = async (path, { method = 'GET', body }, token, isTheReplacement) => 
     // Only a token we sent can be "expired"; a 401 from logging in with a
     // wrong password is just a failed login
     if (response.status === 401 && token && (await sessionEnded(token, isTheReplacement))) onUnauthorized();
-    throw new ApiError(response.status, data?.message || 'Something went wrong. Please try again.');
+    throw new ApiError(response.status, data?.message || 'Something went wrong. Please try again.', retryAfterOf(response));
   }
   return data;
 };
