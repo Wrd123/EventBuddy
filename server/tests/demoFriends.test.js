@@ -55,7 +55,7 @@ after(async () => {
 
 // Every test starts with quick friends and no sessions left over
 beforeEach(() => {
-  Object.assign(demoFriends.timing, originalTiming, { leadMs: [30, 30, 30], minMs: 30, maxMs: 30 });
+  Object.assign(demoFriends.timing, originalTiming, { leadMs: [30, 30, 30], minMs: 30, maxMs: 30, walkMs: 15 });
 });
 
 
@@ -214,6 +214,97 @@ describe('the scripted friends', () => {
     await finished(world);
     assert.equal(await messagesIn(world, 'Found you all! 👋'), 1);
     assert.equal(await stepOf(world), 7);
+  });
+});
+
+// Every position Jordan's share is given, in order, while the mock is in place
+const recordJordan = (t, world) => {
+  const original = LocationShare.updateOne;
+  const seen = [];
+  t.mock.method(LocationShare, 'updateOne', function record(filter, update, ...rest) {
+    if (String(filter?.user) === String(world.id('Jordan'))) seen.push([update.$set.lat, update.$set.lng]);
+    return original.call(this, filter, update, ...rest);
+  });
+  return seen;
+};
+
+describe('walking', () => {
+  it("Jordan's pin passes through points between the start and the dock, in order, and ends there", async (t) => {
+    const world = await makeWorld();
+    const seen = recordJordan(t, world);
+    await subscribe(await logIn(world.person), world.picnic.toString());
+    await finished(world);
+
+    // The first beat's jump, then ten steps to the halfway point, then ten to the dock
+    assert.equal(seen.length, 21);
+    assert.deepEqual(seen[0], [33.7836, -84.3762]);
+    assert.deepEqual(seen.at(-1), [33.7857, -84.3741]);
+    const walked = seen.slice(1);
+    // Each step is closer to the dock than the one before, so the order held
+    const toDock = walked.map(([lat, lng]) => Math.hypot(lat - 33.7857, lng + 84.3741));
+    toDock.slice(1).forEach((d, i) => assert.ok(d < toDock[i], `step ${i + 2} is closer than step ${i + 1}`));
+    // And the walk reached the middle on its way, not just the ends
+    assert.ok(walked.some(([lat]) => lat > 33.7836 && lat < 33.7857));
+  });
+
+  it('sends no further position once the session stops mid-walk', async (t) => {
+    demoFriends.timing.walkMs = 200;
+    // Counts the demo friends' requests that have started but not finished
+    let inFlight = 0;
+    t.mock.method(globalThis, 'fetch', async (...args) => {
+      inFlight += 1;
+      try {
+        return await realFetch(...args);
+      } finally {
+        inFlight -= 1;
+      }
+    });
+    const world = await makeWorld();
+    const seen = recordJordan(t, world);
+    await subscribe(await logIn(world.person), world.picnic.toString());
+    // The first beat's jump, then two steps of beat 4's walk
+    await until(() => seen.length >= 3, 'the walk to be under way');
+    await api().post('/api/auth/logout').set('Authorization', `Bearer ${world.person.token}`).expect(204);
+    assert.equal(demoFriends.running(world.john._id), false);
+
+    // A request the server had already received may still finish (the
+    // guarantee allows it), so count from when none is left. This covers the
+    // overall guarantee, that a stopped session starts no request, rather
+    // than one particular wait: a step is due every 200 ms, and none comes
+    // in the next 400 ms (two walk intervals).
+    await until(() => inFlight === 0, 'the last request to finish');
+    const soFar = seen.length;
+    const deadline = Date.now() + 2 * demoFriends.timing.walkMs;
+    while (Date.now() < deadline) {
+      assert.equal(seen.length, soFar);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(seen.length, soFar);
+  });
+
+  it("starts each walk from where the friend really is, even if the meetup point moved in between", async (t) => {
+    // Beats 4 to 7 wait long enough for the meetup point to be set between them
+    Object.assign(demoFriends.timing, { minMs: 300, maxMs: 300 });
+    const world = await makeWorld();
+    const seen = recordJordan(t, world);
+    await subscribe(await logIn(world.person), world.picnic.toString());
+    // The first beat's jump, then all ten steps of beat 4's walk
+    await until(() => seen.length >= 11, "Jordan's first walk to end");
+    await api().put(`/api/events/${world.picnic}/live/meetup`)
+      .set('Authorization', `Bearer ${world.person.token}`)
+      .send({ lat: 33.8, lng: -84.4, note: 'Moved' })
+      .expect(200);
+    await finished(world);
+
+    // Beat 7's first step is one small step on from where beat 4 left him
+    // (a tenth of the way to the new point), not a jump from a halfway point
+    // worked out for the new meetup point
+    assert.equal(seen.length, 21);
+    const [stopLat, stopLng] = seen[10];
+    const [firstLat, firstLng] = seen[11];
+    const step = Math.hypot(firstLat - stopLat, firstLng - stopLng);
+    assert.ok(step < 0.003, `the first step was ${step} degrees`);
+    assert.deepEqual(seen.at(-1), [33.8, -84.4]);
   });
 });
 

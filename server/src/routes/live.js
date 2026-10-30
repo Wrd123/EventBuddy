@@ -74,7 +74,7 @@ const currentMeetup = (event) =>
 const router = express.Router({ mergeParams: true });
 
 // -> { sharing: { id, until, seq } | null, people: [{ user, share, name, color,
-//      lat, lng, accuracy, positionAt, until }], meetup }
+//      lat, lng, accuracy, positionAt, until }], meetup, now }
 // people is everyone else who's sharing and has sent a position. id and share
 // name a share, which ends when sharing does, so a phone can tell a fix meant
 // for its old share from one for its new one. seq is the last fix number
@@ -105,7 +105,8 @@ router.get('/', async (req, res) => {
     // Freshest first
     .sort((a, b) => b.positionAt - a.positionAt);
 
-  res.json({ sharing: mine ? sharingOf(mine) : null, people, meetup: currentMeetup(event) });
+  // now lets a phone with a wrong clock still count "8 s ago" correctly
+  res.json({ sharing: mine ? sharingOf(mine) : null, people, meetup: currentMeetup(event), now: Date.now() });
 });
 
 // Start sharing, or change until when. Body: { until: ISO time }

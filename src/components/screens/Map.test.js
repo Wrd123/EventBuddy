@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi, settle, removeEvent, holdNext, presence, openSockets } from '../../testUtils/fakeApi';
+import { installFakeApi, settle, removeEvent, holdNext, presence, openSockets, moveFriend } from '../../testUtils/fakeApi';
 import MainLayout from '../layout/MainLayout';
 import { eventDays } from './Map';
 
@@ -635,6 +635,57 @@ describe('Sharing across the app', () => {
     expect(requests('DELETE', '/api/events/5/live/share')).toHaveLength(1);
     await waitFor(() => expect(geolocation.clearWatch).toHaveBeenCalledWith(3));
     expect(storedShare()).toBeNull();
+  });
+});
+
+describe('Map captions in seconds', () => {
+  // The clock is ours from the start, so time passes only when we say; it
+  // still ticks along on its own, which lets the fake API's replies through
+  // Time passes a second at a time, so a poll's reply lands soon after it
+  // was sent. The clock offset counts the reply's travel time, so after one
+  // long jump of the fake clock, the seconds would read well short of it.
+  const pass = async (ms) => {
+    for (let spent = 0; spent < ms; spent += 1000) {
+      await act(async () => { jest.advanceTimersByTime(1000); });
+    }
+  };
+  beforeEach(() => jest.useFakeTimers({ advanceTimers: true }));
+  afterEach(() => jest.useRealTimers());
+
+  it('count the seconds since a friend\'s last position, and keep counting', async () => {
+    installFakeApi({ liveEvent: true }).logIn();
+    moveFriend('5', 'u2', { lat: 33.7866, lng: -84.3727 });
+    renderAt('/map');
+    const alex = await pin('Friend: Alex');
+    expect(alex.dataset.caption).toBe('Alex • just now');
+
+    await pass(8000);
+    expect(screen.getByRole('button', { name: 'Friend: Alex' }).dataset.caption).toMatch(/^Alex • (7|8|9) s ago$/);
+
+    await pass(62000);
+    expect(screen.getByRole('button', { name: 'Friend: Alex' }).dataset.caption).toBe('Alex • 1 min ago');
+  });
+
+  it("go by the server's clock, not a phone that runs 20 s fast", async () => {
+    installFakeApi({ liveEvent: true, viewerClockAheadMs: 20000 }).logIn();
+    moveFriend('5', 'u2', { lat: 33.7866, lng: -84.3727 });
+    renderAt('/map');
+    const alex = await pin('Friend: Alex');
+    expect(alex.dataset.caption).toBe('Alex • just now');
+
+    fireEvent.click(alex);
+    expect(await screen.findByText(/^Updated just now/)).toBeInTheDocument();
+  });
+
+  it("show the same wording on the friend's panel", async () => {
+    installFakeApi({ liveEvent: true }).logIn();
+    moveFriend('5', 'u2', { lat: 33.7866, lng: -84.3727 });
+    renderAt('/map');
+    fireEvent.click(await pin('Friend: Alex'));
+    expect(await screen.findByText(/^Updated just now/)).toBeInTheDocument();
+
+    await pass(12000);
+    expect(screen.getByText(/^Updated (11|12|13) s ago/)).toBeInTheDocument();
   });
 });
 

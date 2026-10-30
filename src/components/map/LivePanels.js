@@ -114,8 +114,9 @@ const ShareChoices = ({ event, onShare }) => {
   );
 };
 
-// A friend's pin, tapped. here: they have the app open right now.
-export const FriendPanel = ({ person, here = false }) => (
+// A friend's pin, tapped. here: they have the app open right now. now: the
+// time to count from, the same one the map's captions use.
+export const FriendPanel = ({ person, here = false, now = Date.now() }) => (
   <div>
     <div className="flex items-center mb-3">
       <div className="relative mr-3 shrink-0" aria-hidden="true">
@@ -130,7 +131,7 @@ export const FriendPanel = ({ person, here = false }) => (
       <div className="min-w-0">
         <h2 className="font-bold truncate">{person.name}</h2>
         <p className="text-sm text-muted">
-          {here && 'Here now • '}Updated {agoText(person.positionAt)} • sharing {untilText(person.until)}
+          {here && 'Here now • '}Updated {agoText(person.positionAt, now)} • sharing {untilText(person.until)}
         </p>
       </div>
     </div>

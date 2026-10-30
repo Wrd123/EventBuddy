@@ -33,6 +33,7 @@
 // 'left'), leaves the picnic, or the world is pruned.
 const User = require('../models/User');
 const Event = require('../models/Event');
+const LocationShare = require('../models/LocationShare');
 const config = require('../config');
 const { signToken } = require('../middleware/auth');
 const { idInWorld, demoWorldUserId } = require('../seed/demoData');
@@ -42,8 +43,11 @@ const realtime = require('./hub');
 // (so even a returning visitor sees something within seconds), else a random
 // time between minMs and maxMs. Tests shorten all of it.
 // toldCheckMs is how often a session whose story is told checks that its
-// world is still the one it told it in.
-const timing = { leadMs: [5000, 10000, 15000], minMs: 20000, maxMs: 40000, requestMs: 5000, toldCheckMs: 60000 };
+// world is still the one it told it in. walkMs is the time between the
+// steps of a walk: about as often as a phone sends its position.
+const timing = {
+  leadMs: [5000, 10000, 15000], minMs: 20000, maxMs: 40000, requestMs: 5000, toldCheckMs: 60000, walkMs: 2000
+};
 
 const FRIENDS = ['Alex', 'Taylor', 'Jordan'];
 
@@ -51,13 +55,17 @@ const FRIENDS = ['Alex', 'Taylor', 'Jordan'];
 // Jordan's seeded pin is a stale 33.7832, -84.3768.
 const DOCK = { lat: 33.7857, lng: -84.3741 };
 const JORDAN_ON_HIS_WAY = { lat: 33.7836, lng: -84.3762 };
+// Alex's seeded pin, where his walk starts
+const ALEX_SEEDED = { lat: 33.7866, lng: -84.3727 };
 const ALEX_NUDGED = { lat: 33.7861, lng: -84.3735 };
 
 // The story as data. A beat is a list of requests, each { as, method, path,
-// body } where path and body may be functions of { picnic, ids, beat, n }
-// (the fresh picnic, user ids by name, this beat's index, this request's
-// index in the beat). A path of null means there is nothing to do, which
-// counts as a failed request.
+// body, afterMs } where path and body may be functions of { picnic, ids, at,
+// beat, n } (the fresh picnic, user ids by name, where each friend with a
+// stored position is right now, this beat's index, this request's index in
+// the beat). A path of null means there is nothing to do,
+// which counts as a failed request. afterMs (a number, or a function that
+// returns one) is a wait before the request, cut short if the session stops.
 const chat = (as, text) => ({
   as,
   method: 'POST',
@@ -73,6 +81,35 @@ const move = (as, position) => ({
   body: typeof position === 'function' ? position : () => ({ ...position, accuracy: 15 })
 });
 
+// A friend walking from one point to another: a move every everyMs along the
+// straight line, the last exactly on `to`. A single jump would show the app
+// nothing to glide between, since the story's beats are 20-40 s apart.
+// from and to are points, or functions of the context like move's position.
+// A walk's start should be read from `at`, so it begins where the friend
+// really is, whatever happened between beats.
+// These are plain position requests, with none of the ordering fields, so
+// the server stamps each with its arrival time: fine, as they arrive in
+// order. Ten steps at 2 s is 30 positions a minute, well under the limit.
+const walk = (as, from, to, { steps = 10, everyMs } = {}) =>
+  Array.from({ length: steps }, (_, i) => ({
+    as,
+    method: 'PUT',
+    path: 'live/position',
+    // Read when played, not when the script is built, so tests can speed it up
+    afterMs: i === 0 ? 0 : everyMs ?? (() => timing.walkMs),
+    body: (context) => {
+      const start = typeof from === 'function' ? from(context) : from;
+      const end = typeof to === 'function' ? to(context) : to;
+      const point = i === steps - 1
+        ? end
+        : {
+          lat: start.lat + ((end.lat - start.lat) * (i + 1)) / steps,
+          lng: start.lng + ((end.lng - start.lng) * (i + 1)) / steps
+        };
+      return { lat: point.lat, lng: point.lng, accuracy: 15 };
+    }
+  }));
+
 // The meetup point if one is set and still current, else the dock
 const targetOf = (picnic) =>
   picnic.meetup?.expiresAt > new Date() ? { lat: picnic.meetup.lat, lng: picnic.meetup.lng } : DOCK;
@@ -86,6 +123,10 @@ const equalShares = (picnic, amountCents) => {
   const extra = amountCents % picnic.members.length;
   return picnic.members.map((m, i) => ({ user: m.user.toString(), amountCents: base + (i < extra ? 1 : 0) }));
 };
+
+// Where Jordan has got to by beat 4's end, and where beat 7's walk starts if
+// his stored position can't be read
+const jordanHalfway = ({ picnic }) => halfway(JORDAN_ON_HIS_WAY, targetOf(picnic));
 
 const sunsetWalk = ({ picnic }) => picnic.schedule.find((item) => item.activity === 'Sunset walk');
 
@@ -115,13 +156,13 @@ const SCRIPT = [
     },
     chat('Alex', "Ice cream's on me, it's in expenses 🍦")
   ],
-  // 3. Taylor is at the dock; Alex drifts toward the meetup point
+  // 3. Taylor is at the dock; Alex strolls a few steps toward the meetup point
   [
     chat('Taylor', "I'm at the dock with the blanket, come find us 🧺"),
-    move('Alex', ALEX_NUDGED)
+    ...walk('Alex', ({ at }) => at.Alex || ALEX_SEEDED, ALEX_NUDGED, { steps: 5 })
   ],
-  // 4. Jordan gets closer
-  [move('Jordan', ({ picnic }) => ({ ...halfway(JORDAN_ON_HIS_WAY, targetOf(picnic)), accuracy: 15 }))],
+  // 4. Jordan gets closer: a walk to the halfway point
+  [...walk('Jordan', ({ at }) => at.Jordan || JORDAN_ON_HIS_WAY, jordanHalfway)],
   // 5. Jordan joins the sunset walk (marking Going leaves no activity line)
   [{ as: 'Jordan', method: 'PUT', path: (ctx) => sunsetWalk(ctx) && `schedule/${sunsetWalk(ctx)._id}/going` }],
   // 6. Taylor plans a photo for today
@@ -139,9 +180,9 @@ const SCRIPT = [
       })
     }
   ],
-  // 7. Jordan arrives
+  // 7. Jordan walks the rest of the way, and only says so if he got there
   [
-    move('Jordan', ({ picnic }) => ({ ...targetOf(picnic), accuracy: 10 })),
+    ...walk('Jordan', (context) => context.at.Jordan || jordanHalfway(context), ({ picnic }) => targetOf(picnic)),
     chat('Jordan', 'Found you all! 👋')
   ]
 ];
@@ -203,12 +244,32 @@ const send = async (session, step, context) => {
 };
 
 // A beat stops at its first failed request
-const playBeat = async (session, beat, picnic, ids) => {
+const playBeat = async (session, beat, picnic, ids, at) => {
   for (let n = 0; n < SCRIPT[beat].length; n += 1) {
     if (session.stopped) return;
-    const ok = await send(session, SCRIPT[beat][n], { picnic, ids, beat, n });
+    const step = SCRIPT[beat][n];
+    const waitMs = typeof step.afterMs === 'function' ? step.afterMs() : step.afterMs;
+    if (waitMs) {
+      await pause(session, waitMs);
+      // A stop during a walk sends nothing more
+      if (session.stopped) return;
+    }
+    const ok = await send(session, step, { picnic, ids, at, beat, n });
     if (!ok) return;
   }
+};
+
+// Where each friend is now, by name: { lat, lng } for those with a stored
+// position. A walk starts from there, so it never jumps if something moved a
+// friend's pin (or the meetup point) since the last beat was scripted.
+const positionsOf = async (session, ids) => {
+  const shares = await LocationShare.find({ event: session.picnicId }).lean();
+  const at = {};
+  FRIENDS.forEach((name) => {
+    const share = shares.find((s) => s.user.equals(ids[name]));
+    if (share && Number.isFinite(share.lat) && Number.isFinite(share.lng)) at[name] = { lat: share.lat, lng: share.lng };
+  });
+  return at;
 };
 
 const run = async (session) => {
@@ -277,7 +338,10 @@ const run = async (session) => {
 
     session.told = false;
 
-    await playBeat(session, before.demoScriptStep || 0, picnic, ids);
+    // Read once, so every step of a walk starts from the same place
+    const at = await positionsOf(session, ids);
+    if (session.stopped) return;
+    await playBeat(session, before.demoScriptStep || 0, picnic, ids, at);
   }
 };
 

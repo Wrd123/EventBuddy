@@ -18,7 +18,7 @@
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 423 server tests, 521 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 438 server tests, 589 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -42,7 +42,8 @@
 
 ## Waiting on the user
 
-- **Push `demo-friends`** (`git push origin demo-friends:main`), then redeploy the API for it (and for 4c, if that hasn't been done). Check: Try the demo, open the picnic, and within ~15 s "Alex added Ice cream ($18.00)" appears and John's "Owed" drops by $4.50.
+- **Push `live-glide`** (`git push origin live-glide:main`; it has 4d's fixes under it too), then redeploy the API for it. Check: open the picnic map in the demo; Jordan's walk to the dock (story steps 4 and 7) glides, and captions read in seconds.
+- (Earlier) **Push `demo-friends`** if `live-glide` isn't pushed instead, then redeploy the API for it (and for 4c, if that hasn't been done). Check: Try the demo, open the picnic, and within ~15 s "Alex added Ice cream ($18.00)" appears and John's "Owed" drops by $4.50.
 - **Redeploy `eventbuddy-api` for `4da7140a`**, if it hasn't been done. Without it, the live picnic has no schedule or costs, and Discover's not-configured message is the old one.
   - Check: a new demo world's "Picnic in the Park" should have 4 schedule items.
 - **Turn on Auto-Deploy for `eventbuddy-api`** (Settings → Build & Deploy), so this stops being a manual step.
@@ -103,6 +104,34 @@
   - **P2:** a finished session waited forever, so a world pruned and rebuilt with the same ids never got its story, and a deleted picnic or a John who left went unnoticed. A told session now re-runs the loop's checks every `toldCheckMs` (60 s), and at once when John opens the picnic again: a rebuilt world (counter back at 0) gets its story, and anything else invalid ends the session.
   - "Never undoes a claim made by the session that replaced it" and the four "after the story is told" tests fail when the old code is put back. "Hands the beat back when nobody has claimed since" guards against making the condition too strict.
 - **Tests:** `server/tests/demoFriends.test.js` (27). Its cleanup hook is registered before `useTestDatabase()`, so stories stop before each wipe. Not covered: `'left'` through token expiry (it shares `endPresence` with logout, which is tested).
+
+**Smoother live tracking (29 Oct, on `live-glide`, after 4d).** The user asked for a friend's pin that moves like a delivery driver's. The plan was revised twice after Codex's reviews, then built by Sonnet subagents, checked by Claude, and reviewed by the `reviewer` subagent before each commit.
+- **Commit A, `b9f9bbf8`, frequent ordered uploads:**
+  - **Sender** (`SharingContext` `useShareMyLocation`, `utils/live.js`):
+    - about every 2 s while moving on screen, with a 10 s target hidden;
+    - one upload in flight, with only the newest fix pending;
+    - checked on every location callback, on becoming visible, and after each upload;
+    - `hasMoved` needs `max(3 m, min(accuracy, 15 m))`;
+    - the heartbeat sends only a new fix;
+    - every failure backs off (4/8/16/30 s, `Retry-After` honoured, exposed by CORS).
+  - **Ordering** (`routes/live.js`):
+    - a fix carries `shareId`, `seq` and `ageMs`;
+    - `positionAt = receipt − ageMs`, plus a stored `receivedAt`;
+    - only a higher `seq` for that share id is stored, an out-of-date or >2-min-old fix answers 204 with `res.locals.noPoke`, and an ended share answers 409;
+    - with none of the three fields, the old unordered path, used by the demo friends.
+  - **Keeping count:** `sharing: { id, until, seq }` comes back from `PUT /share` and `GET /live`. The phone keeps its count in `eventbuddy_share_seq` and counts on from the larger of its own and the server's, so a relaunch doesn't freeze the pin (the reviewer's High finding).
+- **Commit B, glide and freshness:**
+  - **Glide:** `utils/glide.js`, and `createGlider` in `MapCanvas.js` with one rAF loop. It's linear over the measured gap (cap 3 s), snaps after more than 10 s, on first placement, under reduced motion and when the page comes back.
+  - **Accuracy circle** (`.eb-accuracy` in `map.css`) above 20 m.
+  - **Merge:** `mergePositions` in `useLive` (same share only; the server's list decides who's there).
+  - **Captions:** seconds, ticking once a second while friend pins show. `STALE_AFTER_MS` is 2 min.
+  - **Demo friends walk:** `walk()` steps with a stop-aware `afterMs` (`timing.walkMs`).
+- **Checked live** on `rt-api-4150` plus the `rt-web-3999` build, with `walker.mjs` (scratchpad) as a second person joining by invite.
+  - Reads arrived every 2 s, and a fix was readable 5–60 ms after it was measured.
+  - The pin moved in 1 px steps across each interval while frames ran.
+  - The in-app browser pane pauses frames for about 1 s at a time, so judge smoothness on a device.
+  - No CSP errors.
+- **Not claimed:** the locked-iPhone pace and battery. That's finish-plan item 6's physical check.
 
 **Security review** (Claude and Codex independently, then fixes with tests). `docs/SECURITY_REVIEW.md` is the full record.
 

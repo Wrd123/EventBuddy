@@ -5,7 +5,7 @@ const livePath = (eventId) => `/events/${encodeURIComponent(eventId)}/live`;
 
 // -> { sharing: { id, until } | null, people: [{ user, name, color, share,
 //      lat, lng, accuracy, positionAt, until }], meetup: { lat, lng, note, time,
-//      setBy: { user, name }, setAt } | null }
+//      setBy: { user, name }, setAt } | null, now: the server's time in ms }
 export const getLive = (eventId) => apiRequest(livePath(eventId));
 
 // until: a Date, at most 24 hours ahead

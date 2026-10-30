@@ -369,10 +369,14 @@ export const failNext = (method, path, status = 503, { retryAfter } = {}) => {
   failures.push({ method, path, status, retryAfter });
 };
 
+// The server's clock. options.viewerClockAheadMs makes the viewer's clock
+// that much faster than the server's.
+const serverNow = () => Date.now() - (fakeOptions.viewerClockAheadMs || 0);
+
 // A friend sending a new position, as a later read of the map will show
 export const moveFriend = (eventId, user, { lat, lng }) => {
   const person = live[eventId].people.find((p) => p.user === user);
-  Object.assign(person, { lat, lng, positionAt: new Date().toISOString() });
+  Object.assign(person, { lat, lng, positionAt: new Date(serverNow()).toISOString() });
 };
 
 // A message from someone else arriving while the app is open
@@ -468,7 +472,7 @@ let nextShareId = 1;
 
 const liveRoute = (event, method, action, body) => {
   const state = live[event._id] = live[event._id] || { sharing: null, people: [], meetup: null };
-  if (!action && method === 'GET') return respond(200, state);
+  if (!action && method === 'GET') return respond(200, { ...state, now: serverNow() });
   if (action === 'share' && method === 'PUT') {
     // Extending keeps the share's id; stopping and starting again is a new share
     state.sharing = { id: state.sharing?.id || `share-${nextShareId++}`, until: body.until };

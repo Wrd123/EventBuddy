@@ -1,11 +1,17 @@
-import { agoText, isStale, metersBetween, hasMoved, nextSend, backoffMs, shareDurations, untilText, directionsUrl, stillSharing, nextShareEnd } from './live';
+import { agoText, isStale, metersBetween, hasMoved, nextSend, backoffMs, shareDurations, untilText, directionsUrl, stillSharing, nextShareEnd, mergePositions } from './live';
 
 const NOW = new Date(2026, 9, 24, 15, 0).getTime();
 const minutesBefore = (m) => new Date(NOW - m * 60 * 1000).toISOString();
+const secondsBefore = (s) => new Date(NOW - s * 1000).toISOString();
 
 describe('agoText', () => {
   it('reads like a person would say it', () => {
-    expect(agoText(minutesBefore(0.5), NOW)).toBe('just now');
+    expect(agoText(secondsBefore(0), NOW)).toBe('just now');
+    expect(agoText(secondsBefore(4), NOW)).toBe('just now');
+    expect(agoText(secondsBefore(5), NOW)).toBe('5 s ago');
+    expect(agoText(secondsBefore(8), NOW)).toBe('8 s ago');
+    expect(agoText(secondsBefore(59), NOW)).toBe('59 s ago');
+    expect(agoText(minutesBefore(1), NOW)).toBe('1 min ago');
     expect(agoText(minutesBefore(4), NOW)).toBe('4 min ago');
     expect(agoText(minutesBefore(59), NOW)).toBe('59 min ago');
     expect(agoText(minutesBefore(125), NOW)).toBe('2 hr ago');
@@ -13,9 +19,9 @@ describe('agoText', () => {
 });
 
 describe('isStale', () => {
-  it('fades pins after 10 minutes without an update', () => {
-    expect(isStale(minutesBefore(9), NOW)).toBe(false);
-    expect(isStale(minutesBefore(11), NOW)).toBe(true);
+  it('fades pins after 2 minutes without an update', () => {
+    expect(isStale(minutesBefore(1.5), NOW)).toBe(false);
+    expect(isStale(minutesBefore(2.5), NOW)).toBe(true);
   });
 });
 
@@ -150,5 +156,58 @@ describe('stillSharing and nextShareEnd', () => {
   it('finds the next share to run out', () => {
     expect(nextShareEnd(people, NOW)).toBe(new Date(minutesAfter(5)).getTime());
     expect(nextShareEnd([people[1]], NOW)).toBeNull();
+  });
+});
+
+describe('mergePositions', () => {
+  const person = (over = {}) => ({
+    user: 'u1', share: 's1', name: 'Alex', color: '#3b82f6', lat: 1, lng: 2, accuracy: 5,
+    positionAt: secondsBefore(10), until: minutesBefore(-30), ...over
+  });
+
+  it('keeps the newer spot when an older read lands later', () => {
+    const prev = [person({ lat: 9, lng: 9, accuracy: 3, positionAt: secondsBefore(2) })];
+    const next = [person({ name: 'Alexa', color: '#ef4444', until: minutesBefore(-60) })];
+
+    expect(mergePositions(prev, next)).toEqual([
+      { ...next[0], lat: 9, lng: 9, accuracy: 3, positionAt: secondsBefore(2) }
+    ]);
+  });
+
+  it('takes the server\'s spot when it is newer or the same age', () => {
+    const prev = [person({ positionAt: secondsBefore(10) })];
+    const newer = [person({ lat: 5, positionAt: secondsBefore(3) })];
+    const same = [person({ lat: 6 })];
+
+    expect(mergePositions(prev, newer)).toEqual(newer);
+    expect(mergePositions(prev, same)).toEqual(same);
+  });
+
+  it('takes the new fix when the share was restarted', () => {
+    const prev = [person({ share: 's1', lat: 9, positionAt: secondsBefore(1) })];
+    const next = [person({ share: 's2', lat: 1 })];
+
+    expect(mergePositions(prev, next)).toEqual(next);
+  });
+
+  it('lets someone who left the list disappear, and adds newcomers as they are', () => {
+    const prev = [person(), person({ user: 'u2', share: 's2' })];
+    const next = [person({ user: 'u3', share: 's3' })];
+
+    expect(mergePositions(prev, next)).toEqual(next);
+  });
+
+  it('keeps the server\'s order', () => {
+    const prev = [person({ user: 'u1' }), person({ user: 'u2', share: 's2' })];
+    const next = [person({ user: 'u2', share: 's2' }), person({ user: 'u1' })];
+
+    expect(mergePositions(prev, next).map(p => p.user)).toEqual(['u2', 'u1']);
+  });
+
+  it('does not guess when there is no share id to compare', () => {
+    const prev = [person({ share: undefined, lat: 9, positionAt: secondsBefore(1) })];
+    const next = [person({ share: undefined })];
+
+    expect(mergePositions(prev, next)).toEqual(next);
   });
 });

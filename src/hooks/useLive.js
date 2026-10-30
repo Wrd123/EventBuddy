@@ -4,7 +4,7 @@ import { usePolling } from './usePolling';
 import { useSharing, endShareOnServer } from '../context/SharingContext';
 import { ApiError } from '../services/api';
 import { createFreshness } from '../utils/freshness';
-import { stillSharing, nextShareEnd } from '../utils/live';
+import { stillSharing, nextShareEnd, mergePositions } from '../utils/live';
 
 // Friends' positions arrive about this often while the map is open
 export const LIVE_POLL_MS = 10000;
@@ -12,8 +12,10 @@ export const LIVE_POLL_MS = 10000;
 // Who's sharing where in an event, and the meetup point, kept fresh while
 // the map is on screen. eventId may be null (no event happening).
 // status: 'idle' | 'loading' | 'ready' | 'error'
+// clockOffset: add it to Date.now() for the server's time, so "8 s ago"
+// doesn't depend on this phone's clock being right
 export const useLive = (eventId) => {
-  const [state, setState] = useState({ status: eventId ? 'loading' : 'idle', sharing: null, people: [], meetup: null, error: '' });
+  const [state, setState] = useState({ status: eventId ? 'loading' : 'idle', sharing: null, people: [], meetup: null, clockOffset: 0, error: '' });
   const current = useRef(eventId);
   current.current = eventId;
   // The app-wide share (see SharingContext) follows what the server says
@@ -52,9 +54,13 @@ export const useLive = (eventId) => {
     if (!eventId) return;
     const read = freshness.start();
     try {
-      const { sharing, people, meetup } = await liveService.getLive(eventId);
+      const { sharing, people, meetup, now } = await liveService.getLive(eventId);
       if (current.current !== eventId || !freshness.accept(read)) return;
-      setState({ status: 'ready', sharing, people, meetup, error: '' });
+      // Merged against what's showing, so an older fix never pulls a pin back
+      // How far this phone's clock is from the server's, which stamped the
+      // positions: it ignores the trip's delay, fine for counting seconds
+      const clockOffset = Number.isFinite(now) ? now - Date.now() : 0;
+      setState(prev => ({ status: 'ready', sharing, people: mergePositions(prev.people, people), meetup, clockOffset, error: '' }));
       const mine = shareRef.current;
       if (unstoppedRef.current?.eventId === eventId) {
         if (sharing) retryStop();
@@ -77,7 +83,7 @@ export const useLive = (eventId) => {
   }, [eventId, setShare, setUnstopped, retryStop, freshness]);
 
   useEffect(() => {
-    setState({ status: eventId ? 'loading' : 'idle', sharing: null, people: [], meetup: null, error: '' });
+    setState({ status: eventId ? 'loading' : 'idle', sharing: null, people: [], meetup: null, clockOffset: 0, error: '' });
     load();
   }, [eventId, load]);
   usePolling(load, LIVE_POLL_MS, { eventId, what: 'live' });

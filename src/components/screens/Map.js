@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Flag, MapPin } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Footer, { TAB_BAR_CLEARANCE } from '../layout/Footer';
@@ -84,6 +84,38 @@ const Map = () => {
   const unmapped = shownEvents.filter(e => !hasPosition(e));
   const venues = groupByVenue(nearby.events);
 
+  // "8 s ago" counts seconds, so with friends on the map the screen draws
+  // again every second: one timer for every pin and panel, and none while
+  // there's nobody to count for or the page is out of sight.
+  const countingFriends = Boolean(liveEvent) && show.friends && live.people.length > 0;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!countingFriends) return undefined;
+    let timer = null;
+    const start = () => {
+      if (timer !== null) return;
+      setNow(Date.now());
+      timer = setInterval(() => setNow(Date.now()), 1000);
+    };
+    const stop = () => {
+      clearInterval(timer);
+      timer = null;
+    };
+    const onVisibility = () => (document.visibilityState === 'visible' ? start() : stop());
+    if (document.visibilityState === 'visible') start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      stop();
+    };
+  }, [countingFriends]);
+
+  // The server's time, as best this phone can tell, for every caption and the
+  // panel: positions are stamped by the server, and this phone's own clock
+  // may be fast or slow. Before the first tick, the time right now, so the
+  // first draw with friends isn't judged by a stale reading.
+  const at = (countingFriends ? now : Date.now()) + live.clockOffset;
+
   const friendPins = liveEvent && show.friends
     ? [
         ...live.people.map(p => ({
@@ -94,10 +126,12 @@ const Map = () => {
           label: p.name,
           color: p.color,
           initial: p.name.charAt(0),
-          caption: `${p.name} • ${agoText(p.positionAt)}`,
-          stale: isStale(p.positionAt)
+          caption: `${p.name} • ${agoText(p.positionAt, at)}`,
+          stale: isStale(p.positionAt, at),
+          accuracy: p.accuracy,
+          fixAt: new Date(p.positionAt).getTime()
         })),
-        ...(me.position ? [{ id: 'me', kind: 'me', lat: me.position.lat, lng: me.position.lng, label: 'You' }] : [])
+        ...(me.position ? [{ id: 'me', kind: 'me', lat: me.position.lat, lng: me.position.lng, label: 'You', fixAt: me.position.measuredAt }] : [])
       ]
     : [];
   // The meetup point shows with the friends, or on its own before the event
@@ -202,7 +236,7 @@ const Map = () => {
         {placingMeetup ? (
           <MeetupForm existing={live.meetup} onSave={saveMeetup} onCancel={() => setPlacingMeetup(false)} />
         ) : selectedPerson ? (
-          <FriendPanel person={selectedPerson} here={here.has(selectedPerson.user)} />
+          <FriendPanel person={selectedPerson} here={here.has(selectedPerson.user)} now={at} />
         ) : selectedMeetup ? (
           <MeetupPanel meetup={selectedMeetup} onClear={async () => { await live.clearMeetup(); setSelectedId(null); }} />
         ) : selectedEvent ? (

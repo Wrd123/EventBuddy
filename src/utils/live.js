@@ -1,15 +1,23 @@
 // Small helpers for live locations
 
-const MINUTE = 60 * 1000;
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
 
 // After this long without an update, a friend's pin fades: they may have
-// moved since
-export const STALE_AFTER_MS = 10 * MINUTE;
+// moved since. Positions now arrive every couple of seconds while someone
+// moves, so two quiet minutes already means something.
+export const STALE_AFTER_MS = 2 * MINUTE;
 
-// "just now", "4 min ago", "1 hr ago"
+// Under this, a position is as fresh as it gets, and counting seconds would
+// only flicker
+const JUST_NOW_MS = 5 * SECOND;
+
+// "just now", "8 s ago", "4 min ago", "1 hr ago"
 export const agoText = (when, now = Date.now()) => {
-  const minutes = Math.floor((now - new Date(when).getTime()) / MINUTE);
-  if (minutes < 1) return 'just now';
+  const elapsed = now - new Date(when).getTime();
+  if (elapsed < JUST_NOW_MS) return 'just now';
+  if (elapsed < MINUTE) return `${Math.floor(elapsed / SECOND)} s ago`;
+  const minutes = Math.floor(elapsed / MINUTE);
   if (minutes < 60) return `${minutes} min ago`;
   return `${Math.floor(minutes / 60)} hr ago`;
 };
@@ -102,6 +110,22 @@ export const shareDurations = (now = new Date()) => {
 // when it ends, but the map only reads now and then, so it checks too.
 export const stillSharing = (people, now = Date.now()) =>
   people.filter((person) => new Date(person.until).getTime() > now);
+
+// The server's list of who's sharing, with one guard: a read that was
+// answered a moment ago can land after a newer one, and showing an older
+// fix would pull a pin backwards. The server's list is the truth for who is
+// there and for everything but the spot; the spot stays the newer one, but
+// only for the same share. A restarted share (a new id) starts fresh.
+export const mergePositions = (prevPeople, nextPeople) => {
+  const before = new Map(prevPeople.map((person) => [person.user, person]));
+  return nextPeople.map((person) => {
+    const old = before.get(person.user);
+    const newer = old && old.share && old.share === person.share
+      && new Date(old.positionAt).getTime() > new Date(person.positionAt).getTime();
+    if (!newer) return person;
+    return { ...person, lat: old.lat, lng: old.lng, accuracy: old.accuracy, positionAt: old.positionAt };
+  });
+};
 
 // When the next of these shares runs out, or null when none will
 export const nextShareEnd = (people, now = Date.now()) => {

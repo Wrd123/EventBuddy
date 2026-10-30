@@ -106,6 +106,15 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
+/* How far off a friend's position could be: a soft disc under their pin */
+.eb-accuracy {
+  fill: theme('colors.accent.DEFAULT');
+  fill-opacity: 0.12;
+  stroke: theme('colors.accent.DEFAULT');
+  stroke-opacity: 0.4;
+  stroke-width: 1;
+}
+
 /* Not updated for a while: they may have moved since */
 .eb-pin-stale {
   opacity: 0.55;

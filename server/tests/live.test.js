@@ -59,6 +59,16 @@ describe('sharing your location', () => {
     assert.ok(person.positionAt);
   });
 
+  it("says what time it is on the server, so a phone with a wrong clock can count from it", async () => {
+    const { organizer, event } = await setup();
+
+    const before = Date.now();
+    const view = await getLive(organizer.auth, event);
+
+    assert.ok(Number.isInteger(view.now));
+    assert.ok(view.now >= before && view.now <= Date.now());
+  });
+
   it("doesn't list you to yourself, but says you're sharing", async () => {
     const { friend, event } = await setup();
     await startSharing(friend.auth, event);
