@@ -18,7 +18,7 @@
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 438 server tests, 589 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 439 server tests, 589 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -132,6 +132,7 @@
   - The in-app browser pane pauses frames for about 1 s at a time, so judge smoothness on a device.
   - No CSP errors.
 - **Not claimed:** the locked-iPhone pace and battery. That's finish-plan item 6's physical check.
+- **Nobody walks through Lake Clara Meer (29 Oct, after the user spotted Jordan crossing it).** Jordan's straight walk to the dock crossed the lake's southern arm, and Alex's seeded pin and nudge target were inside it. Both friends now start on the west shore (`demoData.js`, `demoFriends.js`), every walk is a straight line at least 6 m from the water, and `demoFriends.test.js` checks every seeded pin and every step of the story against the lake's OpenStreetMap outline (`server/tests/fixtures/lake-clara-meer.json`, relation 2474664, ODbL). The routes were checked with a footpath graph from OpenStreetMap (Overpass). Known limit: if a visitor moves the meetup point across the lake, Jordan's last leg is still a straight line.
 
 **Security review** (Claude and Codex independently, then fixes with tests). `docs/SECURITY_REVIEW.md` is the full record.
 

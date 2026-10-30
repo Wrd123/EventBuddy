@@ -52,12 +52,15 @@ const timing = {
 const FRIENDS = ['Alex', 'Taylor', 'Jordan'];
 
 // Where things happen, near the picnic's seeded meetup point (the dock).
-// Jordan's seeded pin is a stale 33.7832, -84.3768.
+// Lake Clara Meer is right beside it, so every walk here is a straight line
+// that stays at least 6 m from its shore (OpenStreetMap's outline, checked
+// in demoFriends.test.js): nobody wades through the lake. Jordan's seeded
+// pin is a stale 33.78517, -84.37518, on the shore south-west of the dock.
 const DOCK = { lat: 33.7857, lng: -84.3741 };
-const JORDAN_ON_HIS_WAY = { lat: 33.7836, lng: -84.3762 };
-// Alex's seeded pin, where his walk starts
-const ALEX_SEEDED = { lat: 33.7866, lng: -84.3727 };
-const ALEX_NUDGED = { lat: 33.7861, lng: -84.3735 };
+const JORDAN_ON_HIS_WAY = { lat: 33.78521, lng: -84.37509 };
+// Alex's seeded pin, on the path north of the dock, where his walk starts
+const ALEX_SEEDED = { lat: 33.78643, lng: -84.37395 };
+const ALEX_NUDGED = { lat: 33.78563, lng: -84.37418 };
 
 // The story as data. A beat is a list of requests, each { as, method, path,
 // body, afterMs } where path and body may be functions of { picnic, ids, at,

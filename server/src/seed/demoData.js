@@ -229,11 +229,13 @@ const demoPicnic = (users, ids, today) => {
     },
     createdBy: users.Taylor._id
   };
+  // On land around Lake Clara Meer, which the dock looks out on (the
+  // scripted friends walk from here; see realtime/demoFriends.js)
   const shares = [
-    share('Alex', 33.7866, -84.3727, 2),
+    share('Alex', 33.78643, -84.37395, 2),
     share('Taylor', 33.7856, -84.3745, 6),
     // Hasn't moved or opened the app in a while: shown as last seen
-    share('Jordan', 33.7832, -84.3768, 25)
+    share('Jordan', 33.78517, -84.37518, 25)
   ];
   const expenses = [
     expense('Snacks & drinks', 4860, 'Taylor'),

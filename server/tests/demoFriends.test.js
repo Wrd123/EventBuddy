@@ -168,7 +168,7 @@ describe('the scripted friends', () => {
     await ws.next(poke(world.picnic.toString(), 'chat'), 'a chat poke');
     const sorry = await Message.findOne({ event: world.picnic, text: /phone died/ });
     assert.equal(sorry.sender.name, 'Jordan');
-    await until(async () => (await LocationShare.findOne({ event: world.picnic, user: world.id('Jordan') })).lat === 33.7836, "Jordan's pin to move");
+    await until(async () => (await LocationShare.findOne({ event: world.picnic, user: world.id('Jordan') })).lat === 33.78521, "Jordan's pin to move");
 
     const friends = ['Alex', 'Taylor', 'Jordan'].map(world.id);
     await ws.next(presenceWith(world.picnic.toString(), ...friends, world.john._id), 'the friends here');
@@ -228,7 +228,43 @@ const recordJordan = (t, world) => {
   return seen;
 };
 
+// Lake Clara Meer's shoreline, from OpenStreetMap (relation 2474664,
+// (c) OpenStreetMap contributors, ODbL), as [lat, lng] points
+const LAKE = require('./fixtures/lake-clara-meer.json');
+const inLake = ([lat, lng]) => {
+  let inside = false;
+  for (let i = 0, j = LAKE.length - 1; i < LAKE.length; j = i++) {
+    const [y1, x1] = LAKE[i];
+    const [y2, x2] = LAKE[j];
+    if ((y1 > lat) !== (y2 > lat) && lng < ((x2 - x1) * (lat - y1)) / (y2 - y1) + x1) inside = !inside;
+  }
+  return inside;
+};
+// Nowhere on the straight line from a to b is in the lake
+const staysDry = (a, b) => Array.from({ length: 41 }, (_, i) => [a[0] + ((b[0] - a[0]) * i) / 40, a[1] + ((b[1] - a[1]) * i) / 40])
+  .every((point) => !inLake(point));
+
 describe('walking', () => {
+  it('keeps everyone out of the lake, from their seeded pins to the end of the story', async (t) => {
+    const world = await makeWorld();
+    const original = LocationShare.updateOne;
+    const trail = {};
+    (await LocationShare.find({ event: world.picnic }).lean()).forEach((s) => { trail[s.user] = [[s.lat, s.lng]]; });
+    t.mock.method(LocationShare, 'updateOne', function record(filter, update, ...rest) {
+      if (update?.$set?.lat !== undefined) trail[filter.user].push([update.$set.lat, update.$set.lng]);
+      return original.call(this, filter, update, ...rest);
+    });
+    await subscribe(await logIn(world.person), world.picnic.toString());
+    await finished(world);
+
+    for (const [user, points] of Object.entries(trail)) {
+      points.forEach((point) => assert.ok(!inLake(point), `${user} stands in the lake at ${point}`));
+      points.slice(1).forEach((point, i) => assert.ok(staysDry(points[i], point), `${user} walks through the lake to ${point}`));
+    }
+    // Two of them really did walk: Alex's nudge, and Jordan to the dock
+    assert.ok(Object.values(trail).filter((points) => points.length > 3).length >= 2);
+  });
+
   it("Jordan's pin passes through points between the start and the dock, in order, and ends there", async (t) => {
     const world = await makeWorld();
     const seen = recordJordan(t, world);
@@ -237,14 +273,14 @@ describe('walking', () => {
 
     // The first beat's jump, then ten steps to the halfway point, then ten to the dock
     assert.equal(seen.length, 21);
-    assert.deepEqual(seen[0], [33.7836, -84.3762]);
+    assert.deepEqual(seen[0], [33.78521, -84.37509]);
     assert.deepEqual(seen.at(-1), [33.7857, -84.3741]);
     const walked = seen.slice(1);
     // Each step is closer to the dock than the one before, so the order held
     const toDock = walked.map(([lat, lng]) => Math.hypot(lat - 33.7857, lng + 84.3741));
     toDock.slice(1).forEach((d, i) => assert.ok(d < toDock[i], `step ${i + 2} is closer than step ${i + 1}`));
     // And the walk reached the middle on its way, not just the ends
-    assert.ok(walked.some(([lat]) => lat > 33.7836 && lat < 33.7857));
+    assert.ok(walked.some(([lat]) => lat > 33.78521 && lat < 33.7857));
   });
 
   it('sends no further position once the session stops mid-walk', async (t) => {
