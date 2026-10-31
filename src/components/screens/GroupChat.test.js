@@ -213,7 +213,9 @@ describe('Group chat', () => {
       checkForNewMessages();
       await screen.findByText('Sent from my other phone');
 
-      expect(screen.getByRole('button', { name: 'New messages' })).toBeInTheDocument();
+      // The pill follows the messages a render later, so wait for it too: on
+      // a busy machine (CI) it isn't there yet the moment the text appears
+      expect(await screen.findByRole('button', { name: 'New messages' })).toBeInTheDocument();
       expect(reads()).toEqual(['c005']);
     });
 

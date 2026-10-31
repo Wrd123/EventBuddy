@@ -2,13 +2,13 @@
 
 A phone app for planning trips, festivals and nights out with friends: one place for the schedule, the group chat, who owes whom, and where everyone is once you get there.
 
-Built end to end by me: React front end, Express and MongoDB API, and a native iPhone app (Capacitor) that keeps sharing your location with your friends while the phone is locked.
+Built end to end by me: React front end, Express and MongoDB API, and a native iPhone app (Capacitor) built to keep sharing your location with your friends while the phone is locked.
 
 **[Try the live demo](https://eventbuddy-exic.onrender.com)** and tap **Try the demo** to look around as John, in your own copy of the demo, so change anything you like. Open the picnic and three of John's friends, simulated and labelled as such, chat, move on the map and add a cost while you watch. It runs on a free server that sleeps when idle, so the first visit can take up to a minute to wake it.
 
 | Home | Event | Live map | Group chat | Split costs |
 |---|---|---|---|---|
-| <img src="docs/screenshots/home.jpg" width="160" alt="Home: the picnic happening now and the trips coming up"> | <img src="docs/screenshots/event.jpg" width="160" alt="An event page with unread chat messages and what you owe"> | <img src="docs/screenshots/map.jpg" width="160" alt="Friends sharing their location at the picnic, with a meetup point"> | <img src="docs/screenshots/chat.jpg" width="160" alt="The festival group chat"> | <img src="docs/screenshots/expenses.jpg" width="160" alt="Festival expenses with balances and who pays whom"> |
+| <img src="docs/screenshots/home.jpg" width="160" alt="Home: the picnic happening now and the trips coming up"> | <img src="docs/screenshots/event.jpg" width="160" alt="The picnic page: friends here now, the ice cream Alex just added, and what you're owed"> | <img src="docs/screenshots/map.jpg" width="160" alt="Friends at the picnic on the live map, each updated seconds ago, with the meetup point"> | <img src="docs/screenshots/chat.jpg" width="160" alt="The picnic chat, with the friends who are here now"> | <img src="docs/screenshots/expenses.jpg" width="160" alt="Festival expenses with balances and who pays whom"> |
 
 ## What it does
 
@@ -17,7 +17,7 @@ Built end to end by me: React front end, Express and MongoDB API, and a native i
 - **See who's here.** A green dot on a friend's avatar, a "Here now" line in the chat and on the map mean they have EventBuddy open right now.
 - **Catch up at a glance.** The event page shows the latest things that happened ("Taylor set the meetup point", "Alex added Snacks & drinks"), with the whole history a tap away.
 - **Split costs.** Add expenses split equally or by exact amounts. EventBuddy works out balances and a short list of payments to settle up, then opens Venmo, Cash App or PayPal with the amount filled in. The money moves in those apps; EventBuddy only records what you mark paid. Amounts are US dollars, and schedule times are local to the event.
-- **Find each other.** During an event, friends can share their location for an hour, a few hours or until midnight. The map shows where everyone is, how many seconds ago they updated, and a meetup point anyone can set. While a friend walks with the app open, their phone sends a position about every 2 seconds and their pin glides between them, like watching a delivery driver come up the street. In the iPhone app, sharing keeps working with the screen locked, at a slower pace that iOS decides. Before the trip, an event's map helps plan it instead: directions, a meetup point for the first day, and what else is on nearby during those dates.
+- **Find each other.** During an event, friends can share their location for an hour, a few hours or until midnight. The map shows where everyone is, how many seconds ago they updated, and a meetup point anyone can set. While a friend walks with the app open, their phone sends a position about every 2 seconds and their pin glides between them, like watching a delivery driver come up the street. The iPhone app uses iOS background location so sharing can carry on with the screen locked, at a pace iOS decides; that part hasn't been tested on a physical iPhone yet. Before the trip, an event's map helps plan it instead: directions, a meetup point for the first day, and what else is on nearby during those dates.
 - **Discover things to do.** Concerts, games and shows near you (Ticketmaster), found from your phone's location without setting anything up, each one a tap away from becoming a plan with friends.
 
 ## Run it locally

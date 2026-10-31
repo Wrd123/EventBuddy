@@ -42,8 +42,9 @@
 
 ## Waiting on the user
 
-- **Push `abuse-limits`** (`git push origin abuse-limits:main`), then redeploy the API if it doesn't deploy itself. Check: 11 quick `POST /api/auth/demo` from one address give a 429 on the 11th.
-- `1cdcb88c` (4d, smoother tracking, the lake fix) is on GitHub's `main` and was checked live on the hosted API on 31 Oct: share ids, the server clock and the friends' new positions are all there. So the API redeployed, or Auto-Deploy is now on.
+- **Push `readme-refresh`** (`git push origin readme-refresh:main`): new README screenshots, the qualified iPhone claim and the CI flake fix. Nothing in it needs an API redeploy.
+- Everything through `d3f3bf90` (item 5 and the prune fix) is on GitHub's `main` and live. Checked 31 Oct: the hosted demo route answers with `ratelimit-policy: "10-in-1hr"` keyed to the visitor's address, and Discover returns real Ticketmaster events.
+- **The physical-iPhone walk test** (finish-plan item 6) is still yours. Until it's done, the README says locked-phone sharing hasn't been tested on a device.
 - **Check CI** for the 28 Oct pushes.
 
 ## What was done
@@ -101,6 +102,11 @@
   - **P2:** a finished session waited forever, so a world pruned and rebuilt with the same ids never got its story, and a deleted picnic or a John who left went unnoticed. A told session now re-runs the loop's checks every `toldCheckMs` (60 s), and at once when John opens the picnic again: a rebuilt world (counter back at 0) gets its story, and anything else invalid ends the session.
   - "Never undoes a claim made by the session that replaced it" and the four "after the story is told" tests fail when the old code is put back. "Hands the beat back when nobody has claimed since" guards against making the condition too strict.
 - **Tests:** `server/tests/demoFriends.test.js` (27). Its cleanup hook is registered before `useTestDatabase()`, so stories stop before each wipe. Not covered: `'left'` through token expiry (it shares `endPresence` with logout, which is tested).
+
+**CI and README refresh (31 Oct, on `readme-refresh`).**
+- **CI:** GitHub's public API showed runs #42, #43 and #46 to #49 failed in the web app's "Run tests" step only, the API job passing every time (a docs-only commit, #46, failed too, so it was a flaky test). Reproduced locally with `CI=true npx react-scripts test --watchAll=false` (all workers, as CI runs it, not `--maxWorkers=2`): "Group chat › while scrolled up › offers to jump when a friend's message arrives just before one of yours" looked for the "New messages" pill the moment the message text appeared, but the pill comes a render later. It now waits for the pill. Ten CI-style runs in a row passed afterwards. A `Map.test.js` failure showed up once under that load and didn't come back in ten runs; if CI goes red again, read that run's log (job logs need a login, but `api.github.com/repos/Wrd123/EventBuddy/actions/runs/<id>/jobs` shows which step failed).
+- **Screenshots:** `home`, `event`, `chat` and `map` were retaken from the production build in a fresh demo world (picnic with the friends here, the ice cream, the seconds captions). `expenses.jpg` (the festival ledger, unchanged since 27 Oct) was kept. The map is 302x652 because the Browser pane captures a WebGL page at its on-screen size; the others are 710x1536. With the pane shorter than the phone, captures came out 750x1624 with an empty margin and were cropped to 710x1536 with Pillow (`sips` can't write its temp file in the sandbox).
+- **The iPhone claim** in the README's intro and "Find each other" now says locked-phone sharing is built but not yet tested on a physical iPhone. Restore the stronger wording once the walk test passes.
 
 **Finish plan, item 5: the abuse backlog (31 Oct, on `abuse-limits`).** Planned, revised after Codex's review (no `skipFailedRequests`; rebuilds share the cap; a socket test that proves the new close), built by a Sonnet subagent, checked live and reviewed. Details are in `docs/SECURITY_REVIEW.md` under C2.
 - `server/src/demoBuilds.js` is the one build budget (prune, then build, 5 at once) for new worlds and saved-login rebuilds. Busy is a 503 marked `busy`, passed through `authenticate` and turned into close code 1013 (`TRY_LATER`) on the socket.
