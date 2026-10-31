@@ -415,7 +415,23 @@ const createDemoWorld = async ({ tag = newDemoWorldTag(), today } = {}) => {
 // maxWorlds - 1 (leaving room for one more), with everything in them. A
 // sleeping host starts empty anyway; this bounds a busy one's memory, even
 // if someone signs in to the demo over and over. Returns how many went.
-const pruneDemoWorlds = async ({ maxAgeMs, maxWorlds }) => {
+//
+// Prunes take turns: each picks its worlds only once the one before has
+// finished deleting. Several builds can run at once, and each prunes first;
+// two prunes that both picked the same old world would otherwise race. When
+// the first finished, a saved login could rebuild that world (with the same
+// ids, see createDemoWorld), and the second prune's late deletes would then
+// remove the rebuilt one. Taking turns works because this API is a single
+// process, like the ledger lock (eventLock.js).
+let pruning = Promise.resolve();
+const pruneDemoWorlds = (options) => {
+  const run = pruning.then(() => pruneNow(options));
+  // The next prune waits for this one whether it worked or not
+  pruning = run.catch(() => {});
+  return run;
+};
+
+const pruneNow = async ({ maxAgeMs, maxWorlds }) => {
   const owners = await User.find({ demoWorld: { $exists: true }, username: /^john-/ }, 'demoWorld createdAt')
     .sort({ createdAt: -1 });
   const cutoff = Date.now() - maxAgeMs;

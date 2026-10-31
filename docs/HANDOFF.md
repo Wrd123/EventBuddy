@@ -18,7 +18,7 @@
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 453 server tests, 592 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 454 server tests, 592 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -107,6 +107,7 @@
 - `demoLimiter` in `routes/auth.js`: 10 new worlds an hour per address, its own `MemoryStore`, and a refund only for a busy rejection. Tests set it with `createApp({ rateLimits: true, demoLimit })`.
 - `LIMITS.queuedMessages` (50) in `hub.js`, checked before a message joins the queue.
 - Tests hold builds with `holdDemoBuilds(t)` from `server/tests/helpers.js`.
+- **Fixed after Codex's review of `bb0a304a`** (on `prune-race`): prunes take turns (`pruneDemoWorlds` chains them), so two prunes can't pick the same old world and delete a copy a saved login just rebuilt. Regression test: "never deletes a world that a saved login rebuilt after it was pruned" in `auth.test.js`.
 
 **Smoother live tracking (29 Oct, on `live-glide`, after 4d).** The user asked for a friend's pin that moves like a delivery driver's. The plan was revised twice after Codex's reviews, then built by Sonnet subagents, checked by Claude, and reviewed by the `reviewer` subagent before each commit.
 - **Commit A, `b9f9bbf8`, frequent ordered uploads:**

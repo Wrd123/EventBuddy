@@ -86,7 +86,7 @@ flowchart LR
 | App | React 18, React Router, Tailwind CSS, Leaflet with MapLibre vector tiles from OpenFreeMap (free, keyless) |
 | iPhone | Capacitor 7, background geolocation, native HTTP, haptics |
 | API | Node.js 22, Express 5, MongoDB with Mongoose, JWT auth, bcrypt, `ws` for real-time pokes |
-| Testing | Jest and Testing Library (592 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (453 tests) |
+| Testing | Jest and Testing Library (592 tests), Node's test runner with Supertest, a real WebSocket client and an in-memory MongoDB (454 tests) |
 | CI | GitHub Actions: tests and a production build on every push |
 
 ## Decisions worth a look

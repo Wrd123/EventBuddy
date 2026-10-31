@@ -3,6 +3,10 @@ const assert = require('node:assert/strict');
 const { describe, it, beforeEach } = require('node:test');
 const jwt = require('jsonwebtoken');
 const User = require('../src/models/User');
+const Event = require('../src/models/Event');
+const { createDemoWorld } = require('../src/seed/demoData');
+const { signToken, authenticate } = require('../src/middleware/auth');
+const { buildWorld } = require('../src/demoBuilds');
 
 useTestDatabase();
 
@@ -288,6 +292,50 @@ describe('POST /api/auth/password', () => {
 
   it('needs a login', async () => {
     await api().post('/api/auth/password').send({ currentPassword: 'secret123', newPassword: 'a much longer one' }).expect(401);
+  });
+});
+
+describe('pruning while worlds are rebuilt', () => {
+  // Codex's interleaving: two builds both prune at once and both find the
+  // same old world. Held account deletes stand in for a slow database.
+  it("never deletes a world that a saved login rebuilt after it was pruned", async (t) => {
+    const john = await createDemoWorld();
+    const tag = john.demoWorld;
+    const token = signToken(john);
+    // Old enough to prune
+    await User.collection.updateMany({ demoWorld: tag }, { $set: { createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) } });
+
+    const deleteMany = User.deleteMany.bind(User);
+    const held = [];
+    let heldAny;
+    const firstHeld = new Promise((resolve) => { heldAny = resolve; });
+    let holding = true;
+    t.mock.method(User, 'deleteMany', (...args) => {
+      if (!holding) return deleteMany(...args);
+      return new Promise((resolve, reject) => {
+        held.push(() => deleteMany(...args).then(resolve, reject));
+        heldAny();
+      });
+    });
+
+    const builds = [buildWorld(() => createDemoWorld()), buildWorld(() => createDemoWorld())];
+    await firstHeld;
+    // Let the first prune finish deleting the old world
+    held.shift()();
+    const worldUsers = () => User.countDocuments({ demoWorld: tag });
+    while ((await worldUsers()) > 0) await new Promise((resolve) => setImmediate(resolve));
+
+    // John's saved login brings his world back, with the same ids
+    holding = false;
+    await authenticate(token);
+    assert.equal(await worldUsers(), 6);
+
+    // Whatever the other prune was holding now runs; it must not touch it
+    held.splice(0).forEach((resume) => resume());
+    await Promise.all(builds);
+    assert.equal(await worldUsers(), 6);
+    assert.equal(await Event.countDocuments({ 'members.user': john._id }), 4);
+    assert.equal((await authenticate(token))._id.toString(), john._id.toString());
   });
 });
 

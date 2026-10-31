@@ -124,6 +124,8 @@ Bodies over 100 kB were already turned away, but the error handler didn't recogn
 - **Rebuilds share the build cap.** A saved login whose world was pruned (or lost when the free server slept) used to rebuild outside the cap and outside pruning, so many saved logins for different worlds could rebuild at once. Every build now goes through `server/src/demoBuilds.js`: prune, then build, at most 5 at a time. A rebuild that finds it full answers 503 (or closes the socket with 1013, "try again later"), never 401, so nobody is logged out by a busy server. Rebuilds don't use the visitor's new-world budget.
 - **Socket messages:** a socket admits at most 50 messages waiting or running. The 51st closes it with 1008 "Too many messages.", and nothing more from it is admitted. That bounds the queued message backlog (about 50 kB a socket, 25 MB across 500), not the hub's total memory.
 
+**Follow-up (31 Oct 2026, from Codex's review of `bb0a304a`):** two prunes running at once could both pick the same old world. Once the first finished, a saved login could rebuild that world under the same ids, and the second prune's late deletes then removed the rebuilt accounts (Codex reproduced 0 accounts and a 409 on the next read). Prunes now take turns in `pruneDemoWorlds`: each picks its worlds only after the one before has finished deleting. A regression test replays that interleaving and fails without the change.
+
 Tests in `server/tests/auth.test.js` and `server/tests/realtime.test.js` cover each, including an abandoned request, a busy refund, a forged `X-Forwarded-For` prefix, and a flood while the login's lookup is held. Checked live on a production-mode API. This still wasn't load-tested.
 
 ### H1: headers
