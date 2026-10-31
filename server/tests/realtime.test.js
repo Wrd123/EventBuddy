@@ -1,4 +1,4 @@
-const { useTestDatabase, api, registerUser } = require('./helpers');
+const { useTestDatabase, api, registerUser, holdDemoBuilds } = require('./helpers');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const net = require('node:net');
@@ -6,6 +6,9 @@ const { describe, it, before, after, afterEach } = require('node:test');
 const { WebSocket } = require('ws');
 const jwt = require('jsonwebtoken');
 const { createApp } = require('../src/app');
+const User = require('../src/models/User');
+const Event = require('../src/models/Event');
+const demoData = require('../src/seed/demoData');
 const realtime = require('../src/realtime/hub');
 
 useTestDatabase();
@@ -54,7 +57,10 @@ const connect = (options = {}) => new Promise((resolve, reject) => {
     if (waiter >= 0) waiters.splice(waiter, 1)[0].resolve(message);
     else inbox.push(message);
   });
-  ws.closed = new Promise((done) => ws.on('close', (code) => done(code)));
+  ws.closed = new Promise((done) => ws.on('close', (code, reason) => {
+    ws.closeReason = reason.toString();
+    done(code);
+  }));
   ws.next = (match, what = 'a message') => {
     const index = inbox.findIndex(match);
     if (index >= 0) return Promise.resolve(inbox.splice(index, 1)[0]);
@@ -490,5 +496,159 @@ describe('a login running out', () => {
     await api().post(path(event, 'messages')).set('Authorization', organizer.auth).send({ text: 'Still here?' }).expect(201);
     await current.next(poke(event._id, 'chat'), 'the chat poke');
     assert.equal(ws.inbox.some((m) => m.type === 'presence'), false);
+  });
+});
+
+describe('a login that finds the demo busy', () => {
+  it('is told to come back later, not that it ended', async (t) => {
+    // A saved demo login whose world is gone, so logging in must rebuild it
+    const { body } = await api().post('/api/auth/demo').send({}).expect(201);
+    await demoData.pruneDemoWorlds({ maxAgeMs: -1, maxWorlds: 100 });
+    const builds = holdDemoBuilds(t);
+    const filling = [1, 2, 3, 4, 5].map(() => api().post('/api/auth/demo').send({}).expect(201).then((res) => res));
+    await builds.started(5);
+
+    const ws = await connect();
+    ws.send(JSON.stringify({ type: 'auth', token: body.token }));
+    assert.equal(await within(ws.closed, 'the close'), realtime.TRY_LATER);
+
+    builds.release();
+    await Promise.all(filling);
+    // The login was never in doubt: once there's room it gets in
+    await logIn(body);
+  });
+});
+
+describe('a socket that sends a lot of messages', () => {
+  const MANY = 20;
+  const eventsFor = async (organizer, count) => {
+    const events = [];
+    for (let i = 0; i < count; i += 1) {
+      const { body } = await api()
+        .post('/api/events')
+        .set('Authorization', organizer.auth)
+        .send({ name: `Plan ${i}`, startDate: isoDay(0), endDate: isoDay(1) })
+        .expect(201);
+      events.push(body.event);
+    }
+    return events;
+  };
+  const send = (ws, messages) => messages.forEach((message) => ws.send(JSON.stringify(message)));
+
+  it('is served a full burst at the real limit, and the count drains as it is answered', async () => {
+    const organizer = await registerUser();
+    const events = await eventsFor(organizer, MANY);
+    const subscribes = events.map((e) => ({ type: 'subscribe', eventId: e._id }));
+    const unsubscribes = events.map((e) => ({ type: 'unsubscribe', eventId: e._id }));
+    // The last subscribe is answered only once everything before it was handled
+    const last = { type: 'subscribe', eventId: events[0]._id };
+
+    const ws = await connect();
+    // A login, 20 subscribes and 20 unsubscribes at once: 41 of the 50 allowed
+    send(ws, [{ type: 'auth', token: organizer.token }, ...subscribes, ...unsubscribes, last]);
+    const answers = async () => {
+      for (let i = 0; i < MANY + 1; i += 1) await ws.next((m) => m.type === 'subscribed', 'an answer');
+    };
+    await ws.next((m) => m.type === 'ready', 'ready');
+    await within(answers(), 'the first burst');
+
+    // 83 messages over the socket's life, so the count must have gone back down
+    send(ws, [...subscribes, ...unsubscribes, last]);
+    await within(answers(), 'the second burst');
+    assert.equal(ws.readyState, WebSocket.OPEN);
+  });
+
+  describe('past the limit', () => {
+    before(() => {
+      realtime.close();
+      realtime.attach(server, { origins: [ORIGIN], limits: { authMs: 300, leaveGraceMs: LEAVE_GRACE_MS, queuedMessages: 5 } });
+    });
+    after(() => {
+      realtime.close();
+      realtime.attach(server, { origins: [ORIGIN], limits: { authMs: 300, leaveGraceMs: LEAVE_GRACE_MS } });
+    });
+
+    it('is closed while its login is still being checked, and nothing it queued takes effect', async (t) => {
+      const { organizer, friend, event } = await setup();
+      // Only the flooding member's login lookup is held up; everyone else's
+      // goes straight through
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const findById = User.findById.bind(User);
+      let heldLookups = 0;
+      let lookupStarted;
+      const started = new Promise((resolve) => { lookupStarted = resolve; });
+      t.mock.method(User, 'findById', (id, ...rest) => {
+        if (String(id) !== friend.user._id) return findById(id, ...rest);
+        heldLookups += 1;
+        lookupStarted();
+        return gate.then(() => findById(id, ...rest));
+      });
+      const findOne = Event.findOne.bind(Event);
+      const eventChecks = t.mock.method(Event, 'findOne', (...args) => findOne(...args));
+      const finds = [];
+      const find = Event.find.bind(Event);
+      t.mock.method(Event, 'find', (...args) => {
+        const found = Promise.resolve(find(...args));
+        finds.push(found);
+        return found;
+      });
+
+      const flooder = await connect();
+      send(flooder, [{ type: 'auth', token: friend.token }]);
+      await within(started, 'the login lookup');
+      // The login is now waiting on the database; these queue up behind it
+      send(flooder, Array.from({ length: MANY }, () => ({ type: 'subscribe', eventId: event._id })));
+      assert.equal(await within(flooder.closed, 'the close'), 1008);
+      assert.equal(flooder.closeReason, 'Too many messages.');
+
+      // Others are served as normal while that login is still unanswered
+      const ws = await logIn(organizer);
+      assert.equal((await subscribe(ws, event._id)).type, 'subscribed');
+      assert.equal(heldLookups, 1);
+      const checksWhileHeld = eventChecks.mock.callCount();
+
+      const findsBefore = finds.length;
+      release();
+      await within((async () => { while (finds.length === findsBefore) await new Promise((r) => setImmediate(r)); })(), 'the login to finish');
+      await finds[findsBefore];
+
+      // Nothing the closed socket queued ran, and it wasn't counted as here
+      assert.equal(eventChecks.mock.callCount(), checksWhileHeld);
+      realtime.notifyUsers([organizer.user._id]);
+      await ws.next(listChanged, 'the barrier');
+      assert.equal(ws.inbox.some((m) => m.type === 'presence' && m.userIds.includes(friend.user._id)), false);
+      assert.equal(ws.inbox.some((m) => m.type === 'subscribed'), false);
+    });
+
+    it('runs nothing it had queued once it is closed, even after logging in', async (t) => {
+      const { friend, event } = await setup();
+      const flooder = await logIn(friend);
+      // The first subscribe's access check waits on the database; the rest
+      // queue up behind it until the socket goes over the limit
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const findOne = Event.findOne.bind(Event);
+      let held = false;
+      let checkStarted;
+      const started = new Promise((resolve) => { checkStarted = resolve; });
+      const checks = t.mock.method(Event, 'findOne', (...args) => {
+        if (held) return findOne(...args);
+        held = true;
+        checkStarted();
+        return gate.then(() => findOne(...args));
+      });
+      send(flooder, [{ type: 'subscribe', eventId: event._id }]);
+      await within(started, 'the first access check');
+      send(flooder, Array.from({ length: MANY }, () => ({ type: 'subscribe', eventId: event._id })));
+      assert.equal(await within(flooder.closed, 'the close'), 1008);
+      assert.equal(checks.mock.callCount(), 1);
+
+      // Once the held check answers, the queued subscribes come up one by one,
+      // but the socket is closed, so none of them asks the database anything
+      release();
+      for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+      assert.equal(checks.mock.callCount(), 1);
+    });
   });
 });

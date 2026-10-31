@@ -18,7 +18,7 @@
   - The socket connects (`101` in the browser), under the Content Security Policy.
   - The API sends `Cache-Control: no-store`. Logout with no login answers 401, a socket opened from another site gets 403, and a 200 kB body gets 413.
   - `/api/debug/request-ip` answers 404, so `SHOW_REQUEST_IP` is off again.
-- **Tests:** 439 server tests, 589 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
+- **Tests:** 453 server tests, 592 app tests and 12 script tests pass, and `CI=true npm run build` is clean.
   - Run the app suite with `--maxWorkers=2`.
   - Run the script tests with `npm run test:scripts`, not `node --test scripts/`.
 - **`npm audit --omit=dev`:** the server reports nothing, `ws` included. The app reports only `maplibre-gl` (see D1).
@@ -42,11 +42,8 @@
 
 ## Waiting on the user
 
-- **Push `live-glide`** (`git push origin live-glide:main`; it has 4d's fixes under it too), then redeploy the API for it. Check: open the picnic map in the demo; Jordan's walk to the dock (story steps 4 and 7) glides, and captions read in seconds.
-- (Earlier) **Push `demo-friends`** if `live-glide` isn't pushed instead, then redeploy the API for it (and for 4c, if that hasn't been done). Check: Try the demo, open the picnic, and within ~15 s "Alex added Ice cream ($18.00)" appears and John's "Owed" drops by $4.50.
-- **Redeploy `eventbuddy-api` for `4da7140a`**, if it hasn't been done. Without it, the live picnic has no schedule or costs, and Discover's not-configured message is the old one.
-  - Check: a new demo world's "Picnic in the Park" should have 4 schedule items.
-- **Turn on Auto-Deploy for `eventbuddy-api`** (Settings → Build & Deploy), so this stops being a manual step.
+- **Push `abuse-limits`** (`git push origin abuse-limits:main`), then redeploy the API if it doesn't deploy itself. Check: 11 quick `POST /api/auth/demo` from one address give a 429 on the 11th.
+- `1cdcb88c` (4d, smoother tracking, the lake fix) is on GitHub's `main` and was checked live on the hosted API on 31 Oct: share ids, the server clock and the friends' new positions are all there. So the API redeployed, or Auto-Deploy is now on.
 - **Check CI** for the 28 Oct pushes.
 
 ## What was done
@@ -104,6 +101,12 @@
   - **P2:** a finished session waited forever, so a world pruned and rebuilt with the same ids never got its story, and a deleted picnic or a John who left went unnoticed. A told session now re-runs the loop's checks every `toldCheckMs` (60 s), and at once when John opens the picnic again: a rebuilt world (counter back at 0) gets its story, and anything else invalid ends the session.
   - "Never undoes a claim made by the session that replaced it" and the four "after the story is told" tests fail when the old code is put back. "Hands the beat back when nobody has claimed since" guards against making the condition too strict.
 - **Tests:** `server/tests/demoFriends.test.js` (27). Its cleanup hook is registered before `useTestDatabase()`, so stories stop before each wipe. Not covered: `'left'` through token expiry (it shares `endPresence` with logout, which is tested).
+
+**Finish plan, item 5: the abuse backlog (31 Oct, on `abuse-limits`).** Planned, revised after Codex's review (no `skipFailedRequests`; rebuilds share the cap; a socket test that proves the new close), built by a Sonnet subagent, checked live and reviewed. Details are in `docs/SECURITY_REVIEW.md` under C2.
+- `server/src/demoBuilds.js` is the one build budget (prune, then build, 5 at once) for new worlds and saved-login rebuilds. Busy is a 503 marked `busy`, passed through `authenticate` and turned into close code 1013 (`TRY_LATER`) on the socket.
+- `demoLimiter` in `routes/auth.js`: 10 new worlds an hour per address, its own `MemoryStore`, and a refund only for a busy rejection. Tests set it with `createApp({ rateLimits: true, demoLimit })`.
+- `LIMITS.queuedMessages` (50) in `hub.js`, checked before a message joins the queue.
+- Tests hold builds with `holdDemoBuilds(t)` from `server/tests/helpers.js`.
 
 **Smoother live tracking (29 Oct, on `live-glide`, after 4d).** The user asked for a friend's pin that moves like a delivery driver's. The plan was revised twice after Codex's reviews, then built by Sonnet subagents, checked by Claude, and reviewed by the `reviewer` subagent before each commit.
 - **Commit A, `b9f9bbf8`, frequent ordered uploads:**
@@ -177,9 +180,8 @@ Each was checked against the code first, and each got a test that fails on the o
 
 ## Still open
 
-- **C2's per-address demo limit** can go ahead now that F-1 confirmed `req.ip` is the visitor's real address.
 - **D1:** `maplibre-gl` stays on 5.x, because 6.x can't be bundled by CRA; its advisory isn't reachable here. Upgrade it along with moving off CRA (Vite, in phase 5).
-- **Socket hardening backlog** (from Codex): a budget for queued inbound messages per socket, and the iPhone WebView's real Origin (see State).
+- **The iPhone WebView's real Origin** for the socket (see State); the socket's queue budget is done (item 5).
 - **The map's first fit can tuck a friend's pin under the bottom sheet's edge.** It was there before Phase 4, and was found during the 4b screenshots.
 - **Known limit:** a logged-out demo token works again if the hosted demo restarts empty and rebuilds that world. Accepted, and documented in `User.js`.
 
@@ -227,8 +229,8 @@ Follow `docs/FINISH_PLAN.md`, in order:
 2. ~~The demo and copy pass~~ (done).
 3. ~~4c, compact~~ (done, see What was done).
 4. ~~4d~~ (built, see What was done).
-5. **The abuse backlog (next):** a per-visitor demo budget and a socket queue budget.
-6. **Playwright against a real API, the Simulator pass, and the user's physical-iPhone location check.**
+5. ~~The abuse backlog~~ (built 31 Oct on `abuse-limits`; see `docs/SECURITY_REVIEW.md` C2).
+6. **Next: Playwright against a real API, the Simulator pass, and the user's physical-iPhone location check** (now including the locked-phone pace and battery while walking).
 7. **Rehearse and package.**
 
 Notes for what's ahead:

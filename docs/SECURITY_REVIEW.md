@@ -30,7 +30,7 @@ The serious finding was on the client: **a member's display name could run as co
 | R1 | At startup, a late profile reply could show the previous account after switching accounts | Medium (correctness and privacy) | **Fixed** on branch `review-fixes-2` |
 | R2 | A late "session expired" reply for an old login logged out the new one | Low | **Fixed** on branch `review-fixes-2` |
 | R3 | A request body over 100 kB returned 500 instead of 413 | Low | **Fixed** on branch `review-fixes-2` |
-| C2 | The one-tap demo sign-in has no rate limit and had no cap on concurrent world creation | Hardening | Cap added on `review-fixes-2`; a per-address limit waits on F-1 |
+| C2 | The one-tap demo sign-in has no rate limit and had no cap on concurrent world creation | Hardening | **Fixed**: the build cap on `review-fixes-2`; the per-address budget, a shared cap for rebuilds and a socket queue budget on `abuse-limits` (31 Oct 2026) |
 | H1 | No `Cache-Control: no-store` on API responses, and no Content Security Policy on the web page | Hardening | **Fixed** on branch `review-fixes-2`; the policy is live on the deployed site (27 Oct 2026) |
 | D1 | Dependency advisories in the shipped bundle have no reachable path in this app | Hardening | React Router upgraded on branch `handoff-deps-screenshots`; MapLibre stays on 5.x (see D1) |
 | WS | The real-time socket added in phase 4a | Design review | Built with the checks below; on `main` at `45390d63` |
@@ -115,11 +115,16 @@ Bodies over 100 kB were already turned away, but the error handler didn't recogn
 
 ### C2: the demo sign-in
 
-`POST /api/auth/demo` deliberately has no rate limit. Pruning keeps at most 300 worlds.
+`POST /api/auth/demo` had no rate limit. Pruning keeps at most 300 worlds.
 
 **Added:** at most 5 worlds can be built at once. Further taps get a 503 straight away with "The demo is busy right now. Try again in a moment.", which the login screen shows as it is. They aren't queued, because queued work can pile up and keep running after visitors give up. The limit lives in `server/src/concurrencyLimit.js` and has its own tests. It counts within one process, like the ledger lock.
 
-**Still open:** a limit per address waits on F-1, so that client addresses can be trusted. This wasn't load-tested.
+**Added on `abuse-limits` (31 Oct 2026), once F-1 showed `req.ip` is the visitor's own address:**
+- **A budget per address:** 10 new worlds an hour (an IPv6 visitor counts as their /56). People on one office or school network share it. Every admitted request counts, including one whose client hangs up, because the build carries on after that; `skipFailedRequests` would have refunded those and let a script build worlds for free. The only refund is a "busy" rejection that happened before anything was built. A 429 carries `Retry-After` and a friendly message the login screen shows.
+- **Rebuilds share the build cap.** A saved login whose world was pruned (or lost when the free server slept) used to rebuild outside the cap and outside pruning, so many saved logins for different worlds could rebuild at once. Every build now goes through `server/src/demoBuilds.js`: prune, then build, at most 5 at a time. A rebuild that finds it full answers 503 (or closes the socket with 1013, "try again later"), never 401, so nobody is logged out by a busy server. Rebuilds don't use the visitor's new-world budget.
+- **Socket messages:** a socket admits at most 50 messages waiting or running. The 51st closes it with 1008 "Too many messages.", and nothing more from it is admitted. That bounds the queued message backlog (about 50 kB a socket, 25 MB across 500), not the hub's total memory.
+
+Tests in `server/tests/auth.test.js` and `server/tests/realtime.test.js` cover each, including an abandoned request, a busy refund, a forged `X-Forwarded-For` prefix, and a flood while the login's lookup is held. Checked live on a production-mode API. This still wasn't load-tested.
 
 ### H1: headers
 

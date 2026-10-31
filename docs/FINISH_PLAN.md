@@ -29,7 +29,7 @@ The scope stays the same: a $0 portfolio showcase for friends planning trips, wi
    - A small fixed script through the normal routes and pokes.
    - Stops when the owner leaves, never runs twice after a reconnect, and never touches another world.
 4b. **Added 29 Oct: smoother live tracking** (frequent ordered uploads, gliding pins; see `docs/HANDOFF.md`). The physical-iPhone check in item 6 now also covers the locked-phone pace and battery while walking.
-5. **The abuse backlog.**
+5. **The abuse backlog.** Done 31 Oct on `abuse-limits` (see `docs/SECURITY_REVIEW.md` C2).
    - A per-visitor budget for creating demo worlds. `req.ip` is right behind Render's proxies (F-1).
    - A budget for queued socket messages per socket.
    - Bounded local tests, one process.

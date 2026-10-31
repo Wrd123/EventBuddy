@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppProvider } from '../../context/AppContext';
-import { installFakeApi } from '../../testUtils/fakeApi';
+import { installFakeApi, failNext } from '../../testUtils/fakeApi';
 import { todayISO } from '../../utils/dates';
 import MainLayout from '../layout/MainLayout';
 
@@ -38,6 +38,19 @@ describe('Login', () => {
     // No password involved: the server makes a private copy of the demo,
     // with its picnic on this phone's date
     expect(JSON.parse(signIn[1].body)).toEqual({ today: todayISO() });
+  });
+
+  it("shows the server's message when too many demos were started from this address", async () => {
+    installFakeApi({ demo: true });
+    renderLogin();
+    const message = "You've started a lot of demos. Please wait a little and try again.";
+    failNext('POST', '/auth/demo', 429, { retryAfter: 600, message });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Try the demo' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    // Still on the login screen, and able to try again
+    expect(screen.getByRole('button', { name: 'Try the demo' })).toBeEnabled();
   });
 
   it('says the demo is temporary and never moves money', async () => {

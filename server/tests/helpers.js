@@ -63,4 +63,34 @@ const assertFields = (actual, expected) => {
   }
 };
 
-module.exports = { useTestDatabase, api, registerUser, assertFields };
+// Holds every demo world build at its first step (the pruning that
+// buildWorld runs before building), so a test can fill the build limit and
+// let go when it chooses. started(n) resolves once n builds are being held;
+// release() lets them all finish, and builds after that run as normal.
+const holdDemoBuilds = (t) => {
+  const demoData = require('../src/seed/demoData');
+  const original = demoData.pruneDemoWorlds;
+  const held = [];
+  const waiting = [];
+  let released = false;
+  t.mock.method(demoData, 'pruneDemoWorlds', (...args) => {
+    if (released) return original(...args);
+    return new Promise((resolve) => {
+      held.push(() => resolve(original(...args)));
+      waiting.filter((w) => held.length >= w.count).forEach((w) => w.resolve());
+    });
+  });
+  return {
+    started: (count) => new Promise((resolve, reject) => {
+      if (held.length >= count) return resolve();
+      const timer = setTimeout(() => reject(new Error(`Timed out waiting for ${count} held builds`)), 3000);
+      waiting.push({ count, resolve: () => { clearTimeout(timer); resolve(); } });
+    }),
+    release: () => {
+      released = true;
+      held.splice(0).forEach((resume) => resume());
+    }
+  };
+};
+
+module.exports = { useTestDatabase, api, registerUser, assertFields, holdDemoBuilds };

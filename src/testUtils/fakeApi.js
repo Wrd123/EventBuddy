@@ -365,8 +365,9 @@ export const delayNext = (method, path) => {
 // testing that a failed refresh leaves what's on screen alone.
 let failures = [];
 // retryAfter: seconds, sent as the Retry-After header (for a 429).
-export const failNext = (method, path, status = 503, { retryAfter } = {}) => {
-  failures.push({ method, path, status, retryAfter });
+// message: what the server says about it.
+export const failNext = (method, path, status = 503, { retryAfter, message = 'Service unavailable' } = {}) => {
+  failures.push({ method, path, status, retryAfter, message });
 };
 
 // The server's clock. options.viewerClockAheadMs makes the viewer's clock
@@ -843,8 +844,8 @@ export const installFakeApi = (options = {}) => {
     const path = url.replace(/^\/api/, '').split('?')[0];
     const failed = failures.findIndex((f) => f.method === method && f.path === path);
     if (failed !== -1) {
-      const [{ status, retryAfter }] = failures.splice(failed, 1);
-      return respond(status, { message: 'Service unavailable' }, retryAfter === undefined ? {} : { 'Retry-After': String(retryAfter) });
+      const [{ status, retryAfter, message }] = failures.splice(failed, 1);
+      return respond(status, { message }, retryAfter === undefined ? {} : { 'Retry-After': String(retryAfter) });
     }
     const delayed = delays.findIndex((d) => d.method === method && d.path === path);
     if (delayed === -1) return serve(url, method, headers, body);

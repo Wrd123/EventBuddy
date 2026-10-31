@@ -433,9 +433,12 @@ const pruneDemoWorlds = async ({ maxAgeMs, maxWorlds }) => {
     Message.deleteMany({ event: { $in: eventIds } }),
     ChatRead.deleteMany({ $or: [{ event: { $in: eventIds } }, { user: { $in: userIds } }] }),
     LocationShare.deleteMany({ $or: [{ event: { $in: eventIds } }, { user: { $in: userIds } }] }),
-    Activity.deleteMany({ event: { $in: eventIds } }),
-    User.deleteMany({ _id: { $in: userIds } })
+    Activity.deleteMany({ event: { $in: eventIds } })
   ]);
+  // The accounts go last. A saved login rebuilds its world when its account
+  // is missing, with the same ids, so the account must only go once nothing
+  // else of the world is left for that rebuild to collide with.
+  await User.deleteMany({ _id: { $in: userIds } });
   return tags.length;
 };
 

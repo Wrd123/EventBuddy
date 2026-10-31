@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { MemoryStore, ipKeyGenerator } = rateLimit;
 const User = require('../models/User');
 const Event = require('../models/Event');
 const { visibleTo } = require('../eventAccess');
@@ -8,8 +9,8 @@ const { signToken, requireAuth } = require('../middleware/auth');
 const { HttpError } = require('../errors');
 const { validateRegistration, validatePassword, cleanPaymentHandles, text, MAX_NAME_LENGTH } = require('../validation');
 const config = require('../config');
-const { createDemoWorld, pruneDemoWorlds, dayIn } = require('../seed/demoData');
-const { createConcurrencyLimit } = require('../concurrencyLimit');
+const { createDemoWorld, dayIn } = require('../seed/demoData');
+const { buildWorld } = require('../demoBuilds');
 const realtime = require('../realtime/hub');
 
 const { bcryptRounds } = config;
@@ -81,16 +82,7 @@ router.post('/login', attemptLimiter, async (req, res) => {
   res.json({ token: signToken(user), user });
 });
 
-// Private demo worlds last a day, and at most this many are kept
-const DEMO_WORLD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const MAX_DEMO_WORLDS = 300;
 const DAY_MS = 24 * 60 * 60 * 1000;
-// Far more than people tapping "Try the demo" at the same moment
-const MAX_DEMO_BUILDS_AT_ONCE = 5;
-const demoBuilds = createConcurrencyLimit(
-  MAX_DEMO_BUILDS_AT_ONCE,
-  () => new HttpError(503, 'The demo is busy right now. Try again in a moment.')
-);
 
 // The visitor's own date, if it's a real calendar day within one of ours
 // (time zones span about a day either side of UTC)
@@ -100,19 +92,51 @@ const visitorToday = (value) => {
   return value >= dayIn('UTC', now - DAY_MS) && value <= dayIn('UTC', now + DAY_MS) ? value : undefined;
 };
 
+// Each address may start this many new worlds an hour. People on one office
+// or school network share an address, so they share this too. Tests set a
+// smaller number with createApp({ demoLimit }).
+const DEMO_WORLDS_PER_HOUR = 10;
+// The limiter's own store and key, so the route can give back a visit that
+// was turned away before anything was built
+const demoStore = new MemoryStore();
+const demoKey = (req) => ipKeyGenerator(req.ip);
+const demoLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: (req) => req.app.get('demoLimit') ?? DEMO_WORLDS_PER_HOUR,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  store: demoStore,
+  keyGenerator: demoKey,
+  // Off in tests, unless a test builds an app to check the limit itself, and
+  // off where the demo doesn't exist, so that route answers 404 and charges
+  // nothing
+  skip: (req) => !req.app.get('rateLimits') || !config.demoMode,
+  // No skipFailedRequests: it would refund a request whose client hung up,
+  // but the build carries on after that, so a script could build worlds for
+  // free. Every admitted request counts, finished or not.
+  message: { message: "You've started a lot of demos. Please wait a little and try again." }
+});
+
 // One-tap sign-in for people trying the app, as John in a private copy of
 // the demo: what one visitor changes, the next never sees. Only in demo
 // mode; elsewhere it doesn't exist. body.today puts the picnic on the
-// visitor's today. No IP attempt limit (there's no password to guess, and
-// where client IPs can't be read reliably a shared limit would lock everyone
-// out). Pruning bounds how many worlds exist, and demoBuilds how many are
-// being made at once, so a burst of taps can't swamp a small free server.
-router.post('/demo', async (req, res) => {
+// visitor's today. There's no password to guess, but each address has an
+// hourly budget of new worlds (demoLimiter). That's safe to key on the
+// address because TRUST_PROXY is set so req.ip is the visitor's real one,
+// not something a client can make up (the security review's F-1). Pruning
+// bounds how many worlds exist, and buildWorld how many are being made at
+// once, so a burst of taps can't swamp a small free server.
+router.post('/demo', demoLimiter, async (req, res) => {
   if (!config.demoMode) throw new HttpError(404, 'Not found.');
-  const user = await demoBuilds(async () => {
-    await pruneDemoWorlds({ maxAgeMs: DEMO_WORLD_MAX_AGE_MS, maxWorlds: MAX_DEMO_WORLDS });
-    return createDemoWorld({ today: visitorToday(req.body?.today) });
-  });
+  let user;
+  try {
+    user = await buildWorld(() => createDemoWorld({ today: visitorToday(req.body?.today) }));
+  } catch (err) {
+    // The server was full and nothing was started, so this visit costs
+    // nothing. Any other failure, or a client that gave up, still counts.
+    if (err.busy && req.app.get('rateLimits')) await demoStore.decrement(demoKey(req));
+    throw err;
+  }
   res.status(201).json({ token: signToken(user), user });
 });
 

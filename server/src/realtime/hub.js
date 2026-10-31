@@ -41,6 +41,9 @@ const PATH = '/api/socket';
 const ENDED = 4401;
 const REPLACED = 4409;
 const POLICY = 1008;
+// The server is too busy to check this login right now, which says nothing
+// about the login itself: the app reconnects a little later, not logs out
+const TRY_LATER = 1013;
 
 // Everything a screen of one event reads
 const EVERYTHING = ['event', 'live', 'chat'];
@@ -58,7 +61,11 @@ const LIMITS = {
   pingMs: 30000,
   // Someone who closes the app stays here this long, so flicking to another
   // app and straight back doesn't flash them away for everyone
-  leaveGraceMs: 5000
+  leaveGraceMs: 5000,
+  // Messages waiting or running on one socket. Well above the largest
+  // legitimate burst: a login, re-subscribing to up to 20 watched events on
+  // a reconnect, and some unsubscribes.
+  queuedMessages: 50
 };
 
 let state = null;
@@ -177,8 +184,11 @@ const logIn = async (ws, token) => {
       const arriving = !state.memberships.has(found._id.toString());
       return { user: found, events: arriving ? await Event.find(visibleTo(found), '_id') : null };
     }));
-  } catch {
-    ws.close(ENDED, 'Please log in.');
+  } catch (err) {
+    // A rebuild of a demo world that found the server full: the login is
+    // fine, so say to come back rather than that it ended
+    if (err.busy) ws.close(TRY_LATER, 'The demo is busy right now.');
+    else ws.close(ENDED, 'Please log in.');
     return;
   }
   if (!state || ws.readyState !== WebSocket.OPEN) return;
@@ -265,6 +275,8 @@ const subscribe = async (ws, eventId) => {
 };
 
 const handle = async (ws, data, isBinary) => {
+  // Messages queued before the socket closed (or was refused) do nothing
+  if (ws.readyState !== WebSocket.OPEN) return;
   let message;
   try {
     message = isBinary ? null : JSON.parse(data);
@@ -289,10 +301,28 @@ const onConnection = (ws) => {
   ws.alive = true;
   ws.on('pong', () => { ws.alive = true; });
   ws.authTimer = setTimeout(() => ws.close(ENDED, 'Please log in.'), state.limits.authMs);
-  // One message at a time, so a subscribe can't overtake the login before it
+  // One message at a time, so a subscribe can't overtake the login before it.
+  // The queue keeps order, and queuedMessages bounds how many wait in it, so
+  // a client can't stack up thousands while its login is still being checked.
+  // That bounds the queued message backlog (about 50 x 1 kB a socket), not the
+  // hub's whole memory: promises, socket buffers and database work add to it.
   let queue = Promise.resolve();
+  ws.queued = 0;
   ws.on('message', (data, isBinary) => {
-    queue = queue.then(() => handle(ws, data, isBinary)).catch(() => {});
+    // Checked before another promise joins the chain, and once over, never
+    // admitted again: the socket is closing and nothing more is wanted from it
+    if (ws.overflowed || ws.queued >= state.limits.queuedMessages) {
+      if (!ws.overflowed) {
+        ws.overflowed = true;
+        ws.close(POLICY, 'Too many messages.');
+      }
+      return;
+    }
+    ws.queued += 1;
+    queue = queue
+      .then(() => handle(ws, data, isBinary))
+      .catch(() => {})
+      .finally(() => { ws.queued -= 1; });
   });
   ws.on('close', () => {
     clearTimeout(ws.authTimer);
@@ -467,5 +497,5 @@ const pokeOnSuccess = (what) => (req, res, next) => {
 
 module.exports = {
   attach, close, notifyEvent, notifyUsers, dropFromEvent, addMember, closeUsers, pokeOnSuccess,
-  hubEvents: emitter, simulatePresence, endSimulatedPresence, localUrl, PATH, ENDED, REPLACED
+  hubEvents: emitter, simulatePresence, endSimulatedPresence, localUrl, PATH, ENDED, REPLACED, TRY_LATER
 };

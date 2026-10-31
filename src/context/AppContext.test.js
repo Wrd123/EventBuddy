@@ -149,6 +149,17 @@ describe('the profile check when the app opens', () => {
     expect(screen.getByText('Signed in as Sam Rivera')).toBeInTheDocument();
   });
 
+  it('keeps the login when the demo is busy rebuilding its world, and the saved token with it', async () => {
+    failNext('GET', '/auth/me', 503, { message: 'The demo is busy right now. Try again in a moment.' });
+    render(<AppProvider><Who /></AppProvider>);
+    await screen.findByText('Signed in as John Doe');
+    await settle();
+
+    // A 503 is the server asking to try later, not saying the login ended
+    expect(screen.getByText('Signed in as John Doe')).toBeInTheDocument();
+    expect(localStorage.getItem('eventbuddy_token')).toBe('fake-token');
+  });
+
   it("doesn't log out the new account when the old login's rejection lands late", async () => {
     // A saved login the server no longer accepts; its check is held up
     localStorage.setItem('eventbuddy_token', 'expired-token');

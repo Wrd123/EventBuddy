@@ -132,6 +132,20 @@ describe('the socket', () => {
     expect(openSockets()).toHaveLength(1);
   });
 
+  it('comes back later when the server is too busy to check the login, without giving up', async () => {
+    realtime.start();
+    await settle();
+    // 1013: try again later. The login itself was never in question.
+    await dropSocket(1013);
+    expect(realtime.isConnected()).toBe(false);
+
+    await act(() => { jest.advanceTimersByTime(1000); });
+    await settle();
+    expect(allSockets()).toHaveLength(2);
+    expect(openSockets()).toHaveLength(1);
+    expect(realtime.isConnected()).toBe(true);
+  });
+
   it('ignores a socket left over from an earlier login', async () => {
     const poked = jest.fn();
     watch(null, 'events', poked);

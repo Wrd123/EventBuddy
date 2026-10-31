@@ -3,6 +3,7 @@ const User = require('../models/User');
 const config = require('../config');
 const { HttpError } = require('../errors');
 const { createDemoWorld, demoWorldUserId } = require('../seed/demoData');
+const { buildWorld } = require('../demoBuilds');
 
 const { jwtSecret, jwtExpiresIn } = config;
 
@@ -22,12 +23,14 @@ const isCurrentSession = (payload, user) => (payload.sv || 0) === (user.sessionV
 
 // Rebuilds a demo world for a token whose account is gone: a hosted demo
 // that slept and woke with a fresh database, or a world pruned for age.
-// Requests arriving together share one rebuild.
+// Requests arriving together share one rebuild. Rebuilds draw on the same
+// build limit as new demo worlds, so many saved logins for different worlds
+// can't rebuild at once; one that finds it full gets a 503 and tries again.
 const rebuilding = new Map();
 const rebuildDemoWorld = async ({ sub, world }) => {
   if (!config.demoMode || !world || !demoWorldUserId(world).equals(sub)) return null;
   if (!rebuilding.has(world)) {
-    rebuilding.set(world, createDemoWorld({ tag: world }).finally(() => rebuilding.delete(world)));
+    rebuilding.set(world, buildWorld(() => createDemoWorld({ tag: world })).finally(() => rebuilding.delete(world)));
   }
   return rebuilding.get(world);
 };
@@ -43,6 +46,8 @@ const authenticate = async (token) => {
     throw new HttpError(401, 'Your session has expired. Please log in again.');
   }
 
+  // A busy rebuild throws a 503 that is passed on as it is: the login is
+  // fine, so the app should try again rather than sign the person out
   const user = (await User.findById(payload.sub)) || (await rebuildDemoWorld(payload));
   // A missing account, or a session that was ended by logging out or
   // changing the password
